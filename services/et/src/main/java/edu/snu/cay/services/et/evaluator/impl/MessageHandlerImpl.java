@@ -42,6 +42,7 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -58,6 +59,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   private static final int NUM_TBL_ACS_MSG_THREADS = 8;
   private static final int NUM_CHKP_THREADS = 8;
   private static final int NUM_TASKLET_MSG_THREADS = 4;
+  private static final int NUM_DATA_LOAD_THREADS = 4;
 
   private final ExecutorService tableCtrMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_TBL_CTR_MSG_THREADS);
   private final ExecutorService migrationMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_MIGRATION_MSG_THREADS);
@@ -65,6 +67,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   private final ExecutorService tableAccessMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_TBL_ACS_MSG_THREADS);
   private final ExecutorService chkpMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_CHKP_THREADS);
   private final ExecutorService taskletMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_TASKLET_MSG_THREADS);
+  private final ExecutorService dataLoadExecutor = CatchableExecutors.newFixedThreadPool(NUM_DATA_LOAD_THREADS);
 
   private final InjectionFuture<Tables> tablesFuture;
   private final InjectionFuture<TaskletRuntime> taskletRuntimeFuture;
@@ -208,19 +211,28 @@ public final class MessageHandlerImpl implements MessageHandler {
 
   private void onTableLoadMsg(final long opId, final TableLoadMsg msg) {
     try {
-      final String serializedHdfsSplitInfo = msg.getFileSplit();
+      final List<String> serializedHdfsSplitInfos = msg.getFileSplits();
       final String tableId = msg.getTableId();
       final BulkDataLoader bulkDataLoader = tablesFuture.get().getTableComponents(tableId).getBulkDataLoader();
-      try {
-        bulkDataLoader.load(tableId, serializedHdfsSplitInfo);
-        LOG.log(Level.INFO, "Bulk-loading for Table {0} has been done. opId: {1}", new Object[]{tableId, opId});
 
-        msgSenderFuture.get().sendTableLoadAckMsg(opId, tableId);
-      } catch (IOException e) {
-        throw new RuntimeException("IOException while loading data", e);
-      } catch (NetworkException | TableNotExistException | KeyGenerationException e) {
-        throw new RuntimeException(e);
-      }
+      final AtomicInteger numSplitsToLoad = new AtomicInteger(serializedHdfsSplitInfos.size());
+      serializedHdfsSplitInfos.forEach(serializedHdfsSplitInfo ->
+          dataLoadExecutor.submit(() -> {
+            try {
+              bulkDataLoader.load(tableId, serializedHdfsSplitInfo);
+            } catch (IOException | KeyGenerationException | TableNotExistException e) {
+              throw new RuntimeException("Exception while loading data", e);
+            }
+
+            if (numSplitsToLoad.decrementAndGet() == 0) {
+              LOG.log(Level.INFO, "Bulk-loading for Table {0} has been done. opId: {1}", new Object[]{tableId, opId});
+              try {
+                msgSenderFuture.get().sendTableLoadAckMsg(opId, tableId);
+              } catch (NetworkException e) {
+                throw new RuntimeException(e);
+              }
+            }
+          }));
 
     } catch (TableNotExistException e) {
       throw new RuntimeException(e);

@@ -47,7 +47,7 @@ public interface MessageSender {
    */
   void sendTableLoadMsg(long opId, String executorId,
                         String tableId,
-                        HdfsSplitInfo hdfsSplitInfo);
+                        List<HdfsSplitInfo> hdfsSplitInfos);
 
   /**
    * Sends a TableDropMsg that deletes the table from the executor.

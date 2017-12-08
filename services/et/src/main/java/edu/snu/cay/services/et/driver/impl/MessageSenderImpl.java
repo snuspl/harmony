@@ -30,6 +30,7 @@ import org.apache.reef.tang.formats.ConfigurationSerializer;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -77,7 +78,12 @@ public final class MessageSenderImpl implements MessageSender {
   @Override
   public void sendTableLoadMsg(final long opId, final String executorId,
                                final String tableId,
-                               final HdfsSplitInfo hdfsSplitInfo) {
+                               final List<HdfsSplitInfo> hdfsSplitInfos) {
+    final List<String> serializedFileSplits = new ArrayList<>(hdfsSplitInfos.size());
+    for (final HdfsSplitInfo hdfsSplitInfo : hdfsSplitInfos) {
+      serializedFileSplits.add(HdfsSplitInfoSerializer.serialize(hdfsSplitInfo));
+    }
+
     final byte[] innerMsg = AvroUtils.toBytes(
         TableControlMsg.newBuilder()
             .setType(TableControlMsgType.TableLoadMsg)
@@ -85,7 +91,7 @@ public final class MessageSenderImpl implements MessageSender {
             .setTableLoadMsg(
                 TableLoadMsg.newBuilder()
                     .setTableId(tableId)
-                    .setFileSplit(HdfsSplitInfoSerializer.serialize(hdfsSplitInfo))
+                    .setFileSplits(serializedFileSplits)
                     .build())
             .build(), TableControlMsg.class);
 

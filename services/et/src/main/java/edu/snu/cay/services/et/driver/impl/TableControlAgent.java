@@ -40,6 +40,7 @@ import java.util.logging.Logger;
 @DriverSide
 final class TableControlAgent {
   private static final Logger LOG = Logger.getLogger(TableControlAgent.class.getName());
+  private static final int NUM_SPLIT_PER_EXECUTOR = 4;
 
   private final AtomicLong operationIdCounter = new AtomicLong(0);
 
@@ -115,16 +116,18 @@ final class TableControlAgent {
 
     // let's assume that tables always use this TextInputFormat class,
     // which always returns the exact number of splits as requested
-    final HdfsSplitInfo[] fileSplits = HdfsSplitManager.getSplits(inputPath,
-        TextInputFormat.class.getName(), executorIds.size());
-    LOG.log(Level.INFO, "The number of data splits : {0}", fileSplits.length);
-
-    final Iterator<HdfsSplitInfo> splitIterator = Arrays.asList(fileSplits).iterator();
+    final List<HdfsSplitInfo> fileSplits = Arrays.asList(HdfsSplitManager.getSplits(inputPath,
+        TextInputFormat.class.getName(), executorIds.size() * NUM_SPLIT_PER_EXECUTOR));
+    LOG.log(Level.INFO, "The number of data splits : {0}", fileSplits.size());
 
     final AggregateFuture<Void> resultFuture = new AggregateFuture<>(executorIds.size());
     pendingLoad.put(opId, resultFuture);
 
-    executorIds.forEach(executorId -> msgSender.sendTableLoadMsg(opId, executorId, tableId, splitIterator.next()));
+    int idx = 0;
+    for (final String executorId : executorIds) {
+      msgSender.sendTableLoadMsg(opId, executorId, tableId, fileSplits.subList(idx, idx + NUM_SPLIT_PER_EXECUTOR));
+      idx += NUM_SPLIT_PER_EXECUTOR;
+    }
 
     return resultFuture;
   }

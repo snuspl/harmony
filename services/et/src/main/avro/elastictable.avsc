@@ -168,7 +168,7 @@
   "fields":
   [
     {"name": "tableId", "type": "string"},
-    {"name": "fileSplit", "type": "string"}
+    {"name": "fileSplits", "type": {"type": "array", "items": "string"}}
   ]
 },
 
