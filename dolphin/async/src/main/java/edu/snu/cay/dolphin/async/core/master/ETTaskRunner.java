@@ -18,6 +18,7 @@ package edu.snu.cay.dolphin.async.core.master;
 import edu.snu.cay.dolphin.async.DolphinParameters;
 import edu.snu.cay.dolphin.async.JobLogger;
 import edu.snu.cay.dolphin.async.core.worker.WorkerTasklet;
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.services.et.driver.impl.RunningTasklet;
@@ -62,7 +63,7 @@ public final class ETTaskRunner {
                        final JobMessageObserver jobMessageObserver,
                        final ETMaster etMaster,
                        final WorkerStateManager workerStateManager,
-                       @Parameter(DolphinParameters.DolphinJobId.class) final String jobId,
+                       @Parameter(Parameters.JobId.class) final String jobId,
                        @Parameter(DolphinParameters.NumWorkers.class) final int numWorkers) {
     this.jobLogger = jobLogger;
     this.etMaster = etMaster;

@@ -13,16 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.driver;
+package edu.snu.cay.dolphin.async.jobserver;
 
+import edu.snu.cay.dolphin.jobserver.driver.JobDispatcher;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import org.apache.reef.tang.Injector;
+import org.apache.reef.tang.exceptions.InjectionException;
 
 /**
  * A class for encapsulating a job waiting to be scheduled.
  */
-public final class JobEntity {
+public final class DolphinJobEntity implements JobEntity {
   private final Injector jobInjector;
   private final String jobId;
 
@@ -35,15 +38,15 @@ public final class JobEntity {
   private final TableConfiguration workerTableConf;
   private final String inputPath;
 
-  private JobEntity(final Injector jobInjector,
-                   final String jobId,
-                   final int numServers,
-                   final ExecutorConfiguration serverExecutorConf,
-                   final TableConfiguration serverTableConf,
-                   final int numWorkers,
-                   final ExecutorConfiguration workerExecutorConf,
-                   final TableConfiguration workerTableConf,
-                   final String inputPath) {
+  private DolphinJobEntity(final Injector jobInjector,
+                           final String jobId,
+                           final int numServers,
+                           final ExecutorConfiguration serverExecutorConf,
+                           final TableConfiguration serverTableConf,
+                           final int numWorkers,
+                           final ExecutorConfiguration workerExecutorConf,
+                           final TableConfiguration workerTableConf,
+                           final String inputPath) {
     this.jobInjector = jobInjector;
     this.jobId = jobId;
     this.numServers = numServers;
@@ -55,12 +58,19 @@ public final class JobEntity {
     this.inputPath = inputPath;
   }
 
+  @Override
   public Injector getJobInjector() {
     return jobInjector;
   }
 
+  @Override
   public String getJobId() {
     return jobId;
+  }
+
+  @Override
+  public int getNumRequiredExecutors() {
+    return numServers + numWorkers;
   }
 
   public int getNumServers() {
@@ -87,15 +97,25 @@ public final class JobEntity {
     return workerTableConf;
   }
 
+  @Override
   public String getInputPath() {
     return inputPath;
+  }
+
+  @Override
+  public void executeJob() {
+    try {
+      jobInjector.getInstance(JobDispatcher.class).executeJob(this);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public static Builder newBuilder() {
     return new Builder();
   }
 
-  public static final class Builder implements org.apache.reef.util.Builder<JobEntity> {
+  public static final class Builder implements org.apache.reef.util.Builder<DolphinJobEntity> {
 
     private Injector jobInjector;
     private String jobId;
@@ -158,8 +178,8 @@ public final class JobEntity {
     }
 
     @Override
-    public JobEntity build() {
-      return new JobEntity(jobInjector, jobId, numServers, serverExecutorConf, serverTableConf,
+    public DolphinJobEntity build() {
+      return new DolphinJobEntity(jobInjector, jobId, numServers, serverExecutorConf, serverTableConf,
           numWorkers, workerExecutorConf, workerTableConf, inputPath);
     }
   }

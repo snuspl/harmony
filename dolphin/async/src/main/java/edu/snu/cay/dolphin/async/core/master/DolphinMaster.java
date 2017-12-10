@@ -24,7 +24,7 @@ import edu.snu.cay.dolphin.async.core.worker.ModelEvaluationTasklet;
 import edu.snu.cay.dolphin.async.core.worker.WorkerTasklet;
 import edu.snu.cay.dolphin.async.metric.ETDolphinMetricMsgCodec;
 import edu.snu.cay.dolphin.async.metric.parameters.ServerMetricFlushPeriodMs;
-import edu.snu.cay.dolphin.async.optimizer.api.OptimizationOrchestrator;
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.TaskletConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
@@ -62,7 +62,7 @@ public final class DolphinMaster {
 
   private final long serverMetricFlushPeriodMs;
 
-  private final String dolphinJobId;
+  private final String jobId;
 
   private final boolean offlineModelEval; // whether to perform model evaluation offline or online
   private final String modelTableId;
@@ -72,13 +72,12 @@ public final class DolphinMaster {
   @Inject
   private DolphinMaster(final JobLogger jobLogger,
                         final MetricManager metricManager,
-                        final OptimizationOrchestrator optimizationOrchestrator,
                         final ModelChkpManager modelChkpManager,
                         final ETTaskRunner taskRunner,
                         final ProgressTracker progressTracker,
                         final ConfigurationSerializer confSerializer,
                         final MasterSideMsgHandler masterSideMsgHandler,
-                        @Parameter(DolphinJobId.class) final String dolphinJobId,
+                        @Parameter(Parameters.JobId.class) final String jobId,
                         @Parameter(ModelTableId.class) final String modelTableId,
                         @Parameter(InputTableId.class) final String inputTableId,
                         @Parameter(OfflineModelEvaluation.class) final boolean offlineModelEval,
@@ -92,22 +91,21 @@ public final class DolphinMaster {
     this.progressTracker = progressTracker;
     this.msgHandler = masterSideMsgHandler;
     this.serverMetricFlushPeriodMs = serverMetricFlushPeriodMs;
-    this.dolphinJobId = dolphinJobId;
+    this.jobId = jobId;
     this.modelTableId = modelTableId;
     this.inputTableId = inputTableId;
     this.workerConf = confSerializer.fromString(serializedWorkerConf);
     this.offlineModelEval = offlineModelEval;
-    optimizationOrchestrator.start();
   }
 
   public TaskletConfiguration getWorkerTaskletConf() {
     return TaskletConfiguration.newBuilder()
-        .setId(dolphinJobId + "-" + WorkerTasklet.TASKLET_ID)
+        .setId(jobId + "-" + WorkerTasklet.TASKLET_ID)
         .setTaskletClass(WorkerTasklet.class)
         .setTaskletMsgHandlerClass(WorkerSideMsgHandler.class)
         .setUserParamConf(Configurations.merge(
             Tang.Factory.getTang().newConfigurationBuilder()
-                .bindNamedParameter(DolphinJobId.class, dolphinJobId)
+                .bindNamedParameter(Parameters.JobId.class, jobId)
                 .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
                 .bindNamedParameter(ModelTableId.class, modelTableId)
                 .bindNamedParameter(InputTableId.class, inputTableId)
@@ -118,12 +116,12 @@ public final class DolphinMaster {
 
   public TaskletConfiguration getWorkerTaskletConf(final Class<? extends Tasklet> taskletClass) {
     return TaskletConfiguration.newBuilder()
-        .setId(dolphinJobId + "-" + WorkerTasklet.TASKLET_ID)
+        .setId(jobId + "-" + WorkerTasklet.TASKLET_ID)
         .setTaskletClass(taskletClass)
         .setTaskletMsgHandlerClass(WorkerSideMsgHandler.class)
         .setUserParamConf(Configurations.merge(
             Tang.Factory.getTang().newConfigurationBuilder()
-                .bindNamedParameter(DolphinJobId.class, dolphinJobId)
+                .bindNamedParameter(Parameters.JobId.class, jobId)
                 .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
                 .bindNamedParameter(ModelTableId.class, modelTableId)
                 .bindNamedParameter(InputTableId.class, inputTableId)
@@ -135,7 +133,7 @@ public final class DolphinMaster {
 
   public TaskletConfiguration getServerTaskletConf() {
     return TaskletConfiguration.newBuilder()
-        .setId(dolphinJobId + "-" + ServerTasklet.TASKLET_ID)
+        .setId(jobId + "-" + ServerTasklet.TASKLET_ID)
         .setTaskletClass(ServerTasklet.class)
         .build();
   }

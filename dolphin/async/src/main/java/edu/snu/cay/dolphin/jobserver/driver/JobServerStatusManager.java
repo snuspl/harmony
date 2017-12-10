@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.driver;
+package edu.snu.cay.dolphin.jobserver.driver;
 
 import org.apache.reef.runtime.common.driver.idle.DriverIdleManager;
 import org.apache.reef.runtime.common.driver.idle.DriverIdlenessSource;

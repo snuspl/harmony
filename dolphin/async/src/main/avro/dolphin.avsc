@@ -57,7 +57,6 @@
   "name": "DolphinMsg",
   "fields":
   [
-    {"name": "jobId", "type": "string"},
     {"name": "type", "type": {"type": "enum", "name": "dolphinMsgType",
         "symbols": ["ProgressMsg", "SyncMsg", "ReleaseMsg", "ModelEvalAskMsg", "ModelEvalAnsMsg"]}},
     {"name": "progressMsg", "type": ["null", "ProgressMsg"], "default": null},

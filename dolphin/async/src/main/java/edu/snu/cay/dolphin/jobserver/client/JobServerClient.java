@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.client;
+package edu.snu.cay.dolphin.jobserver.client;
 
 import edu.snu.cay.common.param.Parameters.*;
-import edu.snu.cay.dolphin.async.jobserver.*;
-import edu.snu.cay.dolphin.async.jobserver.driver.DriverSideMsgHandler;
-import edu.snu.cay.dolphin.async.jobserver.driver.JobScheduler;
-import edu.snu.cay.dolphin.async.jobserver.driver.JobServerDriver;
-import edu.snu.cay.dolphin.async.jobserver.driver.JobServerStatusManager;
+import edu.snu.cay.dolphin.jobserver.Parameters;
+import edu.snu.cay.dolphin.jobserver.driver.JobScheduler;
+import edu.snu.cay.dolphin.jobserver.driver.DriverSideMsgHandler;
+import edu.snu.cay.dolphin.jobserver.driver.JobServerDriver;
+import edu.snu.cay.dolphin.jobserver.driver.JobServerStatusManager;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
 import edu.snu.cay.services.et.driver.impl.LoggingMetricReceiver;
 import edu.snu.cay.services.et.metric.configuration.MetricServiceDriverConf;
@@ -36,13 +36,15 @@ import org.apache.reef.io.network.naming.NameServerConfiguration;
 import org.apache.reef.io.network.util.StringIdentifierFactory;
 import org.apache.reef.runtime.local.client.LocalRuntimeConfiguration;
 import org.apache.reef.runtime.yarn.client.YarnClientConfiguration;
-import org.apache.reef.tang.*;
-import org.apache.reef.util.EnvironmentUtils;
-import org.apache.reef.wake.IdentifierFactory;
-
+import org.apache.reef.tang.Configuration;
+import org.apache.reef.tang.Configurations;
+import org.apache.reef.tang.Injector;
+import org.apache.reef.tang.Tang;
 import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.exceptions.InjectionException;
 import org.apache.reef.tang.formats.CommandLine;
+import org.apache.reef.util.EnvironmentUtils;
+import org.apache.reef.wake.IdentifierFactory;
 
 import java.io.IOException;
 import java.util.Arrays;

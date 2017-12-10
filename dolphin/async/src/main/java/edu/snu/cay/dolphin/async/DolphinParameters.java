@@ -23,10 +23,6 @@ import org.apache.reef.tang.annotations.NamedParameter;
  * Dolphin-async specific parameters.
  */
 public final class DolphinParameters {
-  @NamedParameter(doc = "Dolphin job identifier", default_value = "dolphin")
-  public final class DolphinJobId implements Name<String> {
-  }
-
   @NamedParameter(doc = "input table identifier", default_value = InputTableId.DEFAULT_VALUE)
   public final class InputTableId implements Name<String> {
     public static final String DEFAULT_VALUE = "input_table";

@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.driver;
+package edu.snu.cay.dolphin.jobserver.driver;
 
-import edu.snu.cay.dolphin.async.core.master.DolphinMaster;
-import edu.snu.cay.dolphin.async.DolphinMsg;
+import edu.snu.cay.dolphin.jobserver.JobServerMsg;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.tang.InjectionFuture;
@@ -24,9 +23,9 @@ import org.apache.reef.tang.InjectionFuture;
 import javax.inject.Inject;
 
 /**
- * A driver-side message handler for JobServer, which manages multiple {@link DolphinMaster}s.
- * Therefore, it routes messages to an appropriate {@link DolphinMaster}
- * based on {@link edu.snu.cay.dolphin.async.DolphinParameters.DolphinJobId} embedded in incoming {@link DolphinMsg}.
+ * A driver-side message handler for JobServer, which manages multiple {@link JobMaster}s.
+ * Therefore, it routes messages to an appropriate {@link JobMaster}
+ * based on {@link edu.snu.cay.dolphin.jobserver.Parameters.JobId} embedded in incoming {@link JobServerMsg}.
  */
 public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
@@ -39,10 +38,10 @@ public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
   @Override
   public void onNext(final byte[] bytes) {
-    final DolphinMsg dolphinMsg = AvroUtils.fromBytes(bytes, DolphinMsg.class);
+    final JobServerMsg jobServerMsg = AvroUtils.fromBytes(bytes, JobServerMsg.class);
+    final String jobId = jobServerMsg.getJobId().toString();
+    final byte[] jobMsg = jobServerMsg.getJobMsg().array();
 
-    final String jobId = dolphinMsg.getJobId().toString();
-    final DolphinMaster dolphinMaster = jobServerDriverFuture.get().getDolphinMaster(jobId);
-    dolphinMaster.getMsgHandler().onDolphinMsg(dolphinMsg);
+    jobServerDriverFuture.get().getJobMaster(jobId).onMsg(jobMsg);
   }
 }

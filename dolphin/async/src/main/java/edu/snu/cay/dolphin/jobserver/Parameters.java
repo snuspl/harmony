@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver;
+package edu.snu.cay.dolphin.jobserver;
 
 import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
@@ -37,6 +37,10 @@ public final class Parameters {
 
   }
 
+  @NamedParameter(doc = "Job identifier", default_value = "job")
+  public final class JobId implements Name<String> {
+  }
+
   @NamedParameter(doc = "The number of total available resources in a cluster",
       short_name = "num_total_resources")
   public final class NumTotalResources implements Name<Integer> {
@@ -44,7 +48,7 @@ public final class Parameters {
 
   @NamedParameter(doc = "A class of the scheduler",
       short_name = "scheduler",
-      default_value = "edu.snu.cay.dolphin.async.jobserver.driver.FIFOJobScheduler")
+      default_value = "edu.snu.cay.dolphin.jobserver.driver.FIFOJobScheduler")
   public final class SchedulerClass implements Name<String> {
   }
 }

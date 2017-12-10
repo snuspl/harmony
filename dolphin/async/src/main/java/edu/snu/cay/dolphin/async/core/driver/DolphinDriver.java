@@ -19,6 +19,7 @@ import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.async.core.master.DolphinMaster;
 import edu.snu.cay.dolphin.async.DolphinParameters.*;
 import edu.snu.cay.dolphin.async.core.client.ETDolphinLauncher;
+import edu.snu.cay.dolphin.async.optimizer.api.OptimizationOrchestrator;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
 import edu.snu.cay.services.et.configuration.ResourceConfiguration;
@@ -40,7 +41,6 @@ import org.apache.reef.driver.task.FailedTask;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
 import org.apache.reef.io.serialization.SerializableCodec;
-import org.apache.reef.runtime.common.driver.parameters.JobIdentifier;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.Tang;
@@ -86,13 +86,12 @@ public final class DolphinDriver {
   private final TableConfiguration serverTableConf;
   private final String inputPath;
 
-  private final String jobId;
-
   @Inject
   private DolphinDriver(final DolphinMaster dolphinMaster,
                         final ETMaster etMaster,
                         final JobMessageObserver jobMessageObserver,
                         final ConfigurationSerializer confSerializer,
+                        final OptimizationOrchestrator optimizationOrchestrator,
                         @Parameter(OfflineModelEvaluation.class) final boolean offlineModelEval,
                         @Parameter(NumServers.class) final int numServers,
                         @Parameter(ServerMemSize.class) final int serverMemSize,
@@ -110,7 +109,6 @@ public final class DolphinDriver {
                         @Parameter(WorkerHandlerQueueSize.class) final int workerHandlerQueueSize,
                         @Parameter(NumWorkerBlocks.class) final int numWorkerBlocks,
                         @Parameter(NumServerBlocks.class) final int numServerBlocks,
-                        @Parameter(JobIdentifier.class) final String jobId,
                         @Parameter(ETDolphinLauncher.SerializedParamConf.class) final String serializedParamConf,
                         @Parameter(ETDolphinLauncher.SerializedWorkerConf.class) final String serializedWorkerConf,
                         @Parameter(ETDolphinLauncher.SerializedServerConf.class) final String serializedServerConf)
@@ -143,7 +141,7 @@ public final class DolphinDriver {
         numWorkerHandlerThreads, workerHandlerQueueSize);
     this.workerTableConf = buildWorkerTableConf(workerInjector, numWorkerBlocks, userParamConf);
     this.inputPath = workerInjector.getNamedInstance(Parameters.InputDir.class);
-    this.jobId = jobId;
+    optimizationOrchestrator.start();
   }
 
   private static ResourceConfiguration buildResourceConf(final int numCores, final int memSize) {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.client;
+package edu.snu.cay.dolphin.async.jobserver;
 
 import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.dolphin.async.DolphinParameters.*;
@@ -21,10 +21,15 @@ import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
 import edu.snu.cay.dolphin.async.core.client.ETDolphinLauncher;
 import edu.snu.cay.dolphin.async.core.master.DolphinMaster;
 import edu.snu.cay.dolphin.async.core.worker.*;
-import edu.snu.cay.dolphin.async.jobserver.Parameters.*;
+import edu.snu.cay.dolphin.jobserver.Parameters.*;
 import edu.snu.cay.dolphin.async.metric.parameters.ServerMetricFlushPeriodMs;
-import edu.snu.cay.dolphin.async.optimizer.api.OptimizationOrchestrator;
-import edu.snu.cay.dolphin.async.optimizer.impl.DummyOrchestrator;
+import edu.snu.cay.dolphin.jobserver.client.CommandListener;
+import edu.snu.cay.dolphin.jobserver.client.CommandSender;
+import edu.snu.cay.dolphin.jobserver.client.JobServerClient;
+import edu.snu.cay.dolphin.jobserver.driver.JobDispatcher;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntityDecoder;
+import edu.snu.cay.dolphin.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
 import edu.snu.cay.services.et.configuration.parameters.ValueCodec;
@@ -177,7 +182,10 @@ public final class JobLauncher {
                                                    final Configuration userParamConf) {
     return Configurations.merge(masterConf, Tang.Factory.getTang().newConfigurationBuilder()
         .bindNamedParameter(AppIdentifier.class, appId)
-        .bindImplementation(OptimizationOrchestrator.class, DummyOrchestrator.class)
+        .bindImplementation(JobMaster.class, DolphinJobMaster.class)
+        .bindImplementation(JobEntity.class, DolphinJobEntity.class)
+        .bindImplementation(JobEntityDecoder.class, DolphinJobEntityDecoder.class)
+        .bindImplementation(JobDispatcher.class, DolphinJobDispatcher.class)
         .bindNamedParameter(ETDolphinLauncher.SerializedServerConf.class, Configurations.toString(serverConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedWorkerConf.class, Configurations.toString(workerConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedParamConf.class, Configurations.toString(userParamConf))
