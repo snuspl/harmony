@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.async;
 
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import org.apache.reef.tang.annotations.Parameter;
 import sun.misc.JavaLangAccess;
 import sun.misc.SharedSecrets;
@@ -27,7 +28,7 @@ import java.util.logging.Logger;
 
 /**
  * A logger for dolphin jobs, which distinguishes jobs with the injected
- * {@link edu.snu.cay.dolphin.async.DolphinParameters.DolphinJobId}.
+ * {@link edu.snu.cay.dolphin.jobserver.Parameters.JobId}.
  * This class relays log messages to the {@link Logger}, appending job id to log messages.
  */
 public final class JobLogger {
@@ -35,8 +36,8 @@ public final class JobLogger {
   private final Logger logger;
 
   @Inject
-  private JobLogger(@Parameter(DolphinParameters.DolphinJobId.class) final String dolphinJobId) throws IOException {
-    this.msgPrefix = "[JobId: " + dolphinJobId + "] ";
+  private JobLogger(@Parameter(Parameters.JobId.class) final String jobId) throws IOException {
+    this.msgPrefix = "[JobId: " + jobId + "] ";
     this.logger = Logger.getLogger(JobLogger.class.getName());
   }
 

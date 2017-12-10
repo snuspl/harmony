@@ -16,6 +16,8 @@
 package edu.snu.cay.dolphin.async.core.worker;
 
 import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.dolphin.jobserver.JobServerMsg;
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.evaluator.impl.TaskletCustomMsgSender;
 import edu.snu.cay.utils.AvroUtils;
@@ -33,7 +35,7 @@ import java.nio.ByteBuffer;
  */
 @EvaluatorSide
 public final class WorkerSideMsgSender {
-  private final String dolphinJobId;
+  private final String jobId;
   private final String executorId;
   private final TaskletCustomMsgSender taskletCustomMsgSender;
 
@@ -42,10 +44,10 @@ public final class WorkerSideMsgSender {
   @Inject
   private WorkerSideMsgSender(final TaskletCustomMsgSender taskletCustomMsgSender,
                               final SerializableCodec<WorkerGlobalBarrier.State> codec,
-                              @Parameter(DolphinParameters.DolphinJobId.class) final String dolphinJobId,
+                              @Parameter(Parameters.JobId.class) final String jobId,
                               @Parameter(ExecutorIdentifier.class) final String executorId) {
     this.taskletCustomMsgSender = taskletCustomMsgSender;
-    this.dolphinJobId = dolphinJobId;
+    this.jobId = jobId;
     this.executorId = executorId;
     this.codec = codec;
   }
@@ -62,12 +64,11 @@ public final class WorkerSideMsgSender {
         .build();
 
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.ProgressMsg)
         .setProgressMsg(progressMsg)
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class));
+    sendDolphinMsg(dolphinMsg);
   }
 
   /**
@@ -82,12 +83,11 @@ public final class WorkerSideMsgSender {
         .build();
 
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.ProgressMsg)
         .setProgressMsg(progressMsg)
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class));
+    sendDolphinMsg(dolphinMsg);
   }
 
   /**
@@ -103,12 +103,11 @@ public final class WorkerSideMsgSender {
         .build();
 
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.SyncMsg)
         .setSyncMsg(syncMsg)
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class));
+    sendDolphinMsg(dolphinMsg);
   }
 
   /**
@@ -116,10 +115,18 @@ public final class WorkerSideMsgSender {
    */
   void sendModelEvalAskMsg() throws NetworkException {
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.ModelEvalAskMsg)
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class));
+    sendDolphinMsg(dolphinMsg);
+  }
+
+  private void sendDolphinMsg(final DolphinMsg dolphinMsg) {
+    final JobServerMsg jobServerMsg = JobServerMsg.newBuilder()
+        .setJobId(jobId)
+        .setJobMsg(ByteBuffer.wrap(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class)))
+        .build();
+
+    taskletCustomMsgSender.send(AvroUtils.toBytes(jobServerMsg, JobServerMsg.class));
   }
 }

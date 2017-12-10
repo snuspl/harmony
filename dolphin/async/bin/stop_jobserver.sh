@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-CLASS=edu.snu.cay.dolphin.async.jobserver.client.JobServerCloser
+CLASS=edu.snu.cay.dolphin.jobserver.client.JobServerCloser
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $CLASS $*"
 echo $CMD

@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.driver;
+package edu.snu.cay.dolphin.jobserver.driver;
 
-import edu.snu.cay.dolphin.async.jobserver.Parameters;
-import org.apache.reef.tang.InjectionFuture;
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -34,17 +33,13 @@ public final class FIFOJobScheduler implements JobScheduler {
 
   private final Queue<JobEntity> jobWaitingQueue = new ConcurrentLinkedQueue<>();
 
-  private final InjectionFuture<JobServerDriver> jobServerDriverFuture;
-
   private final int numTotalResources;
   private int numAvailableResources;
 
   @Inject
-  private FIFOJobScheduler(@Parameter(Parameters.NumTotalResources.class) final int numTotalResources,
-                           final InjectionFuture<JobServerDriver> jobServerDriverFuture) {
+  private FIFOJobScheduler(@Parameter(Parameters.NumTotalResources.class) final int numTotalResources) {
     this.numTotalResources = numTotalResources;
     this.numAvailableResources = numTotalResources;
-    this.jobServerDriverFuture = jobServerDriverFuture;
   }
 
   /**
@@ -54,7 +49,7 @@ public final class FIFOJobScheduler implements JobScheduler {
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
     // reject a job if it's larger than the total resource size
-    if (numTotalResources < jobEntity.getNumServers() + jobEntity.getNumWorkers()) {
+    if (numTotalResources < jobEntity.getNumRequiredExecutors()) {
       return false;
     }
 
@@ -95,7 +90,7 @@ public final class FIFOJobScheduler implements JobScheduler {
    * @return True it succeed to execute a job
    */
   private boolean tryExecute(final JobEntity jobEntity) {
-    final int numResourcesToUse = jobEntity.getNumWorkers() + jobEntity.getNumServers();
+    final int numResourcesToUse = jobEntity.getNumRequiredExecutors();
 
     final boolean execute = numAvailableResources >= numResourcesToUse;
 
@@ -104,7 +99,7 @@ public final class FIFOJobScheduler implements JobScheduler {
           new Object[]{jobEntity.getJobId(), numAvailableResources, numAvailableResources - numResourcesToUse});
 
       numAvailableResources -= numResourcesToUse;
-      jobServerDriverFuture.get().executeJob(jobEntity);
+      jobEntity.executeJob();
     }
 
     return execute;

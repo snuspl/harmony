@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package edu.snu.cay.dolphin.async.core.client;
+import edu.snu.cay.common.client.JobMessageLogger;
 import edu.snu.cay.dolphin.async.CachedModelAccessor;
 import edu.snu.cay.dolphin.async.DolphinParameters.*;
 import edu.snu.cay.common.param.Parameters.*;

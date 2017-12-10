@@ -19,7 +19,6 @@ import edu.snu.cay.dolphin.async.*;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.InjectionFuture;
-import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 
@@ -31,21 +30,16 @@ import java.util.logging.Level;
 final class MasterSideMsgSender {
   private final JobLogger jobLogger;
 
-  private final String dolphinJobId;
-
   private final InjectionFuture<ETTaskRunner> taskRunnerFuture;
   private final byte[] serializedReleaseMsg;
 
   @Inject
   private MasterSideMsgSender(final JobLogger jobLogger,
-                              final InjectionFuture<ETTaskRunner> taskRunnerFuture,
-                              @Parameter(DolphinParameters.DolphinJobId.class) final String dolphinJobId) {
+                              final InjectionFuture<ETTaskRunner> taskRunnerFuture) {
     this.jobLogger = jobLogger;
     this.taskRunnerFuture = taskRunnerFuture;
-    this.dolphinJobId = dolphinJobId;
 
     this.serializedReleaseMsg = AvroUtils.toBytes(DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.ReleaseMsg)
         .build(), DolphinMsg.class);
   }
@@ -69,7 +63,6 @@ final class MasterSideMsgSender {
    */
   void sendModelEvalAnsMsg(final String workerId, final boolean doNext) {
     final DolphinMsg msg = DolphinMsg.newBuilder()
-        .setJobId(dolphinJobId)
         .setType(dolphinMsgType.ModelEvalAnsMsg)
         .setModelEvalAnsMsg(ModelEvalAnsMsg.newBuilder()
             .setDoNext(doNext).build())

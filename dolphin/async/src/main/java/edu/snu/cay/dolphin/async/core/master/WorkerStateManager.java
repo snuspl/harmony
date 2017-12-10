@@ -80,7 +80,6 @@ public final class WorkerStateManager {
   private WorkerStateManager(final JobLogger jobLogger,
                              final MasterSideMsgSender masterSideMsgSender,
                              @Parameter(DolphinParameters.NumWorkers.class) final int numWorkers,
-                             @Parameter(DolphinParameters.DolphinJobId.class) final String jobId,
                              final SerializableCodec<WorkerGlobalBarrier.State> codec) {
     this.jobLogger = jobLogger;
     this.masterSideMsgSender = masterSideMsgSender;

@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.client;
+package edu.snu.cay.dolphin.jobserver.client;
 
-
-import edu.snu.cay.dolphin.async.jobserver.driver.JobServerDriver;
-import edu.snu.cay.dolphin.async.jobserver.Parameters;
+import edu.snu.cay.dolphin.jobserver.Parameters;
+import edu.snu.cay.dolphin.jobserver.driver.JobServerDriver;
 
 import javax.inject.Inject;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A class for sending a command message from {@link JobLauncher} to {@link JobServerClient}.
+ * A class for sending a command message to {@link JobServerClient}.
  * {@link CommandListener} at {@link JobServerClient} will receive the message.
  * For job submission command, a message contains a serialized job configuration.
  */
-final class CommandSender {
+public final class CommandSender {
 
   private static final Logger LOG = Logger.getLogger(CommandSender.class.getName());
 
@@ -44,7 +46,7 @@ final class CommandSender {
    * a method {@code JobServerDrier.executeJob(String)}.
    * @param serializedConf a serialized job configuration.
    */
-  void sendJobSubmitCommand(final String serializedConf) throws IOException {
+  public void sendJobSubmitCommand(final String serializedConf) throws IOException {
     final String commandMsg = Parameters.SUBMIT_COMMAND + Parameters.COMMAND_DELIMITER + serializedConf;
 
     LOG.log(Level.INFO, "Job command : {0}", new Object[]{Parameters.SUBMIT_COMMAND});

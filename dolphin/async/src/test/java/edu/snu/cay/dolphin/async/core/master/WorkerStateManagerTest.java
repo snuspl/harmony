@@ -158,7 +158,6 @@ public class WorkerStateManagerTest {
     doAnswer(invocation -> {
       final WorkerGlobalBarrier.State state = invocation.getArgumentAt(0, WorkerGlobalBarrier.State.class);
       final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-          .setJobId(JOB_ID)
           .setType(dolphinMsgType.SyncMsg)
           .setSyncMsg(
               SyncMsg.newBuilder()

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver.driver;
+package edu.snu.cay.dolphin.jobserver.driver;
 
 /**
  * A scheduler interface.
@@ -24,7 +24,7 @@ public interface JobScheduler {
   /**
    * Invoke when a new job is submitted from client-side.
    * The job will be scheduled immediately or later, depending of the scheduler policy.
-   * @param jobEntity a {@link JobEntity}
+   * @param jobEntity a job entity
    * @return True if a job is accepted
    */
   boolean onJobArrival(JobEntity jobEntity);
