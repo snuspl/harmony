@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.dolphin.pregel;
 
-import edu.snu.cay.common.centcomm.master.CentCommConfProvider;
 import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.pregel.PregelParameters.*;
 import edu.snu.cay.dolphin.pregel.common.DefaultVertexCodec;
@@ -57,8 +56,6 @@ public final class PregelDriver {
   public static final String MSG_TABLE_1_ID = "Msg_table_1";
   public static final String MSG_TABLE_2_ID = "Msg_table_2";
 
-  static final String CENTCOMM_CLIENT_ID = "CENTCOMM_CLIENT_ID";
-
   private final ETMaster etMaster;
   private final int numWorkers;
   private final String inputDir;
@@ -76,7 +73,6 @@ public final class PregelDriver {
                        @Parameter(WorkerMemSize.class) final int workerMemSize,
                        @Parameter(WorkerNumCores.class) final int workerNumCores,
                        @Parameter(Parameters.InputDir.class) final String inputDir,
-                       final CentCommConfProvider centCommConfProvider,
                        final PregelMaster pregelMaster,
                        final DataParser dataParser,
                        @Parameter(VertexValueCodec.class) final StreamingCodec vertexValueCodec,
@@ -87,7 +83,7 @@ public final class PregelDriver {
     this.numWorkers = numWorkers;
     this.inputDir = inputDir;
     this.pregelMaster = pregelMaster;
-    this.executorConf = buildExecutorConf(workerNumCores, workerMemSize, centCommConfProvider);
+    this.executorConf = buildExecutorConf(workerNumCores, workerMemSize);
     this.vertexTableConf = buildVertexTableConf(dataParser, vertexValueCodec, edgeCodec, VERTEX_TABLE_ID);
     this.msgTable1Conf = buildMsgTableConf(msgValueCodec, MSG_TABLE_1_ID);
     this.msgTable2Conf = buildMsgTableConf(msgValueCodec, MSG_TABLE_2_ID);
@@ -126,8 +122,7 @@ public final class PregelDriver {
   }
 
   private ExecutorConfiguration buildExecutorConf(final int workerNumCores,
-                                                  final int workerMemSize,
-                                                  final CentCommConfProvider centCommConfProvider) {
+                                                  final int workerMemSize) {
     return ExecutorConfiguration.newBuilder()
         .setResourceConf(ResourceConfiguration.newBuilder()
             .setNumCores(workerNumCores)
@@ -139,8 +134,6 @@ public final class PregelDriver {
             .setSenderQueueSize(2048)
             .setNumSenderThreads(4)
             .build())
-        .setUserContextConf(centCommConfProvider.getContextConfiguration())
-        .setUserServiceConf(centCommConfProvider.getServiceConfWithoutNameResolver())
         .build();
   }
 

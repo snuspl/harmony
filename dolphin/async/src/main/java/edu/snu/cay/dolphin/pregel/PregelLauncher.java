@@ -16,7 +16,6 @@
 package edu.snu.cay.dolphin.pregel;
 
 
-import edu.snu.cay.common.centcomm.CentCommConf;
 import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.dolphin.pregel.PregelParameters.*;
 import edu.snu.cay.dolphin.pregel.graph.api.Computation;
@@ -118,14 +117,7 @@ public final class PregelLauncher {
         .bindImplementation(IdentifierFactory.class, StringIdentifierFactory.class)
         .build();
 
-    final Configuration centCommConfiguration = CentCommConf.newBuilder()
-        .addCentCommClient(PregelDriver.CENTCOMM_CLIENT_ID,
-            DriverSideMsgHandler.class, WorkerMsgManager.class)
-        .build()
-        .getDriverConfiguration();
-
-    return Configurations.merge(nameServerConfiguration, nameClientConfiguration, idFactoryImplConfiguration,
-        centCommConfiguration);
+    return Configurations.merge(nameServerConfiguration, nameClientConfiguration, idFactoryImplConfiguration);
   }
 
   public static LauncherStatus launch(final String jobName, final String[] args, final PregelConfiguration pregelConf)
@@ -194,6 +186,7 @@ public final class PregelLauncher {
         .build();
 
     final Configuration etMasterConfiguration = ETDriverConfiguration.CONF
+        .set(ETDriverConfiguration.TASKLET_CUSTOM_MSG_HANDLER, DriverSideMsgHandler.class)
         .set(ETDriverConfiguration.CHKP_COMMIT_PATH, chkpCommitPath)
         .set(ETDriverConfiguration.CHKP_TEMP_PATH, chkpTempPath)
         .build();
