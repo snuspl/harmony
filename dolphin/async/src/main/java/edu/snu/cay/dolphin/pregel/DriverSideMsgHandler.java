@@ -15,20 +15,18 @@
  */
 package edu.snu.cay.dolphin.pregel;
 
-import edu.snu.cay.common.centcomm.avro.CentCommMsg;
+import edu.snu.cay.dolphin.async.core.master.DolphinMaster;
+import edu.snu.cay.dolphin.jobserver.JobServerMsg;
+import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.tang.InjectionFuture;
-import org.apache.reef.wake.EventHandler;
 
 import javax.inject.Inject;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * A driver-side message handler that routes messages to {@link PregelMaster}.
+ * A driver-side message handler that routes messages to {@link DolphinMaster}.
  */
-public final class DriverSideMsgHandler implements EventHandler<CentCommMsg> {
-  private static final Logger LOG = Logger.getLogger(DriverSideMsgHandler.class.getName());
+public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
   private final InjectionFuture<PregelMaster> pregelMasterFuture;
 
@@ -38,15 +36,13 @@ public final class DriverSideMsgHandler implements EventHandler<CentCommMsg> {
   }
 
   @Override
-  public void onNext(final CentCommMsg message) {
+  public void onNext(final byte[] bytes) {
+    final JobServerMsg jobServerMsg = AvroUtils.fromBytes(bytes, JobServerMsg.class);
+    final byte[] jobMsg = jobServerMsg.getJobMsg().array();
 
-    final String sourceId = message.getSourceId().toString();
+    final String srcId = jobServerMsg.getSrcId().toString();
+    final SuperstepResultMsg resultMsg = AvroUtils.fromBytes(jobMsg, SuperstepResultMsg.class);
 
-    LOG.log(Level.INFO, "Received CentComm message {0} from {1}",
-        new Object[]{message, sourceId});
-
-    final SuperstepResultMsg resultMsg = AvroUtils.fromBytes(message.getData().array(), SuperstepResultMsg.class);
-
-    pregelMasterFuture.get().onWorkerMsg(sourceId, resultMsg);
+    pregelMasterFuture.get().onWorkerMsg(srcId, resultMsg);
   }
 }

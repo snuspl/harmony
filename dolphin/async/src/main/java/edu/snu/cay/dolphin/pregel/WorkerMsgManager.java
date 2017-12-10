@@ -15,13 +15,17 @@
  */
 package edu.snu.cay.dolphin.pregel;
 
-import edu.snu.cay.common.centcomm.avro.CentCommMsg;
-import edu.snu.cay.common.centcomm.slave.SlaveSideCentCommMsgSender;
+import edu.snu.cay.dolphin.jobserver.JobServerMsg;
+import edu.snu.cay.dolphin.jobserver.Parameters;
+import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
+import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
+import edu.snu.cay.services.et.evaluator.impl.TaskletCustomMsgSender;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.annotations.audience.EvaluatorSide;
-import org.apache.reef.wake.EventHandler;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
+import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -32,10 +36,10 @@ import java.util.logging.Logger;
  * Master will decide whether the worker continues or not.
  */
 @EvaluatorSide
-final class WorkerMsgManager implements EventHandler<CentCommMsg> {
+final class WorkerMsgManager implements TaskletCustomMsgHandler {
   private static final Logger LOG = Logger.getLogger(WorkerMsgManager.class.getName());
 
-  private final SlaveSideCentCommMsgSender centCommMsgSender;
+  private final TaskletCustomMsgSender taskletCustomMsgSender;
 
   /**
    * This value is updated by the response from master at the end of each superstep.
@@ -45,15 +49,22 @@ final class WorkerMsgManager implements EventHandler<CentCommMsg> {
 
   private volatile CountDownLatch syncLatch;
 
+  private final String jobId;
+  private final String taskletId;
+
   @Inject
-  private WorkerMsgManager(final SlaveSideCentCommMsgSender centCommMsgSender) {
-    this.centCommMsgSender = centCommMsgSender;
+  private WorkerMsgManager(@Parameter(Parameters.JobId.class) final String jobId,
+                           @Parameter(TaskletIdentifier.class) final String taskletId,
+                           final TaskletCustomMsgSender taskletCustomMsgSender) {
+    this.jobId = jobId;
+    this.taskletId = taskletId;
+    this.taskletCustomMsgSender = taskletCustomMsgSender;
   }
 
   @Override
-  public void onNext(final CentCommMsg message) {
-    LOG.log(Level.INFO, "Received CentComm message {0}", message);
-    final SuperstepControlMsg controlMsg = AvroUtils.fromBytes(message.getData().array(), SuperstepControlMsg.class);
+  public void onNext(final byte[] bytes) {
+    final SuperstepControlMsg controlMsg = AvroUtils.fromBytes(bytes, SuperstepControlMsg.class);
+    LOG.log(Level.INFO, "Received superstep control message: {0}", controlMsg);
     onControlMsg(controlMsg);
   }
 
@@ -92,7 +103,13 @@ final class WorkerMsgManager implements EventHandler<CentCommMsg> {
         .setIsNoOngoingMsgs(isNoOngoingMsgs)
         .build();
 
-    centCommMsgSender.send(PregelDriver.CENTCOMM_CLIENT_ID, AvroUtils.toBytes(resultMsg, SuperstepResultMsg.class));
+    final JobServerMsg jobServerMsg = JobServerMsg.newBuilder()
+        .setJobId(jobId)
+        .setSrcId(taskletId)
+        .setJobMsg(ByteBuffer.wrap(AvroUtils.toBytes(resultMsg, SuperstepResultMsg.class)))
+        .build();
+
+    taskletCustomMsgSender.send(AvroUtils.toBytes(jobServerMsg, JobServerMsg.class));
 
     // 3. wait for a response
     try {
