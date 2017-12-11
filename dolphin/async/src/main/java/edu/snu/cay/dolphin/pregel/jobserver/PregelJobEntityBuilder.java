@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.pregel;
+package edu.snu.cay.dolphin.pregel.jobserver;
 
-import edu.snu.cay.common.param.Parameters;
+import edu.snu.cay.dolphin.jobserver.Parameters;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.dolphin.pregel.PregelParameters.*;
 import edu.snu.cay.dolphin.pregel.common.DefaultVertexCodec;
 import edu.snu.cay.dolphin.pregel.common.MessageCodec;
@@ -24,9 +26,6 @@ import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
 import edu.snu.cay.services.et.configuration.ResourceConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
-import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
-import edu.snu.cay.services.et.driver.api.AllocatedTable;
-import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
@@ -35,88 +34,69 @@ import edu.snu.cay.utils.StreamingSerializableCodec;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
 import org.apache.reef.tang.Configuration;
+import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.Tang;
-import org.apache.reef.tang.annotations.Parameter;
-import org.apache.reef.tang.annotations.Unit;
 import org.apache.reef.tang.exceptions.InjectionException;
-import org.apache.reef.wake.EventHandler;
-import org.apache.reef.wake.time.event.StartTime;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 /**
- * Driver code for Pregel applications.
+ * Created by xyzi on 06/12/2017.
  */
-@Unit
-public final class PregelDriver {
-  private final ETMaster etMaster;
-  private final int numWorkers;
-  private final String inputDir;
-  private final ExecutorConfiguration executorConf;
+public final class PregelJobEntityBuilder implements JobEntityBuilder {
 
-  private final PregelMaster pregelMaster;
-
-  private final TableConfiguration vertexTableConf;
-  private final TableConfiguration msgTable1Conf;
-  private final TableConfiguration msgTable2Conf;
+  private final Injector jobInjector;
 
   @Inject
-  private PregelDriver(final ETMaster etMaster,
-                       @Parameter(NumExecutors.class) final int numWorkers,
-                       @Parameter(ExecutorMemSize.class) final int workerMemSize,
-                       @Parameter(ExecutorNumCores.class) final int workerNumCores,
-                       @Parameter(Parameters.InputDir.class) final String inputDir,
-                       final PregelMaster pregelMaster,
-                       final DataParser dataParser,
-                       @Parameter(VertexValueCodec.class) final StreamingCodec vertexValueCodec,
-                       @Parameter(EdgeCodec.class) final StreamingCodec edgeCodec,
-                       @Parameter(MessageValueCodec.class) final StreamingCodec msgValueCodec,
-                       @Parameter(VertexTableId.class) final String vertexTableId,
-                       @Parameter(MessageTableId.class) final String messageTableId)
-      throws IOException, InjectionException {
-    this.etMaster = etMaster;
-    this.numWorkers = numWorkers;
-    this.inputDir = inputDir;
-    this.pregelMaster = pregelMaster;
-    this.executorConf = buildExecutorConf(workerNumCores, workerMemSize);
-    this.vertexTableConf = buildVertexTableConf(dataParser, vertexValueCodec, edgeCodec, vertexTableId);
-    this.msgTable1Conf = buildMsgTableConf(msgValueCodec, messageTableId + 1);
-    this.msgTable2Conf = buildMsgTableConf(msgValueCodec, messageTableId + 2);
+  private PregelJobEntityBuilder(final Injector jobInjector) {
+    this.jobInjector = jobInjector;
   }
 
-  public final class StartHandler implements EventHandler<StartTime> {
+  @Override
+  public JobEntity build() throws InjectionException, IOException {
+    // generate different dolphin job id for each job
+    final int jobCount = JOB_COUNTER.getAndIncrement();
 
-    @Override
-    public void onNext(final StartTime startTime) {
+    final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
+    final String pregelJobId = appId + "-" + jobCount;
+    final String vertexTableId = VertexTableId.DEFAULT_VALUE + jobCount;
+    final String msgTableId = MessageTableId.DEFAULT_VALUE + jobCount;
 
-      final List<AllocatedExecutor> executors;
+    final int workerNumCores = jobInjector.getNamedInstance(ExecutorNumCores.class);
+    final int workerMemSize = jobInjector.getNamedInstance(ExecutorMemSize.class);
 
-      try {
-        executors = etMaster.addExecutors(numWorkers, executorConf).get();
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
+    final ExecutorConfiguration executorConf = buildExecutorConf(workerNumCores, workerMemSize);
 
-      new Thread(() -> {
-        try {
-          final AllocatedTable msgTable1 = etMaster.createTable(msgTable1Conf, executors).get();
-          final AllocatedTable msgTable2 = etMaster.createTable(msgTable2Conf, executors).get();
-          final AllocatedTable vertexTable = etMaster.createTable(vertexTableConf, executors).get();
+    final DataParser dataParser = jobInjector.getInstance(DataParser.class);
+    final StreamingCodec vertexValueCodec = jobInjector.getNamedInstance(VertexValueCodec.class);
+    final StreamingCodec edgeCodec = jobInjector.getNamedInstance(EdgeCodec.class);
 
-          vertexTable.load(executors, inputDir).get();
+    final TableConfiguration vertexTableConf = buildVertexTableConf(dataParser,
+        vertexValueCodec, edgeCodec, vertexTableId);
 
-          pregelMaster.start(executors, vertexTable, msgTable1, msgTable2);
+    final StreamingCodec msgValueCodec = jobInjector.getNamedInstance(MessageValueCodec.class);
 
-          executors.forEach(AllocatedExecutor::close);
+    final TableConfiguration msgTable1Conf = buildMsgTableConf(msgValueCodec, msgTableId + "-" + 1);
+    final TableConfiguration msgTable2Conf = buildMsgTableConf(msgValueCodec, msgTableId + "-" + 2);
 
-        } catch (InterruptedException | ExecutionException e) {
-          throw new RuntimeException(e);
-        }
-      }).start();
-    }
+    final int numWorkers = jobInjector.getNamedInstance(NumExecutors.class);
+    final String inputDir = jobInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
+
+    jobInjector.bindVolatileParameter(Parameters.JobId.class, pregelJobId);
+    jobInjector.bindVolatileParameter(VertexTableId.class, vertexTableId);
+    jobInjector.bindVolatileParameter(MessageTableId.class, msgTableId);
+
+    return PregelJobEntity.newBuilder()
+        .setJobInjector(jobInjector)
+        .setJobId(pregelJobId)
+        .setNumWorkers(numWorkers)
+        .setWorkerExecutorConf(executorConf)
+        .setVertexTableConf(vertexTableConf)
+        .setMsgTable1Conf(msgTable1Conf)
+        .setMsgTable2Conf(msgTable2Conf)
+        .setInputPath(inputDir)
+        .build();
   }
 
   private ExecutorConfiguration buildExecutorConf(final int workerNumCores,
@@ -134,6 +114,7 @@ public final class PregelDriver {
             .build())
         .build();
   }
+
 
   /**
    * Build a configuration of vertex table.

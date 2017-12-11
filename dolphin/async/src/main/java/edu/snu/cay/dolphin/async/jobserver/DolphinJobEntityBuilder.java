@@ -19,7 +19,7 @@ import edu.snu.cay.dolphin.async.DolphinParameters.*;
 import edu.snu.cay.dolphin.async.core.client.ETDolphinLauncher;
 import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
-import edu.snu.cay.dolphin.jobserver.driver.JobEntityDecoder;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
 import edu.snu.cay.services.et.configuration.ResourceConfiguration;
@@ -41,26 +41,22 @@ import org.apache.reef.tang.exceptions.InjectionException;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by xyzi on 06/12/2017.
  */
-public final class DolphinJobEntityDecoder implements JobEntityDecoder {
-  private final AtomicInteger jobCounter = new AtomicInteger(0);
+public final class DolphinJobEntityBuilder implements JobEntityBuilder {
+  private final Injector jobInjector;
 
   @Inject
-  private DolphinJobEntityDecoder() {
-
+  private DolphinJobEntityBuilder(final Injector jobInjector) {
+    this.jobInjector = jobInjector;
   }
 
   @Override
-  public JobEntity from(final Injector jobBaseInjector,
-                        final Configuration jobConf) throws InjectionException, IOException {
-    final Injector jobInjector = jobBaseInjector.forkInjector(jobConf);
-
+  public JobEntity build() throws InjectionException, IOException {
     // generate different dolphin job id for each job
-    final int jobCount = jobCounter.getAndIncrement();
+    final int jobCount = JOB_COUNTER.getAndIncrement();
 
     final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
     final String dolphinJobId = appId + "-" + jobCount;

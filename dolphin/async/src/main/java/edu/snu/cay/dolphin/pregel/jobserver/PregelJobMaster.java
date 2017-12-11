@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async.jobserver;
+package edu.snu.cay.dolphin.pregel.jobserver;
 
-import edu.snu.cay.dolphin.async.DolphinMsg;
-import edu.snu.cay.dolphin.async.core.master.DolphinMaster;
-import edu.snu.cay.dolphin.async.core.master.MasterSideMsgHandler;
 import edu.snu.cay.dolphin.jobserver.driver.JobMaster;
+import edu.snu.cay.dolphin.pregel.PregelMaster;
+import edu.snu.cay.dolphin.pregel.SuperstepResultMsg;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.utils.AvroUtils;
@@ -29,31 +28,28 @@ import java.util.List;
 /**
  * Created by xyzi on 10/12/2017.
  */
-public final class DolphinJobMaster implements JobMaster {
+public final class PregelJobMaster implements JobMaster {
 
-  private final DolphinMaster dolphinMaster;
-  private final MasterSideMsgHandler msgHandler;
+  private final PregelMaster pregelMaster;
 
   @Inject
-  private DolphinJobMaster(final DolphinMaster dolphinMaster,
-                           final MasterSideMsgHandler msgHandler) {
-    this.dolphinMaster = dolphinMaster;
-    this.msgHandler = msgHandler;
+  private PregelJobMaster(final PregelMaster pregelMaster) {
+    this.pregelMaster = pregelMaster;
   }
 
   @Override
   public void onMsg(final String srcId, final byte[] bytes) {
-    final DolphinMsg dolphinMsg = AvroUtils.fromBytes(bytes, DolphinMsg.class);
-    msgHandler.onDolphinMsg(dolphinMsg);
+    final SuperstepResultMsg resultMsg = AvroUtils.fromBytes(bytes, SuperstepResultMsg.class);
+    pregelMaster.onWorkerMsg(srcId, resultMsg);
   }
 
   @Override
   public void start(final List<List<AllocatedExecutor>> executorGroups, final List<AllocatedTable> tables) {
-    final List<AllocatedExecutor> servers = executorGroups.get(0);
-    final List<AllocatedExecutor> workers = executorGroups.get(1);
+    final List<AllocatedExecutor> workers = executorGroups.get(0);
 
-    final AllocatedTable modelTable = tables.get(0);
-    final AllocatedTable inputTable = tables.get(1);
-    dolphinMaster.start(servers, workers, modelTable, inputTable);
+    final AllocatedTable vertexTable = tables.get(0);
+    final AllocatedTable msgTable1 = tables.get(1);
+    final AllocatedTable msgTable2 = tables.get(2);
+    pregelMaster.start(workers, vertexTable, msgTable1, msgTable2);
   }
 }

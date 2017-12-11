@@ -19,6 +19,7 @@ import edu.snu.cay.dolphin.async.*;
 import edu.snu.cay.dolphin.jobserver.JobServerMsg;
 import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
+import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.impl.TaskletCustomMsgSender;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.annotations.audience.EvaluatorSide;
@@ -36,6 +37,8 @@ import java.nio.ByteBuffer;
 @EvaluatorSide
 public final class WorkerSideMsgSender {
   private final String jobId;
+  private final String taskletId;
+
   private final String executorId;
   private final TaskletCustomMsgSender taskletCustomMsgSender;
 
@@ -45,9 +48,11 @@ public final class WorkerSideMsgSender {
   private WorkerSideMsgSender(final TaskletCustomMsgSender taskletCustomMsgSender,
                               final SerializableCodec<WorkerGlobalBarrier.State> codec,
                               @Parameter(Parameters.JobId.class) final String jobId,
+                              @Parameter(TaskletIdentifier.class) final String taskletId,
                               @Parameter(ExecutorIdentifier.class) final String executorId) {
     this.taskletCustomMsgSender = taskletCustomMsgSender;
     this.jobId = jobId;
+    this.taskletId = taskletId;
     this.executorId = executorId;
     this.codec = codec;
   }
@@ -124,6 +129,7 @@ public final class WorkerSideMsgSender {
   private void sendDolphinMsg(final DolphinMsg dolphinMsg) {
     final JobServerMsg jobServerMsg = JobServerMsg.newBuilder()
         .setJobId(jobId)
+        .setSrcId(taskletId)
         .setJobMsg(ByteBuffer.wrap(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class)))
         .build();
 

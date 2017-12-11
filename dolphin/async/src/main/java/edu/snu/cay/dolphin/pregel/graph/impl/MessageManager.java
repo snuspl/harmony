@@ -15,10 +15,11 @@
  */
 package edu.snu.cay.dolphin.pregel.graph.impl;
 
-import edu.snu.cay.dolphin.pregel.PregelDriver;
+import edu.snu.cay.dolphin.pregel.PregelParameters.MessageTableId;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -42,9 +43,10 @@ public final class MessageManager<Long, M> {
   private boolean tableFlag;
 
   @Inject
-  private MessageManager(final TableAccessor tableAccessor) throws TableNotExistException {
-    messageTable1 = tableAccessor.getTable(PregelDriver.MSG_TABLE_1_ID);
-    messageTable2 = tableAccessor.getTable(PregelDriver.MSG_TABLE_2_ID);
+  private MessageManager(final TableAccessor tableAccessor,
+                         @Parameter(MessageTableId.class) final String messageTableId) throws TableNotExistException {
+    messageTable1 = tableAccessor.getTable(messageTableId + "-" + 1);
+    messageTable2 = tableAccessor.getTable(messageTableId + "-" + 2);
     tableFlag = true;
   }
 

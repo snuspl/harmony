@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.jobserver.driver;
 
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.driver.context.FailedContext;
@@ -59,7 +60,8 @@ public final class JobServerDriver {
   private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
   @Inject
-  private JobServerDriver(final JobMessageObserver jobMessageObserver,
+  private JobServerDriver(final ETMaster etMaster,
+                          final JobMessageObserver jobMessageObserver,
                           final Injector jobBaseInjector,
                           final JobServerStatusManager jobServerStatusManager,
                           final JobScheduler jobScheduler)
@@ -142,7 +144,7 @@ public final class JobServerDriver {
         try {
           final String serializedConf = result[1];
           final Configuration jobConf = ConfigurationUtils.fromString(serializedConf);
-          final JobEntity jobEntity = JobEntityDecoder.get(jobConf).from(jobBaseInjector, jobConf);
+          final JobEntity jobEntity = JobEntityBuilder.get(jobBaseInjector, jobConf).build();
 
           final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
 

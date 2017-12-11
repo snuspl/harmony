@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.mlapps.lda;
 
 import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
-import edu.snu.cay.dolphin.async.jobserver.JobLauncher;
+import edu.snu.cay.dolphin.async.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.async.mlapps.lda.LDAParameters.Alpha;
 import edu.snu.cay.dolphin.async.mlapps.lda.LDAParameters.Beta;
 import edu.snu.cay.dolphin.async.mlapps.lda.LDAParameters.NumTopics;
@@ -37,7 +37,7 @@ public final class LDAJob {
   }
 
   public static void main(final String[] args) {
-    JobLauncher.submitJob("LDA", args, ETDolphinConfiguration.newBuilder()
+    DolphinJobLauncher.submitJob("LDA", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(LDATrainer.class)
         .setInputParserClass(LDAETDataParser.class)
         .setInputKeyCodecClass(StreamingSerializableCodec.class)

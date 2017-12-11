@@ -24,17 +24,17 @@ import org.apache.reef.tang.annotations.NamedParameter;
  */
 public final class PregelParameters {
 
-  @NamedParameter(doc = "The number of workers", short_name = "num_workers")
-  public final class NumWorkers implements Name<Integer> {
+  @NamedParameter(doc = "The number of executors", short_name = "num_executors")
+  public final class NumExecutors implements Name<Integer> {
 
   }
 
-  @NamedParameter(doc = "Desired memory size for each worker evaluator (MBs)", short_name = "worker_mem_size")
-  public final class WorkerMemSize implements Name<Integer> {
+  @NamedParameter(doc = "Desired memory size for each executor (MBs)", short_name = "executor_mem_size")
+  public final class ExecutorMemSize implements Name<Integer> {
   }
 
-  @NamedParameter(doc = "The number of CPU cores for each worker evaluator", short_name = "worker_num_cores")
-  public final class WorkerNumCores implements Name<Integer> {
+  @NamedParameter(doc = "The number of CPU cores for each executor", short_name = "executor_num_cores")
+  public final class ExecutorNumCores implements Name<Integer> {
 
   }
 
@@ -56,5 +56,21 @@ public final class PregelParameters {
   @NamedParameter(doc = "The codec class for encoding and decoding edge values")
   public final class EdgeCodec implements Name<StreamingCodec> {
 
+  }
+
+  @NamedParameter(doc = "Vertex table identifier", default_value = VertexTableId.DEFAULT_VALUE)
+  public final class VertexTableId implements Name<String> {
+    public static final String DEFAULT_VALUE = "vertex_table";
+
+    private VertexTableId() {
+    }
+  }
+
+  @NamedParameter(doc = "Message table identifier", default_value = MessageTableId.DEFAULT_VALUE)
+  public final class MessageTableId implements Name<String> {
+    public static final String DEFAULT_VALUE = "msg_table";
+
+    private MessageTableId() {
+    }
   }
 }

@@ -73,7 +73,7 @@ public final class PregelLauncher {
         ChkpCommitPath.class, ChkpTempPath.class);
 
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(
-        InputDir.class, NumWorkers.class, WorkerMemSize.class, WorkerNumCores.class);
+        InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
 
     final CommandLine cl = new CommandLine();
     clientParamList.forEach(cl::registerShortNameOfClass);

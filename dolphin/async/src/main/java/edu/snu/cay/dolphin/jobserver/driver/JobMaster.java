@@ -29,7 +29,7 @@ public interface JobMaster {
    * Returns a msg handler, which handles a byte msg.
    * It should be called when driver-side msg handler has been called.
    */
-  void onMsg(byte[] bytes);
+  void onMsg(String srcId, byte[] bytes);
 
   /**
    * Start running a job with given executors and tables.

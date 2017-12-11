@@ -71,7 +71,7 @@ public final class ETTaskRunner {
     this.etDolphinMasterFuture = dolphinMasterFuture;
     this.workerStateManager = workerStateManager;
     this.jobId = jobId;
-    jobLogger.log(Level.INFO, "Initialized with NumWorkers: {0}", numWorkers);
+    jobLogger.log(Level.INFO, "Initialized with NumExecutors: {0}", numWorkers);
   }
 
   /**

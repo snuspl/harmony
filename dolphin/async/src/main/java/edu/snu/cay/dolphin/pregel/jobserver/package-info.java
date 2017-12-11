@@ -13,16 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-[
-{
-  "namespace": "edu.snu.cay.dolphin.jobserver",
-  "type": "record",
-  "name": "JobServerMsg",
-  "fields":
-  [
-    {"name": "srcId", "type": "string"},
-    {"name": "jobId", "type": "string"},
-    {"name": "jobMsg", "type": "bytes"}
-  ]
-}
-]
+/**
+ * Classes for the dolphin jobserver, which supports multiple dolphin jobs concurrently.
+ */
+package edu.snu.cay.dolphin.pregel.jobserver;
