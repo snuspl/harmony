@@ -24,8 +24,10 @@ import edu.snu.cay.dolphin.pregel.graph.impl.Partition;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.reef.annotations.audience.EvaluatorSide;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -54,19 +56,21 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
 
   private final WorkerMsgManager workerMsgManager;
 
-  private final TableAccessor tableAccessor;
-
   private final Computation<V, E, M> computation;
+
+  private final Table<Long, Vertex<V, E>, ?> vertexTable;
 
   @Inject
   private PregelWorkerTask(final MessageManager<Long, M> messageManager,
                            final WorkerMsgManager workerMsgManager,
                            final Computation<V, E, M> computation,
-                           final TableAccessor tableAccessor) {
+                           final TableAccessor tableAccessor,
+                           @Parameter(PregelParameters.VertexTableId.class) final String vertexTableId)
+      throws TableNotExistException {
     this.messageManager = messageManager;
     this.workerMsgManager = workerMsgManager;
     this.computation = computation;
-    this.tableAccessor = tableAccessor;
+    this.vertexTable = tableAccessor.getTable(vertexTableId);
   }
 
   @Override
@@ -78,8 +82,6 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
     final ExecutorService executorService = CatchableExecutors.newFixedThreadPool(numThreads);
 
     int superStepCount = 0;
-    final Table<Long, Vertex<V, E>, ?> vertexTable = tableAccessor.getTable(PregelDriver.VERTEX_TABLE_ID);
-
     // run supersteps until all vertices halt
     // each loop is a superstep
     while (true) {

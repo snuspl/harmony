@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.mlapps.mlr;
 
 import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
-import edu.snu.cay.dolphin.async.jobserver.JobLauncher;
+import edu.snu.cay.dolphin.async.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.async.mlapps.serialization.DenseVectorCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 
@@ -34,7 +34,7 @@ public final class MLRJob {
   }
 
   public static void main(final String[] args) {
-    JobLauncher.submitJob("MLR", args, ETDolphinConfiguration.newBuilder()
+    DolphinJobLauncher.submitJob("MLR", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(MLRTrainer.class)
         .setInputParserClass(MLRETDataParser.class)
         .setInputKeyCodecClass(StreamingSerializableCodec.class)

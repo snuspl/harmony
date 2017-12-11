@@ -84,7 +84,7 @@ public final class WorkerStateManager {
     this.jobLogger = jobLogger;
     this.masterSideMsgSender = masterSideMsgSender;
     this.numWorkers = numWorkers;
-    jobLogger.log(Level.INFO, "Initialized with NumWorkers: {0}", numWorkers);
+    jobLogger.log(Level.INFO, "Initialized with NumExecutors: {0}", numWorkers);
     this.codec = codec;
     this.stateMachine = initStateMachine();
   }
@@ -273,7 +273,7 @@ public final class WorkerStateManager {
       if (localState.equals(WorkerGlobalBarrier.State.INIT)) {
         blockWorker(workerId);
 
-        // collect worker ids until it reaches NumWorkers
+        // collect worker ids until it reaches NumExecutors
         runningWorkerIds.add(workerId);
 
         jobLogger.log(Level.INFO, "Worker {0} is initialized. [{1} / {2}]",

@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.mlapps.lasso;
 
 import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
-import edu.snu.cay.dolphin.async.jobserver.JobLauncher;
+import edu.snu.cay.dolphin.async.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.async.mlapps.serialization.DenseVectorCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 
@@ -32,7 +32,7 @@ public final class LassoJob {
   }
 
   public static void main(final String[] args) {
-    JobLauncher.submitJob("Lasso", args, ETDolphinConfiguration.newBuilder()
+    DolphinJobLauncher.submitJob("Lasso", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(LassoTrainer.class)
         .setInputParserClass(LassoETParser.class)
         .setInputKeyCodecClass(StreamingSerializableCodec.class)

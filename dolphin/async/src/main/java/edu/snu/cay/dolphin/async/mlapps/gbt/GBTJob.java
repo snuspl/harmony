@@ -17,7 +17,7 @@ package edu.snu.cay.dolphin.async.mlapps.gbt;
 
 
 import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
-import edu.snu.cay.dolphin.async.jobserver.JobLauncher;
+import edu.snu.cay.dolphin.async.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.async.mlapps.serialization.GBTreeCodec;
 import edu.snu.cay.dolphin.async.mlapps.serialization.GBTreeListCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
@@ -33,7 +33,7 @@ public final class GBTJob {
   }
 
   public static void main(final String[] args) {
-    JobLauncher.submitJob("GBT", args, ETDolphinConfiguration.newBuilder()
+    DolphinJobLauncher.submitJob("GBT", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(GBTTrainer.class)
         .setInputParserClass(GBTETDataParser.class)
         .setInputKeyCodecClass(StreamingSerializableCodec.class)

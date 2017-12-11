@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.pregel;
 
+import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.common.util.TaskletUtils;
 import edu.snu.cay.services.et.configuration.TaskletConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
@@ -25,6 +26,8 @@ import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.annotations.audience.DriverSide;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.Configuration;
+import org.apache.reef.tang.Configurations;
+import org.apache.reef.tang.Tang;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -61,19 +64,30 @@ public final class PregelMaster {
 
   private final int numWorkers;
   private final AtomicInteger workerCounter = new AtomicInteger(0);
+
   private final Configuration taskConf;
+  private final String vertexTableId;
+  private final String msgTableId;
+
+  private final String jobId;
 
   private final Map<String, RunningTasklet> runningTaskletMap = new ConcurrentHashMap<>();
 
   @Inject
   private PregelMaster(@Parameter(PregelParameters.SerializedTaskletConf.class) final String serializedTaskConf,
-                       @Parameter(PregelParameters.NumWorkers.class) final int numWorkers) throws IOException {
+                       @Parameter(PregelParameters.VertexTableId.class) final String vertexTableId,
+                       @Parameter(PregelParameters.MessageTableId.class) final String msgTableId,
+                       @Parameter(Parameters.JobId.class) final String jobId,
+                       @Parameter(PregelParameters.NumExecutors.class) final int numWorkers) throws IOException {
     this.msgCountDownLatch = new CountDownLatch(numWorkers);
     this.workerIds = Collections.synchronizedSet(new HashSet<String>(numWorkers));
     this.isAllVerticesHalt = true;
     this.isNoOngoingMsgs = true;
     this.numWorkers = numWorkers;
     this.taskConf = ConfigurationUtils.fromString(serializedTaskConf);
+    this.vertexTableId = vertexTableId;
+    this.msgTableId = msgTableId;
+    this.jobId = jobId;
   }
 
   public void start(final List<AllocatedExecutor> executors,
@@ -83,7 +97,7 @@ public final class PregelMaster {
     initControlThread();
 
     final List<Future<RunningTasklet>> taskletFutureList = new ArrayList<>();
-    executors.forEach(executor -> taskletFutureList.add(executor.submitTasklet(buildTaskConf())));
+    executors.forEach(executor -> taskletFutureList.add(executor.submitTasklet(buildTaskletConf())));
 
     taskletFutureList.forEach(taskletFuture -> {
       try {
@@ -97,13 +111,18 @@ public final class PregelMaster {
     TaskletUtils.waitAndCheckTaskletResult(taskletFutureList, true);
   }
 
-  private TaskletConfiguration buildTaskConf() {
+  private TaskletConfiguration buildTaskletConf() {
     return TaskletConfiguration.newBuilder()
         .setId(WORKER_PREFIX + workerCounter.getAndIncrement())
         .setTaskletClass(PregelWorkerTask.class)
         .setTaskletMsgHandlerClass(WorkerMsgManager.class)
-        .setUserParamConf(taskConf)
-        .build();
+        .setUserParamConf(Configurations.merge(
+            Tang.Factory.getTang().newConfigurationBuilder()
+                .bindNamedParameter(Parameters.JobId.class, jobId)
+                .bindNamedParameter(PregelParameters.VertexTableId.class, vertexTableId)
+                .bindNamedParameter(PregelParameters.MessageTableId.class, msgTableId)
+                .build(),
+            taskConf)).build();
   }
 
   private void initControlThread() {

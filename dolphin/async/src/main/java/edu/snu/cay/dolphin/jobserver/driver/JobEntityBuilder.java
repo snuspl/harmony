@@ -17,25 +17,26 @@ package edu.snu.cay.dolphin.jobserver.driver;
 
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.Injector;
-import org.apache.reef.tang.Tang;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by xyzi on 08/12/2017.
  */
-public interface JobEntityDecoder {
+public interface JobEntityBuilder {
+  AtomicInteger JOB_COUNTER = new AtomicInteger(0);
 
-  static JobEntityDecoder get(final Configuration jobConf) throws InjectionException {
-    return Tang.Factory.getTang().newInjector(jobConf).getInstance(JobEntityDecoder.class);
+  static JobEntityBuilder get(final Injector jobBaseInjector, final Configuration jobConf) throws InjectionException {
+    final Injector jobInjector = jobBaseInjector.forkInjector(jobConf);
+    return jobInjector.getInstance(JobEntityBuilder.class);
   }
 
   /**
    * Build a JobEntityImpl from a given job configuration.
-   * @param jobConf a job configuration
    * @return a decoded {@link JobEntity}
    * @throws InjectionException
    */
-  JobEntity from(Injector jobBaseInjector, Configuration jobConf) throws InjectionException, IOException;
+  JobEntity build() throws InjectionException, IOException;
 }

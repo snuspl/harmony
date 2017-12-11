@@ -28,7 +28,7 @@ import edu.snu.cay.dolphin.jobserver.client.CommandSender;
 import edu.snu.cay.dolphin.jobserver.client.JobServerClient;
 import edu.snu.cay.dolphin.jobserver.driver.JobDispatcher;
 import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
-import edu.snu.cay.dolphin.jobserver.driver.JobEntityDecoder;
+import edu.snu.cay.dolphin.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.dolphin.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
@@ -59,12 +59,12 @@ import static edu.snu.cay.utils.ConfigurationUtils.extractParameterConf;
  * args and dolphin configuration for {@link #submitJob(String, String[], ETDolphinConfiguration)}.
  */
 @ClientSide
-public final class JobLauncher {
+public final class DolphinJobLauncher {
 
-  private static final Logger LOG = Logger.getLogger(JobLauncher.class.getName());
+  private static final Logger LOG = Logger.getLogger(DolphinJobLauncher.class.getName());
 
   // utility class should not be instantiated
-  private JobLauncher() {
+  private DolphinJobLauncher() {
 
   }
 
@@ -184,7 +184,7 @@ public final class JobLauncher {
         .bindNamedParameter(AppIdentifier.class, appId)
         .bindImplementation(JobMaster.class, DolphinJobMaster.class)
         .bindImplementation(JobEntity.class, DolphinJobEntity.class)
-        .bindImplementation(JobEntityDecoder.class, DolphinJobEntityDecoder.class)
+        .bindImplementation(JobEntityBuilder.class, DolphinJobEntityBuilder.class)
         .bindImplementation(JobDispatcher.class, DolphinJobDispatcher.class)
         .bindNamedParameter(ETDolphinLauncher.SerializedServerConf.class, Configurations.toString(serverConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedWorkerConf.class, Configurations.toString(workerConf))

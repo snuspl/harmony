@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.mlapps.nmf;
 
 import edu.snu.cay.dolphin.async.core.client.ETDolphinConfiguration;
-import edu.snu.cay.dolphin.async.jobserver.JobLauncher;
+import edu.snu.cay.dolphin.async.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.async.mlapps.serialization.DenseVectorCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 
@@ -34,7 +34,7 @@ public final class NMFJob {
   }
 
   public static void main(final String[] args) {
-    JobLauncher.submitJob("NMF", args, ETDolphinConfiguration.newBuilder()
+    DolphinJobLauncher.submitJob("NMF", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(NMFTrainer.class)
         .setInputParserClass(NMFETDataParser.class)
         .setInputKeyCodecClass(StreamingSerializableCodec.class)
