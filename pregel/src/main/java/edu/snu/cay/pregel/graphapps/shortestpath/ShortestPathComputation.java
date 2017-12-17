@@ -18,6 +18,7 @@ package edu.snu.cay.pregel.graphapps.shortestpath;
 import edu.snu.cay.pregel.graph.api.Edge;
 import edu.snu.cay.pregel.graph.api.Vertex;
 import edu.snu.cay.pregel.graph.impl.AbstractComputation;
+import edu.snu.cay.pregel.graph.impl.MessageManager;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -30,7 +31,9 @@ public final class ShortestPathComputation extends AbstractComputation<Long, Lon
   private final Long sourceId;
 
   @Inject
-  private ShortestPathComputation(@Parameter(SourceId.class) final Long sourceId) {
+  private ShortestPathComputation(final MessageManager<Long, Long> messageManager,
+                                  @Parameter(SourceId.class) final Long sourceId) {
+    super(messageManager);
     this.sourceId = sourceId;
   }
 

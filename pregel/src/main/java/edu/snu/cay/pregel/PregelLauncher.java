@@ -15,9 +15,9 @@
  */
 package edu.snu.cay.pregel;
 
-
 import edu.snu.cay.common.centcomm.CentCommConf;
 import edu.snu.cay.common.param.Parameters.*;
+import edu.snu.cay.pregel.combiner.MessageCombiner;
 import edu.snu.cay.pregel.graph.api.Computation;
 import edu.snu.cay.pregel.PregelParameters.*;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
@@ -151,6 +151,7 @@ public final class PregelLauncher {
       final Configuration taskConf = Configurations.merge(userParamConf,
           Tang.Factory.getTang().newConfigurationBuilder()
               .bindImplementation(Computation.class, pregelConf.getComputationClass())
+              .bindImplementation(MessageCombiner.class, pregelConf.getMessageCombinerClass())
               .build());
 
       // driver configuration
