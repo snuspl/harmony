@@ -18,6 +18,7 @@ package edu.snu.cay.pregel.graphapps.pagerank;
 import edu.snu.cay.pregel.graph.api.Computation;
 import edu.snu.cay.pregel.graph.api.Vertex;
 import edu.snu.cay.pregel.graph.impl.AbstractComputation;
+import edu.snu.cay.pregel.graph.impl.MessageManager;
 
 import javax.inject.Inject;
 
@@ -36,8 +37,8 @@ public final class PagerankComputation extends AbstractComputation<Double, Void,
   private static final int NUM_TOTAL_SUPERSTEP = 10;
 
   @Inject
-  private PagerankComputation() {
-    super();
+  private PagerankComputation(final MessageManager<Long, Double> messageManager) {
+    super(messageManager);
   }
 
   @Override

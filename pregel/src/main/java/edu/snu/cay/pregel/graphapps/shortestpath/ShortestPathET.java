@@ -17,6 +17,7 @@ package edu.snu.cay.pregel.graphapps.shortestpath;
 
 import edu.snu.cay.pregel.PregelConfiguration;
 import edu.snu.cay.pregel.PregelLauncher;
+import edu.snu.cay.pregel.combiner.MinimumLongMessageCombiner;
 import edu.snu.cay.pregel.common.DefaultEdgeCodec;
 import edu.snu.cay.pregel.common.DefaultGraphParser;
 import edu.snu.cay.utils.StreamingSerializableCodec;
@@ -41,6 +42,7 @@ public final class ShortestPathET {
     PregelLauncher.launch(ShortestPathET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
         .setComputationClass(ShortestPathComputation.class)
         .setDataParserClass(DefaultGraphParser.class)
+        .setMessageCombinerClass(MinimumLongMessageCombiner.class)
         .setMessageValueCodecClass(StreamingSerializableCodec.class)
         .setVertexValueCodecClass(StreamingSerializableCodec.class)
         .setEdgeCodecClass(DefaultEdgeCodec.class)
