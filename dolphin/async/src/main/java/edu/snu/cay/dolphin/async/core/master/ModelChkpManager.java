@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.core.master;
 
 import edu.snu.cay.dolphin.async.DolphinParameters;
-import edu.snu.cay.dolphin.async.JobLogger;
+import edu.snu.cay.dolphin.jobserver.JobLogger;
 import edu.snu.cay.services.et.common.util.concurrent.ListenableFuture;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;

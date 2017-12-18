@@ -25,6 +25,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Created by xyzi on 08/12/2017.
  */
+
+/**
+ * A builder interface for {@link JobEntity}.
+ * Users should provide job-specific builder implementation.
+ */
 public interface JobEntityBuilder {
   AtomicInteger JOB_COUNTER = new AtomicInteger(0);
 

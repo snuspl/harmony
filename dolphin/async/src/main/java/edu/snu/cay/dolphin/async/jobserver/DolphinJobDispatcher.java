@@ -21,7 +21,6 @@ import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.tang.InjectionFuture;
-import org.apache.reef.tang.exceptions.InjectionException;
 
 import javax.inject.Inject;
 import java.util.Arrays;
@@ -32,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Created by xyzi on 06/12/2017.
+ * Dolphin's {@link JobDispatcher} implmentation.
  */
 public final class DolphinJobDispatcher implements JobDispatcher {
   private static final Logger LOG = Logger.getLogger(DolphinJobDispatcher.class.getName());
@@ -89,7 +88,7 @@ public final class DolphinJobDispatcher implements JobDispatcher {
 
         try {
           LOG.log(Level.FINE, "Spawn new jobMaster with ID: {0}", jobId);
-          final JobMaster jobMaster = dolphinJobEntity.getJobInjector().getInstance(JobMaster.class);
+          final JobMaster jobMaster = dolphinJobEntity.getJobMaster();
           jobServerDriverFuture.get().putJobMaster(jobId, jobMaster);
 
           final List<List<AllocatedExecutor>> executorGroups = Arrays.asList(servers, workers);
@@ -108,7 +107,7 @@ public final class DolphinJobDispatcher implements JobDispatcher {
           jobSchedulerFuture.get().onJobFinish(workers.size() + servers.size());
         }
 
-      } catch (InterruptedException | ExecutionException | InjectionException e) {
+      } catch (InterruptedException | ExecutionException e) {
         LOG.log(Level.SEVERE, "Exception while running a job");
         throw new RuntimeException(e);
       }

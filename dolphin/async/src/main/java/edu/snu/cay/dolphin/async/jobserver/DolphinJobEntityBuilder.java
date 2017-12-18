@@ -43,7 +43,7 @@ import javax.inject.Inject;
 import java.io.IOException;
 
 /**
- * Created by xyzi on 06/12/2017.
+ * Dolphin's {@link JobEntityBuilder} implementation.
  */
 public final class DolphinJobEntityBuilder implements JobEntityBuilder {
   private final Injector jobInjector;

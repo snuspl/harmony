@@ -17,6 +17,7 @@ package edu.snu.cay.dolphin.async.core.master;
 
 import edu.snu.cay.dolphin.async.*;
 import edu.snu.cay.dolphin.async.core.worker.WorkerGlobalBarrier;
+import edu.snu.cay.dolphin.jobserver.JobLogger;
 import edu.snu.cay.utils.StateMachine;
 import org.apache.reef.annotations.audience.Private;
 import org.apache.reef.io.serialization.Codec;
@@ -84,7 +85,7 @@ public final class WorkerStateManager {
     this.jobLogger = jobLogger;
     this.masterSideMsgSender = masterSideMsgSender;
     this.numWorkers = numWorkers;
-    jobLogger.log(Level.INFO, "Initialized with NumExecutors: {0}", numWorkers);
+    jobLogger.log(Level.INFO, "Initialized with NumWorkers: {0}", numWorkers);
     this.codec = codec;
     this.stateMachine = initStateMachine();
   }
@@ -273,7 +274,7 @@ public final class WorkerStateManager {
       if (localState.equals(WorkerGlobalBarrier.State.INIT)) {
         blockWorker(workerId);
 
-        // collect worker ids until it reaches NumExecutors
+        // collect worker ids until it reaches NumWorkers
         runningWorkerIds.add(workerId);
 
         jobLogger.log(Level.INFO, "Worker {0} is initialized. [{1} / {2}]",

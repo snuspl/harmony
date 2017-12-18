@@ -15,18 +15,16 @@
  */
 package edu.snu.cay.dolphin.jobserver.driver;
 
-import org.apache.reef.tang.Injector;
-
 /**
- * Created by xyzi on 08/12/2017.
+ * A class that encapsulates all information required to execute a job.
  */
 public interface JobEntity {
 
   String getJobId();
 
-  int getNumRequiredExecutors();
+  int getNumExecutors();
 
-  Injector getJobInjector();
+  JobMaster getJobMaster();
 
   String getInputPath();
 

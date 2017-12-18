@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.jobserver.driver;
 
 /**
- * Created by xyzi on 10/12/2017.
+ * An interface for frameworks to specify how to execute a job with given {@link JobEntity}.
  */
 public interface JobDispatcher {
 

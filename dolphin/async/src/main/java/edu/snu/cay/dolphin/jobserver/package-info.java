@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Classes for the jobserver, which supports multiple jobs concurrently.
+ * Classes for the jobserver, which is capable of running multiple jobs concurrently.
  */
 package edu.snu.cay.dolphin.jobserver;

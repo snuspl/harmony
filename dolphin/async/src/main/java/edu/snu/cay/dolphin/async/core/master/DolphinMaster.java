@@ -24,6 +24,7 @@ import edu.snu.cay.dolphin.async.core.worker.ModelEvaluationTasklet;
 import edu.snu.cay.dolphin.async.core.worker.WorkerTasklet;
 import edu.snu.cay.dolphin.async.metric.ETDolphinMetricMsgCodec;
 import edu.snu.cay.dolphin.async.metric.parameters.ServerMetricFlushPeriodMs;
+import edu.snu.cay.dolphin.jobserver.JobLogger;
 import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.TaskletConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;

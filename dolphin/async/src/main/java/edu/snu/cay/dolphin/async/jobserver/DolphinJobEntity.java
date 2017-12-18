@@ -17,13 +17,14 @@ package edu.snu.cay.dolphin.async.jobserver;
 
 import edu.snu.cay.dolphin.jobserver.driver.JobDispatcher;
 import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
+import edu.snu.cay.dolphin.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 /**
- * A class for encapsulating a job waiting to be scheduled.
+ * Dolphin's {@link JobEntity} implementation.
  */
 public final class DolphinJobEntity implements JobEntity {
   private final Injector jobInjector;
@@ -59,8 +60,12 @@ public final class DolphinJobEntity implements JobEntity {
   }
 
   @Override
-  public Injector getJobInjector() {
-    return jobInjector;
+  public JobMaster getJobMaster() {
+    try {
+      return jobInjector.getInstance(JobMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -69,7 +74,7 @@ public final class DolphinJobEntity implements JobEntity {
   }
 
   @Override
-  public int getNumRequiredExecutors() {
+  public int getNumExecutors() {
     return numServers + numWorkers;
   }
 

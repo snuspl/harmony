@@ -20,8 +20,8 @@
   "name": "JobServerMsg",
   "fields":
   [
-    {"name": "srcId", "type": "string"},
     {"name": "jobId", "type": "string"},
+    {"name": "srcId", "type": "string"},
     {"name": "jobMsg", "type": "bytes"}
   ]
 }

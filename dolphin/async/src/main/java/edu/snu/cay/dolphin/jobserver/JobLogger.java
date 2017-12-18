@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package edu.snu.cay.dolphin.async;
+package edu.snu.cay.dolphin.jobserver;
 
-import edu.snu.cay.dolphin.jobserver.Parameters;
 import org.apache.reef.tang.annotations.Parameter;
 import sun.misc.JavaLangAccess;
 import sun.misc.SharedSecrets;

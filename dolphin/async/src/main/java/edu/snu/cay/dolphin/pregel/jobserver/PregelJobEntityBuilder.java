@@ -18,6 +18,7 @@ package edu.snu.cay.dolphin.pregel.jobserver;
 import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.dolphin.jobserver.driver.JobEntity;
 import edu.snu.cay.dolphin.jobserver.driver.JobEntityBuilder;
+import edu.snu.cay.dolphin.pregel.PregelParameters;
 import edu.snu.cay.dolphin.pregel.PregelParameters.*;
 import edu.snu.cay.dolphin.pregel.common.DefaultVertexCodec;
 import edu.snu.cay.dolphin.pregel.common.MessageCodec;
@@ -42,7 +43,7 @@ import javax.inject.Inject;
 import java.io.IOException;
 
 /**
- * Created by xyzi on 06/12/2017.
+ * Pregel's {@link JobEntityBuilder} implementation.
  */
 public final class PregelJobEntityBuilder implements JobEntityBuilder {
 
@@ -55,7 +56,7 @@ public final class PregelJobEntityBuilder implements JobEntityBuilder {
 
   @Override
   public JobEntity build() throws InjectionException, IOException {
-    // generate different dolphin job id for each job
+    // generate different pregel job id for each job
     final int jobCount = JOB_COUNTER.getAndIncrement();
 
     final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
@@ -77,8 +78,10 @@ public final class PregelJobEntityBuilder implements JobEntityBuilder {
 
     final StreamingCodec msgValueCodec = jobInjector.getNamedInstance(MessageValueCodec.class);
 
-    final TableConfiguration msgTable1Conf = buildMsgTableConf(msgValueCodec, msgTableId + "-" + 1);
-    final TableConfiguration msgTable2Conf = buildMsgTableConf(msgValueCodec, msgTableId + "-" + 2);
+    final TableConfiguration msgTable1Conf = buildMsgTableConf(msgValueCodec,
+        msgTableId + PregelParameters.MSG_TABLE_1_ID_POSTFIX);
+    final TableConfiguration msgTable2Conf = buildMsgTableConf(msgValueCodec,
+        msgTableId + PregelParameters.MSG_TABLE_2_ID_POSTFIX);
 
     final int numWorkers = jobInjector.getNamedInstance(NumExecutors.class);
     final String inputDir = jobInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);

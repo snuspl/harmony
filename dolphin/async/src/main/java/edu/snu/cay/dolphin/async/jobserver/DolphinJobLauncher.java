@@ -51,7 +51,7 @@ import java.util.logging.Logger;
 import static edu.snu.cay.utils.ConfigurationUtils.extractParameterConf;
 
 /**
- * A class that submits a specific ML job dynamically to job server via {@link JobServerClient}.
+ * A class that submits a specific Dolphin job dynamically to job server via {@link JobServerClient}.
  * It communicates with {@link JobServerClient}
  * through the connection between {@link CommandSender} and {@link CommandListener}.
  *

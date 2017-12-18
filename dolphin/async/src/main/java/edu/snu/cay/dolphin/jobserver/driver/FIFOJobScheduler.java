@@ -49,7 +49,7 @@ public final class FIFOJobScheduler implements JobScheduler {
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
     // reject a job if it's larger than the total resource size
-    if (numTotalResources < jobEntity.getNumRequiredExecutors()) {
+    if (numTotalResources < jobEntity.getNumExecutors()) {
       return false;
     }
 
@@ -90,7 +90,7 @@ public final class FIFOJobScheduler implements JobScheduler {
    * @return True it succeed to execute a job
    */
   private boolean tryExecute(final JobEntity jobEntity) {
-    final int numResourcesToUse = jobEntity.getNumRequiredExecutors();
+    final int numResourcesToUse = jobEntity.getNumExecutors();
 
     final boolean execute = numAvailableResources >= numResourcesToUse;
 

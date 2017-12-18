@@ -21,12 +21,12 @@ import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import java.util.List;
 
 /**
- * A Dolphin master, which runs a dolphin job with given executors and tables.
+ * A job master, which is a master of each job composed of executors and table.
  */
 public interface JobMaster {
 
   /**
-   * Returns a msg handler, which handles a byte msg.
+   * Upon a msg from a tasklet with {@code srcId} that belong to this job.
    * It should be called when driver-side msg handler has been called.
    */
   void onMsg(String srcId, byte[] bytes);

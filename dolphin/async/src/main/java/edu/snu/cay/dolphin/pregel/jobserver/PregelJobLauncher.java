@@ -45,7 +45,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A class that submits a specific ML job dynamically to job server via {@link JobServerClient}.
+ * A class that submits a specific Pregel job dynamically to job server via {@link JobServerClient}.
  * It communicates with {@link JobServerClient}
  * through the connection between {@link CommandSender} and {@link CommandListener}.
  *

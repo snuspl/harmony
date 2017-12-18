@@ -21,7 +21,6 @@ import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.tang.InjectionFuture;
-import org.apache.reef.tang.exceptions.InjectionException;
 
 import javax.inject.Inject;
 import java.util.Arrays;
@@ -33,7 +32,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Created by xyzi on 06/12/2017.
+ * Pregel's {@link JobDispatcher} implmentation.
  */
 public final class PregelJobDispatcher implements JobDispatcher {
   private static final Logger LOG = Logger.getLogger(PregelJobDispatcher.class.getName());
@@ -90,7 +89,7 @@ public final class PregelJobDispatcher implements JobDispatcher {
 
         try {
           LOG.log(Level.FINE, "Spawn new jobMaster with ID: {0}", jobId);
-          final JobMaster jobMaster = pregelJobEntity.getJobInjector().getInstance(JobMaster.class);
+          final JobMaster jobMaster = pregelJobEntity.getJobMaster();
           jobServerDriverFuture.get().putJobMaster(jobId, jobMaster);
 
           final List<List<AllocatedExecutor>> executorGroups = Collections.singletonList(workers);
@@ -108,7 +107,7 @@ public final class PregelJobDispatcher implements JobDispatcher {
           jobSchedulerFuture.get().onJobFinish(workers.size());
         }
 
-      } catch (InterruptedException | ExecutionException | InjectionException e) {
+      } catch (InterruptedException | ExecutionException e) {
         LOG.log(Level.SEVERE, "Exception while running a job");
         throw new RuntimeException(e);
       }

@@ -23,6 +23,12 @@ import org.apache.reef.tang.annotations.NamedParameter;
  * Pregel specific parameters.
  */
 public final class PregelParameters {
+  public static final String MSG_TABLE_1_ID_POSTFIX = "-1";
+  public static final String MSG_TABLE_2_ID_POSTFIX = "-2";
+
+  private PregelParameters() {
+
+  }
 
   @NamedParameter(doc = "The number of executors", short_name = "num_executors")
   public final class NumExecutors implements Name<Integer> {

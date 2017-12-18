@@ -83,8 +83,8 @@ public final class PregelDriver {
     this.pregelMaster = pregelMaster;
     this.executorConf = buildExecutorConf(workerNumCores, workerMemSize);
     this.vertexTableConf = buildVertexTableConf(dataParser, vertexValueCodec, edgeCodec, vertexTableId);
-    this.msgTable1Conf = buildMsgTableConf(msgValueCodec, messageTableId + 1);
-    this.msgTable2Conf = buildMsgTableConf(msgValueCodec, messageTableId + 2);
+    this.msgTable1Conf = buildMsgTableConf(msgValueCodec, messageTableId + PregelParameters.MSG_TABLE_1_ID_POSTFIX);
+    this.msgTable2Conf = buildMsgTableConf(msgValueCodec, messageTableId + PregelParameters.MSG_TABLE_2_ID_POSTFIX);
   }
 
   public final class StartHandler implements EventHandler<StartTime> {

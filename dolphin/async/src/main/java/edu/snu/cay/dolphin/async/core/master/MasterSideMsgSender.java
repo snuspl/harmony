@@ -16,6 +16,7 @@
 package edu.snu.cay.dolphin.async.core.master;
 
 import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.dolphin.jobserver.JobLogger;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.InjectionFuture;

@@ -16,6 +16,7 @@
 package edu.snu.cay.dolphin.pregel.graph.impl;
 
 import com.google.common.collect.Lists;
+import edu.snu.cay.dolphin.pregel.PregelParameters;
 import edu.snu.cay.dolphin.pregel.PregelParameters.MessageTableId;
 import edu.snu.cay.dolphin.pregel.combiner.MessageCombiner;
 import edu.snu.cay.services.et.evaluator.api.Table;
@@ -64,8 +65,8 @@ public final class MessageManager<Long, M> {
   private MessageManager(final TableAccessor tableAccessor,
                          @Parameter(MessageTableId.class) final String messageTableId,
                          final MessageCombiner<Long, M> messageCombiner) throws TableNotExistException {
-    messageTable1 = tableAccessor.getTable(messageTableId + "-" + 1);
-    messageTable2 = tableAccessor.getTable(messageTableId + "-" + 2);
+    messageTable1 = tableAccessor.getTable(messageTableId + PregelParameters.MSG_TABLE_1_ID_POSTFIX);
+    messageTable2 = tableAccessor.getTable(messageTableId + PregelParameters.MSG_TABLE_2_ID_POSTFIX);
     tableFlag = true;
     this.messageCombiner = messageCombiner;
   }

@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.async.core.master;
 
 import edu.snu.cay.dolphin.async.DolphinParameters;
-import edu.snu.cay.dolphin.async.JobLogger;
+import edu.snu.cay.dolphin.jobserver.JobLogger;
 import edu.snu.cay.dolphin.async.ProgressMsg;
 import edu.snu.cay.dolphin.jobserver.Parameters;
 import edu.snu.cay.utils.StateMachine;

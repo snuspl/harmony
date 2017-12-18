@@ -39,8 +39,10 @@ import java.util.logging.Logger;
 import static edu.snu.cay.dolphin.jobserver.Parameters.*;
 
 /**
- * Driver code for Dolphin on ET.
- * It executes a job or finishes itself upon request from clients.
+ * Driver code for JobServer.
+ * Upon request from client,
+ * 1) it executes a job
+ * 2) or finishes itself.
  */
 @Unit
 public final class JobServerDriver {
