@@ -18,22 +18,22 @@ package edu.snu.cay.dolphin.pregel.graphapps.shortestpath;
 import edu.snu.cay.dolphin.pregel.graph.api.Edge;
 import edu.snu.cay.dolphin.pregel.graph.api.Vertex;
 import edu.snu.cay.dolphin.pregel.graph.impl.AbstractComputation;
+import edu.snu.cay.dolphin.pregel.graph.impl.MessageManager;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
-import java.util.logging.Logger;
 
 /**
  * Implementation of {@link edu.snu.cay.dolphin.pregel.graph.api.Computation} to execute a shortest-path algorithm.
  * It calculates all vertices distances from given {@link SourceId}.
  */
 public final class ShortestPathComputation extends AbstractComputation<Long, Long, Long> {
-
-  private static final Logger LOG = Logger.getLogger(ShortestPathComputation.class.getName());
   private final Long sourceId;
 
   @Inject
-  private ShortestPathComputation(@Parameter(SourceId.class) final Long sourceId) {
+  private ShortestPathComputation(final MessageManager<Long, Long> messageManager,
+                                  @Parameter(SourceId.class) final Long sourceId) {
+    super(messageManager);
     this.sourceId = sourceId;
   }
 

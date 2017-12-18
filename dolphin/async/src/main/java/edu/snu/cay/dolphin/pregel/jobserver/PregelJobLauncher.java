@@ -26,6 +26,7 @@ import edu.snu.cay.dolphin.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.dolphin.jobserver.driver.JobMaster;
 import edu.snu.cay.dolphin.pregel.PregelConfiguration;
 import edu.snu.cay.dolphin.pregel.PregelParameters.*;
+import edu.snu.cay.dolphin.pregel.combiner.MessageCombiner;
 import edu.snu.cay.dolphin.pregel.graph.api.Computation;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.utils.ConfigurationUtils;
@@ -124,6 +125,7 @@ public final class PregelJobLauncher {
   private static Configuration getTaskletConf(final PregelConfiguration pregelConf) throws InjectionException {
     return Tang.Factory.getTang().newConfigurationBuilder()
         .bindImplementation(Computation.class, pregelConf.getComputationClass())
+        .bindImplementation(MessageCombiner.class, pregelConf.getMessageCombinerClass())
         .build();
   }
 

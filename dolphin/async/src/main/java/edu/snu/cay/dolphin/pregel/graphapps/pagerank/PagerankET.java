@@ -17,6 +17,7 @@ package edu.snu.cay.dolphin.pregel.graphapps.pagerank;
 
 import edu.snu.cay.dolphin.pregel.PregelConfiguration;
 import edu.snu.cay.dolphin.pregel.PregelLauncher;
+import edu.snu.cay.dolphin.pregel.combiner.DoubleSumMessageCombiner;
 import edu.snu.cay.dolphin.pregel.common.NoneEdgeValueGraphParser;
 import edu.snu.cay.dolphin.pregel.common.NoneValueEdgeCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
@@ -40,6 +41,7 @@ public final class PagerankET {
     PregelLauncher.launch(PagerankET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
         .setComputationClass(PagerankComputation.class)
         .setDataParserClass(NoneEdgeValueGraphParser.class)
+        .setMessageCombinerClass(DoubleSumMessageCombiner.class)
         .setMessageValueCodecClass(StreamingSerializableCodec.class)
         .setVertexValueCodecClass(StreamingSerializableCodec.class)
         .setEdgeCodecClass(NoneValueEdgeCodec.class)
