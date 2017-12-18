@@ -23,10 +23,10 @@
     <groupId>edu.snu.cay</groupId>
     <artifactId>cay</artifactId>
     <version>0.1-SNAPSHOT</version>
-    <relativePath>../../</relativePath>
+    <relativePath>../</relativePath>
   </parent>
-  <artifactId>dolphin-async</artifactId>
-  <name>Dolphin Async</name>
+  <artifactId>jobserver</artifactId>
+  <name>JobServer</name>
 
   <dependencies>
     <dependency>
