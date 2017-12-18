@@ -20,7 +20,7 @@
  * sent in a fixed time unit, which is called window.
  */
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "ServerMetrics",
   "fields":
@@ -46,7 +46,7 @@
  * Parameter worker metrics are collected and sent in worker's mini-batch unit.
  */
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "ParameterWorkerMetrics",
   "fields":
@@ -103,7 +103,7 @@
  * Mini-batch metrics are used for optimization and all fields are required unless noted otherwise.
  */
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "WorkerMetrics",
   "fields":
@@ -113,7 +113,7 @@
     {"name": "metrics", "type": ["null", "edu.snu.cay.common.metric.avro.Metrics"], "default": null},
 
     // Parameter worker metrics containing pull/push request time split into multiple components (ex. encode time).
-    {"name": "parameterWorkerMetrics", "type": ["null", "edu.snu.cay.dolphin.async.metric.avro.ParameterWorkerMetrics"],
+    {"name": "parameterWorkerMetrics", "type": ["null", "edu.snu.cay.ps.metric.avro.ParameterWorkerMetrics"],
      "default":null},
 
     // number of data processed in unit time
@@ -159,7 +159,7 @@
 },
 
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "BatchMetrics",
   "fields":
@@ -198,7 +198,7 @@
 },
 
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "EpochMetrics",
   "fields":
@@ -232,7 +232,7 @@
 },
 
 {
-  "namespace": "edu.snu.cay.dolphin.async.metric.avro",
+  "namespace": "edu.snu.cay.ps.metric.avro",
   "type": "record",
   "name": "DolphinWorkerMetrics",
   "fields":

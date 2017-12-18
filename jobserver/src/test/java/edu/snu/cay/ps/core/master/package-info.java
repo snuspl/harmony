@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Tests for dolphin-async.
+ * Tests for PS.
  */
 package edu.snu.cay.ps.core.master;

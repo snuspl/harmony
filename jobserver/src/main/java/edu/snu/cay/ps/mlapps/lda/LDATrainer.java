@@ -16,8 +16,8 @@
 package edu.snu.cay.ps.mlapps.lda;
 
 import com.google.common.collect.Table;
-import edu.snu.cay.dolphin.async.*;
-import edu.snu.cay.dolphin.async.core.worker.*;
+import edu.snu.cay.ps.*;
+import edu.snu.cay.ps.core.worker.*;
 import edu.snu.cay.ps.core.worker.ModelAccessor;
 import edu.snu.cay.ps.core.worker.Trainer;
 import edu.snu.cay.ps.mlapps.lda.LDAParameters.*;

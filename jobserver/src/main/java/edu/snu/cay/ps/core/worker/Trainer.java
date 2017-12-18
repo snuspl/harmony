@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.ps.core.worker;
 
-import edu.snu.cay.ps.core.client.ETDolphinConfiguration;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import org.apache.reef.annotations.audience.TaskSide;
 
@@ -23,7 +22,7 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * A trainer of a {@code dolphin-async} application.
+ * A trainer of a {@code PS} application.
  *
  * Classes implementing this interface should consist of
  * a main {@code run} method that is executed once every iteration, as well as
@@ -35,7 +34,7 @@ import java.util.Map;
  * annotation, so that the framework can successfully instantiate the class via dependency injection.
  *
  * Other parameters specified with
- * {@link ETDolphinConfiguration.Builder#addParameterClass(Class)}
+ * {@link edu.snu.cay.ps.core.client.ETDolphinConfiguration.Builder#addParameterClass(Class)}
  * can also be received as constructor parameters, given that the parameter itself is tagged with
  * {@link org.apache.reef.tang.annotations.Parameter} and an actual value is given for the parameter via command line.
  *

@@ -19,9 +19,8 @@ import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.ps.core.client.ETDolphinConfiguration;
 import edu.snu.cay.ps.core.client.ETDolphinLauncher;
 import edu.snu.cay.ps.core.master.DolphinMaster;
-import edu.snu.cay.dolphin.async.core.worker.*;
-import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.ps.core.worker.*;
+import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.ps.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
@@ -30,7 +29,7 @@ import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.jobserver.driver.JobMaster;
-import edu.snu.cay.ps.DolphinParameters;
+import edu.snu.cay.ps.DolphinParameters.*;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
 import edu.snu.cay.services.et.configuration.parameters.ValueCodec;
@@ -128,13 +127,13 @@ public final class DolphinJobLauncher {
 
     // parameters for master
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
-        DolphinParameters.MaxNumEpochs.class, DolphinParameters.NumTotalMiniBatches.class, DolphinParameters.NumWorkers.class, ServerMetricFlushPeriodMs.class
+        MaxNumEpochs.class, NumTotalMiniBatches.class, NumWorkers.class, ServerMetricFlushPeriodMs.class
     );
 
     // commonly used parameters for ML apps
     final List<Class<? extends Name<?>>> commonAppParamList = Arrays.asList(
-        DolphinParameters.NumFeatures.class, DolphinParameters.Lambda.class, DolphinParameters.DecayRate.class, DolphinParameters.DecayPeriod.class, DolphinParameters.StepSize.class,
-        DolphinParameters.ModelGaussian.class, DolphinParameters.NumFeaturesPerPartition.class
+        NumFeatures.class, Lambda.class, DecayRate.class, DecayPeriod.class, StepSize.class,
+        ModelGaussian.class, NumFeaturesPerPartition.class
     );
 
     // user param list is composed by common app parameters and custom app parameters
@@ -143,19 +142,19 @@ public final class DolphinJobLauncher {
 
     // parameters for servers
     final List<Class<? extends Name<?>>> serverParamList = Arrays.asList(
-        DolphinParameters.NumServers.class, DolphinParameters.ServerMemSize.class, DolphinParameters.NumServerCores.class,
-        DolphinParameters.NumServerHandlerThreads.class, DolphinParameters.NumServerSenderThreads.class,
-        DolphinParameters.ServerHandlerQueueSize.class, DolphinParameters.ServerSenderQueueSize.class,
-        DolphinParameters.NumServerBlocks.class, ServerMetricFlushPeriodMs.class
+        NumServers.class, ServerMemSize.class, NumServerCores.class,
+        NumServerHandlerThreads.class, NumServerSenderThreads.class,
+        ServerHandlerQueueSize.class, ServerSenderQueueSize.class,
+        NumServerBlocks.class, ServerMetricFlushPeriodMs.class
     );
 
     // parameters for workers
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
-        DolphinParameters.NumWorkers.class, DolphinParameters.WorkerMemSize.class, DolphinParameters.NumWorkerCores.class,
-        DolphinParameters.NumWorkerHandlerThreads.class, DolphinParameters.NumWorkerSenderThreads.class,
-        DolphinParameters.WorkerHandlerQueueSize.class, DolphinParameters.WorkerSenderQueueSize.class,
-        DolphinParameters.NumWorkerBlocks.class, DolphinParameters.HyperThreadEnabled.class, DolphinParameters.MaxNumEpochs.class,
-        DolphinParameters.NumTotalMiniBatches.class, DolphinParameters.TestDataPath.class, InputDir.class
+        NumWorkers.class, WorkerMemSize.class, NumWorkerCores.class,
+        NumWorkerHandlerThreads.class, NumWorkerSenderThreads.class,
+        WorkerHandlerQueueSize.class, WorkerSenderQueueSize.class,
+        NumWorkerBlocks.class, HyperThreadEnabled.class, MaxNumEpochs.class,
+        NumTotalMiniBatches.class, TestDataPath.class, InputDir.class
     );
 
     final CommandLine cl = new CommandLine();

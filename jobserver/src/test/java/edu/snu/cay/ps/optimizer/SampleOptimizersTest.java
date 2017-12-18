@@ -20,6 +20,7 @@ import edu.snu.cay.ps.optimizer.api.Optimizer;
 import edu.snu.cay.ps.optimizer.impl.DataInfoImpl;
 import edu.snu.cay.ps.optimizer.impl.EvaluatorParametersImpl;
 import edu.snu.cay.ps.optimizer.impl.SampleOptimizers;
+import edu.snu.cay.ps.optimizer.impl.SampleOptimizers.*;
 import edu.snu.cay.ps.optimizer.parameters.Constants;
 import edu.snu.cay.ps.plan.api.Plan;
 import edu.snu.cay.ps.plan.api.TransferStep;
@@ -95,21 +96,21 @@ public final class SampleOptimizersTest {
   }
 
   /**
-   * Tests whether {@link SampleOptimizers.AddOneServerOptimizer} generates correct plan with given eval parameters.
+   * Tests whether {@link AddOneServerOptimizer} generates correct plan with given eval parameters.
    */
   @Test
   public void testAddOneServerOptimizer() throws InjectionException {
-    final Optimizer addOneServerOptimizer = getOptimizer(SampleOptimizers.AddOneServerOptimizer.class);
+    final Optimizer addOneServerOptimizer = getOptimizer(AddOneServerOptimizer.class);
 
     testAddOneOptimizer(addOneServerOptimizer, Constants.NAMESPACE_SERVER);
   }
 
   /**
-   * Tests whether {@link SampleOptimizers.AddOneWorkerOptimizer} generates a correct plan with given eval parameters.
+   * Tests whether {@link AddOneWorkerOptimizer} generates a correct plan with given eval parameters.
    */
   @Test
   public void testAddOneWorkerOptimizer() throws InjectionException {
-    final Optimizer addOneWorkerOptimizer = getOptimizer(SampleOptimizers.AddOneWorkerOptimizer.class);
+    final Optimizer addOneWorkerOptimizer = getOptimizer(AddOneWorkerOptimizer.class);
 
     testAddOneOptimizer(addOneWorkerOptimizer, Constants.NAMESPACE_WORKER);
   }
@@ -145,32 +146,32 @@ public final class SampleOptimizersTest {
   }
 
   /**
-   * Tests whether {@link SampleOptimizers.DeleteOneWorkerOptimizer} generates a correct plan with given eval parameters.
+   * Tests whether {@link DeleteOneWorkerOptimizer} generates a correct plan with given eval parameters.
    */
   @Test
   public void testDeleteOneServerOptimizer() throws InjectionException {
-    final Optimizer deleteOneServerOptimizer = getOptimizer(SampleOptimizers.DeleteOneServerOptimizer.class);
+    final Optimizer deleteOneServerOptimizer = getOptimizer(DeleteOneServerOptimizer.class);
 
     testDeleteOneOptimizer(deleteOneServerOptimizer, Constants.NAMESPACE_SERVER);
   }
 
   /**
-   * Tests whether {@link SampleOptimizers.DeleteOneWorkerOptimizer} generates a correct plan with given eval parameters.
+   * Tests whether {@link DeleteOneWorkerOptimizer} generates a correct plan with given eval parameters.
    */
   @Test
   public void testDeleteOneWorkerOptimizer() throws InjectionException {
-    final Optimizer deleteOneWorkerOptimizer = getOptimizer(SampleOptimizers.DeleteOneWorkerOptimizer.class);
+    final Optimizer deleteOneWorkerOptimizer = getOptimizer(DeleteOneWorkerOptimizer.class);
 
     testDeleteOneOptimizer(deleteOneWorkerOptimizer, Constants.NAMESPACE_WORKER);
   }
 
   /**
-   * Tests whether {@link SampleOptimizers.ExchangeOneOptimizer} generates a correct plan with given eval parameters.
+   * Tests whether {@link ExchangeOneOptimizer} generates a correct plan with given eval parameters.
    * Since it randomly choose the evaluators we cannot verify the plan in fine-grained manner.
    */
   @Test
   public void testExchangeOneOptimizer() throws InjectionException {
-    final Optimizer exchangeOneOptimizer = getOptimizer(SampleOptimizers.ExchangeOneOptimizer.class);
+    final Optimizer exchangeOneOptimizer = getOptimizer(ExchangeOneOptimizer.class);
 
     final Map<String, List<EvaluatorParameters>> evalParamsMap = new HashMap<>();
     evalParamsMap.put(Constants.NAMESPACE_SERVER, evalParamsList);

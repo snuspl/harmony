@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Common serialization classes for ml apps in dolphin-async.
+ * Common serialization classes for ml apps in PS.
  */
 package edu.snu.cay.ps.mlapps.serialization;

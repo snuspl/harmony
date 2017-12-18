@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.ps.core.master;
 
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.ps.DolphinMsg;
 import edu.snu.cay.ps.ModelEvalAnsMsg;

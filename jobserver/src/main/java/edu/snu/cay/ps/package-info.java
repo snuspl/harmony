@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Classes for the {@code dolphin-async} framework.
+ * Classes for the {@code PS} framework.
  */
 package edu.snu.cay.ps;

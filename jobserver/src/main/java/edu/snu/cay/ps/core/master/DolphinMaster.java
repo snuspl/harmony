@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.ps.core.master;
 
-import edu.snu.cay.dolphin.async.*;
 import edu.snu.cay.ps.core.client.ETDolphinLauncher;
 import edu.snu.cay.ps.core.server.ServerTasklet;
 import edu.snu.cay.ps.core.worker.WorkerSideMsgHandler;
@@ -26,7 +25,7 @@ import edu.snu.cay.ps.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.ps.DolphinMsg;
-import edu.snu.cay.ps.DolphinParameters;
+import edu.snu.cay.ps.DolphinParameters.*;
 import edu.snu.cay.services.et.configuration.TaskletConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
@@ -80,9 +79,9 @@ public final class DolphinMaster {
                         final ConfigurationSerializer confSerializer,
                         final MasterSideMsgHandler masterSideMsgHandler,
                         @Parameter(Parameters.JobId.class) final String jobId,
-                        @Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
-                        @Parameter(DolphinParameters.InputTableId.class) final String inputTableId,
-                        @Parameter(DolphinParameters.OfflineModelEvaluation.class) final boolean offlineModelEval,
+                        @Parameter(ModelTableId.class) final String modelTableId,
+                        @Parameter(InputTableId.class) final String inputTableId,
+                        @Parameter(OfflineModelEvaluation.class) final boolean offlineModelEval,
                         @Parameter(ServerMetricFlushPeriodMs.class) final long serverMetricFlushPeriodMs,
                         @Parameter(ETDolphinLauncher.SerializedWorkerConf.class) final String serializedWorkerConf)
       throws IOException, InjectionException {
@@ -108,10 +107,10 @@ public final class DolphinMaster {
         .setUserParamConf(Configurations.merge(
             Tang.Factory.getTang().newConfigurationBuilder()
                 .bindNamedParameter(Parameters.JobId.class, jobId)
-                .bindNamedParameter(DolphinParameters.StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
-                .bindNamedParameter(DolphinParameters.ModelTableId.class, modelTableId)
-                .bindNamedParameter(DolphinParameters.InputTableId.class, inputTableId)
-                .bindNamedParameter(DolphinParameters.OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
+                .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
+                .bindNamedParameter(ModelTableId.class, modelTableId)
+                .bindNamedParameter(InputTableId.class, inputTableId)
+                .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
                 .build(),
             workerConf)).build();
   }
@@ -124,10 +123,10 @@ public final class DolphinMaster {
         .setUserParamConf(Configurations.merge(
             Tang.Factory.getTang().newConfigurationBuilder()
                 .bindNamedParameter(Parameters.JobId.class, jobId)
-                .bindNamedParameter(DolphinParameters.StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
-                .bindNamedParameter(DolphinParameters.ModelTableId.class, modelTableId)
-                .bindNamedParameter(DolphinParameters.InputTableId.class, inputTableId)
-                .bindNamedParameter(DolphinParameters.OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
+                .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
+                .bindNamedParameter(ModelTableId.class, modelTableId)
+                .bindNamedParameter(InputTableId.class, inputTableId)
+                .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
                 .build(),
             workerConf))
         .build();

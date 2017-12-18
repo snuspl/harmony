@@ -16,7 +16,6 @@
 package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.jobserver.JobServerMsg;
-import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.tang.InjectionFuture;
@@ -26,7 +25,7 @@ import javax.inject.Inject;
 /**
  * A driver-side message handler for JobServer, which manages multiple {@link JobMaster}s.
  * Therefore, it routes messages to an appropriate {@link JobMaster}
- * based on {@link Parameters.JobId} embedded in incoming {@link JobServerMsg}.
+ * based on {@link edu.snu.cay.jobserver.Parameters.JobId} embedded in incoming {@link JobServerMsg}.
  */
 public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 

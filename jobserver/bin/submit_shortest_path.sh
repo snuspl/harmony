@@ -16,7 +16,7 @@
 # EXAMPLE USAGE
 # ./submit_shortest_path.sh -num_executors 3 -input file://$(pwd)/inputs/shortest_path -source 0 -executor_mem_size 128 -executor_num_cores 1
 
-SELF_JAR=`echo ../target/dolphin-async-*-shaded.jar`
+SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 
 LOGGING_CONFIG='-Djava.util.logging.config.class=edu.snu.cay.utils.LoggingConfig'
 
@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-JOB=edu.snu.cay.dolphin.pregel.graphapps.shortestpath.ShortestPathJob
+JOB=edu.snu.cay.pregel.graphapps.shortestpath.ShortestPathJob
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $JOB $*"
 echo $CMD

@@ -18,7 +18,7 @@ package edu.snu.cay.ps.core.master;
 import edu.snu.cay.ps.DolphinMsg;
 import edu.snu.cay.ps.DolphinParameters;
 import edu.snu.cay.ps.SyncMsg;
-import edu.snu.cay.dolphin.async.core.worker.*;
+import edu.snu.cay.ps.core.worker.*;
 import edu.snu.cay.ps.core.worker.ModelEvaluator;
 import edu.snu.cay.ps.core.worker.WorkerSideMsgHandler;
 import edu.snu.cay.ps.dolphinMsgType;

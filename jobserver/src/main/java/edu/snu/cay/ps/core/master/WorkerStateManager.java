@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.ps.core.master;
 
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.ps.DolphinParameters;
 import edu.snu.cay.ps.SyncMsg;
 import edu.snu.cay.ps.core.worker.WorkerGlobalBarrier;

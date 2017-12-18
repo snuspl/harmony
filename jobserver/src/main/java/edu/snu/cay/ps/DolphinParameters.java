@@ -20,7 +20,7 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 
 /**
- * Dolphin-async specific parameters.
+ * PS specific parameters.
  */
 public final class DolphinParameters {
   @NamedParameter(doc = "input table identifier", default_value = InputTableId.DEFAULT_VALUE)

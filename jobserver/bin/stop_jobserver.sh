@@ -16,7 +16,7 @@
 # EXAMPLE USAGE
 # ./stop_jobserver.sh 
 
-SELF_JAR=`echo ../target/dolphin-async-*-shaded.jar`
+SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 
 LOGGING_CONFIG='-Djava.util.logging.config.class=edu.snu.cay.utils.LoggingConfig'
 
@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-CLASS=edu.snu.cay.dolphin.jobserver.client.JobServerCloser
+CLASS=edu.snu.cay.jobserver.client.JobServerCloser
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $CLASS $*"
 echo $CMD

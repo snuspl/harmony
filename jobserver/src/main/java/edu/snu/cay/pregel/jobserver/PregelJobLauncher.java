@@ -28,7 +28,7 @@ import edu.snu.cay.pregel.PregelConfiguration;
 import edu.snu.cay.pregel.combiner.MessageCombiner;
 import edu.snu.cay.pregel.graph.api.Computation;
 import edu.snu.cay.pregel.PregelMaster;
-import edu.snu.cay.pregel.PregelParameters;
+import edu.snu.cay.pregel.PregelParameters.*;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.annotations.audience.ClientSide;
@@ -101,7 +101,7 @@ public final class PregelJobLauncher {
       throws IOException {
 
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
-        InputDir.class, PregelParameters.NumExecutors.class, PregelParameters.ExecutorMemSize.class, PregelParameters.ExecutorNumCores.class);
+        InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
 
     final CommandLine cl = new CommandLine();
     masterParamList.forEach(cl::registerShortNameOfClass);
@@ -117,9 +117,9 @@ public final class PregelJobLauncher {
   private static Configuration getMasterConf(final PregelConfiguration pregelConf) {
     return Tang.Factory.getTang().newConfigurationBuilder()
         .bindImplementation(DataParser.class, pregelConf.getDataParserClass())
-        .bindNamedParameter(PregelParameters.VertexValueCodec.class, pregelConf.getVertexValueCodecClass())
-        .bindNamedParameter(PregelParameters.EdgeCodec.class, pregelConf.getEdgeCodecClass())
-        .bindNamedParameter(PregelParameters.MessageValueCodec.class, pregelConf.getMessageValueCodecClass())
+        .bindNamedParameter(VertexValueCodec.class, pregelConf.getVertexValueCodecClass())
+        .bindNamedParameter(EdgeCodec.class, pregelConf.getEdgeCodecClass())
+        .bindNamedParameter(MessageValueCodec.class, pregelConf.getMessageValueCodecClass())
         .build();
   }
 
@@ -143,7 +143,7 @@ public final class PregelJobLauncher {
         .bindImplementation(JobEntity.class, PregelJobEntity.class)
         .bindImplementation(JobEntityBuilder.class, PregelJobEntityBuilder.class)
         .bindImplementation(JobDispatcher.class, PregelJobDispatcher.class)
-        .bindNamedParameter(PregelParameters.SerializedTaskletConf.class, Configurations.toString(taskletConf))
+        .bindNamedParameter(SerializedTaskletConf.class, Configurations.toString(taskletConf))
         .build());
   }
 }

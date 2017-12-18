@@ -16,7 +16,7 @@
 # EXAMPLE USAGE
 # ./submit_lasso.sh -max_num_epochs 300 -num_workers 4 -number_servers 1 -num_mini_batches 9 -num_worker_blocks 9 -features 10 -input file://$(pwd)/sample_lasso -test_data_path file://$(pwd)/sample_lasso_test -lambda 0.5 -step_size 0.1 -decay_rate 0.95 -decay_period 5 -features_per_partition 2 -server_metric_flush_period_ms 1000
 
-SELF_JAR=`echo ../target/dolphin-async-*-shaded.jar`
+SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 
 LOGGING_CONFIG='-Djava.util.logging.config.class=edu.snu.cay.utils.LoggingConfig'
 
@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-ALG=edu.snu.cay.dolphin.async.mlapps.lasso.LassoJob
+ALG=edu.snu.cay.ps.mlapps.lasso.LassoJob
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $ALG $*"
 echo $CMD

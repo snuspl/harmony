@@ -17,7 +17,7 @@ package edu.snu.cay.ps.mlapps.lasso;
 
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
-import edu.snu.cay.ps.DolphinParameters;
+import edu.snu.cay.ps.DolphinParameters.*;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
 import org.apache.reef.tang.annotations.Parameter;
 
@@ -37,8 +37,8 @@ public final class LassoETModelUpdateFunction implements UpdateFunction<Integer,
   private final Random random;
 
   @Inject
-  private LassoETModelUpdateFunction(@Parameter(DolphinParameters.ModelGaussian.class) final double modelGaussian,
-                                     @Parameter(DolphinParameters.NumFeaturesPerPartition.class) final int numFeaturesPerPartition,
+  private LassoETModelUpdateFunction(@Parameter(ModelGaussian.class) final double modelGaussian,
+                                     @Parameter(NumFeaturesPerPartition.class) final int numFeaturesPerPartition,
                                      final VectorFactory vectorFactory) {
     this.numFeaturesPerPartition = numFeaturesPerPartition;
     this.modelGaussian = modelGaussian;

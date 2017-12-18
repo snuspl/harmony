@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.ps.optimizer.impl;
 
-import edu.snu.cay.dolphin.async.*;
 import edu.snu.cay.ps.DolphinParameters;
 import edu.snu.cay.ps.core.master.ETTaskRunner;
 import edu.snu.cay.ps.core.master.ProgressTracker;
@@ -25,7 +24,6 @@ import edu.snu.cay.ps.metric.avro.WorkerMetrics;
 import edu.snu.cay.ps.optimizer.api.OptimizationOrchestrator;
 import edu.snu.cay.ps.optimizer.api.EvaluatorParameters;
 import edu.snu.cay.ps.optimizer.api.Optimizer;
-import edu.snu.cay.dolphin.async.optimizer.parameters.*;
 import edu.snu.cay.ps.optimizer.parameters.*;
 import edu.snu.cay.ps.plan.impl.PlanCompiler;
 import edu.snu.cay.ps.plan.api.Plan;

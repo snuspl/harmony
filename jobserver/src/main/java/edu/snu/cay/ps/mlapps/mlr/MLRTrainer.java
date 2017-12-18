@@ -17,7 +17,7 @@ package edu.snu.cay.ps.mlapps.mlr;
 
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.ps.DolphinParameters;
 import edu.snu.cay.ps.core.worker.ModelAccessor;
 import edu.snu.cay.ps.core.worker.ModelHolder;

@@ -18,7 +18,6 @@ package edu.snu.cay.ps.optimizer.impl.hetero;
 import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.ps.optimizer.api.EvaluatorParameters;
 import edu.snu.cay.ps.optimizer.api.Optimizer;
-import edu.snu.cay.dolphin.async.optimizer.impl.*;
 import edu.snu.cay.ps.optimizer.impl.*;
 import edu.snu.cay.ps.optimizer.parameters.Constants;
 import edu.snu.cay.ps.plan.api.Plan;

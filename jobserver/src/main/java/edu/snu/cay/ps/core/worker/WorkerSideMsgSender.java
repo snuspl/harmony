@@ -15,10 +15,9 @@
  */
 package edu.snu.cay.ps.core.worker;
 
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.jobserver.JobServerMsg;
 import edu.snu.cay.jobserver.Parameters;
-import edu.snu.cay.ps.*;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.impl.TaskletCustomMsgSender;

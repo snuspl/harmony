@@ -16,7 +16,7 @@
 # EXAMPLE USAGE
 # ./submit_lda.sh -input file://$(pwd)/sample_lda -num_workers 4 -number_servers 2 -num_topics 10 -num_vocabs 17935 -max_num_epochs 3 -num_mini_batches 20 -num_worker_blocks 20 -server_metric_flush_period_ms 1000
 
-SELF_JAR=`echo ../target/dolphin-async-*-shaded.jar`
+SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 
 LOGGING_CONFIG='-Djava.util.logging.config.class=edu.snu.cay.utils.LoggingConfig'
 
@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-ALG=edu.snu.cay.dolphin.async.mlapps.lda.LDAJob
+ALG=edu.snu.cay.ps.mlapps.lda.LDAJob
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $ALG $*"
 echo $CMD

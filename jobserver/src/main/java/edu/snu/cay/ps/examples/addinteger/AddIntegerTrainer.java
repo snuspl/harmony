@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.ps.examples.addinteger;
 
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.ps.examples.common.ExampleParameters;
 import edu.snu.cay.ps.core.worker.ModelAccessor;
 import edu.snu.cay.ps.core.worker.Trainer;

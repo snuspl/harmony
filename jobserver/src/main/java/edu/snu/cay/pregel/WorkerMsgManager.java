@@ -70,10 +70,10 @@ final class WorkerMsgManager implements TaskletCustomMsgHandler {
 
   private void onControlMsg(final SuperstepControlMsg msg) {
     switch (msg.getType()) {
-    case ControlMsgType.Start:
+    case Start:
       goNextSuperstep = true;
       break;
-    case ControlMsgType.Stop:
+    case Stop:
       goNextSuperstep = false;
       break;
     default:

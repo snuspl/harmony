@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.pregel;
 
-import edu.snu.cay.ps.core.master.DolphinMaster;
 import edu.snu.cay.jobserver.JobServerMsg;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
@@ -24,7 +23,7 @@ import org.apache.reef.tang.InjectionFuture;
 import javax.inject.Inject;
 
 /**
- * A driver-side message handler that routes messages to {@link DolphinMaster}.
+ * A driver-side message handler that routes messages to {@link PregelMaster}.
  */
 public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 

@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.ps.plan.impl;
 
-import edu.snu.cay.dolphin.async.*;
+import edu.snu.cay.ps.*;
 import edu.snu.cay.ps.DolphinParameters;
 import edu.snu.cay.ps.core.driver.DolphinDriver;
 import edu.snu.cay.ps.core.master.DolphinMaster;

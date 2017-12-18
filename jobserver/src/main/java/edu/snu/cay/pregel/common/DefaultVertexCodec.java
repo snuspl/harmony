@@ -20,7 +20,7 @@ import com.google.common.collect.Lists;
 import edu.snu.cay.pregel.graph.api.Edge;
 import edu.snu.cay.pregel.graph.api.Vertex;
 import edu.snu.cay.pregel.graph.impl.DefaultVertex;
-import edu.snu.cay.pregel.PregelParameters;
+import edu.snu.cay.pregel.PregelParameters.*;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Codec for {@link DefaultVertex}, which is composed of {@link PregelParameters.VertexValueCodec} and {@link PregelParameters.EdgeCodec}.
+ * Codec for {@link DefaultVertex}, which is composed of {@link VertexValueCodec} and {@link EdgeCodec}.
  *
  * Encoding format of vertex is as follows:
  * 1. Vertex w/ value : [ long: vertex id | true | V: vertex value | E: edge | E: edge | E: edge ...],
@@ -49,8 +49,8 @@ public final class DefaultVertexCodec<V, E> implements Codec<Vertex<V, E>>, Stre
   private final StreamingCodec<Edge<E>> edgeCodec;
 
   @Inject
-  private DefaultVertexCodec(@Parameter(PregelParameters.VertexValueCodec.class) final StreamingCodec<V> vertexValueCodec,
-                             @Parameter(PregelParameters.EdgeCodec.class) final StreamingCodec<Edge<E>> edgeCodec) {
+  private DefaultVertexCodec(@Parameter(VertexValueCodec.class) final StreamingCodec<V> vertexValueCodec,
+                             @Parameter(EdgeCodec.class) final StreamingCodec<Edge<E>> edgeCodec) {
     this.vertexValueCodec = vertexValueCodec;
     this.edgeCodec = edgeCodec;
   }

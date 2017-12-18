@@ -17,7 +17,6 @@ package edu.snu.cay.ps.metric;
 
 import edu.snu.cay.common.metric.avro.Metrics;
 import edu.snu.cay.ps.DolphinParameters;
-import edu.snu.cay.dolphin.async.metric.avro.*;
 import edu.snu.cay.ps.metric.avro.*;
 import edu.snu.cay.services.et.avro.MetricMsg;
 import edu.snu.cay.services.et.avro.MetricMsgType;

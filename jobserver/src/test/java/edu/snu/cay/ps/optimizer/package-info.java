@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Optimizer tests for dolphin-async.
+ * Optimizer tests for PS.
  */
 package edu.snu.cay.ps.optimizer;

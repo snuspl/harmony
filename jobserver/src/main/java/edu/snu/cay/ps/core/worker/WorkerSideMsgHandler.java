@@ -16,7 +16,6 @@
 package edu.snu.cay.ps.core.worker;
 
 import edu.snu.cay.ps.DolphinMsg;
-import edu.snu.cay.ps.dolphinMsgType;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
 import edu.snu.cay.utils.CatchableExecutors;
@@ -48,11 +47,11 @@ public final class WorkerSideMsgHandler implements TaskletCustomMsgHandler {
   public void onNext(final byte[] bytes) {
     final DolphinMsg dolphinMsg = AvroUtils.fromBytes(bytes, DolphinMsg.class);
     switch (dolphinMsg.getType()) {
-    case dolphinMsgType.ReleaseMsg:
+    case ReleaseMsg:
       releaseMsgExecutor.submit(workerGlobalBarrier::onReleaseMsg);
       break;
 
-    case dolphinMsgType.ModelEvalAnsMsg:
+    case ModelEvalAnsMsg:
       modelEvalMsgExecutor.submit(() -> modelEvaluator.onMasterMsg(dolphinMsg.getModelEvalAnsMsg()));
       break;
     default:

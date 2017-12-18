@@ -16,6 +16,7 @@
 package edu.snu.cay.pregel;
 
 import edu.snu.cay.common.param.Parameters.*;
+import edu.snu.cay.pregel.PregelParameters.*;
 import edu.snu.cay.pregel.combiner.MessageCombiner;
 import edu.snu.cay.pregel.graph.api.Computation;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
@@ -72,7 +73,7 @@ public final class PregelLauncher {
         ChkpCommitPath.class, ChkpTempPath.class);
 
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(
-        InputDir.class, PregelParameters.NumExecutors.class, PregelParameters.ExecutorMemSize.class, PregelParameters.ExecutorNumCores.class);
+        InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
 
     final CommandLine cl = new CommandLine();
     clientParamList.forEach(cl::registerShortNameOfClass);
@@ -103,9 +104,9 @@ public final class PregelLauncher {
   private static Configuration getMasterConf(final PregelConfiguration pregelConf) throws InjectionException {
     return Tang.Factory.getTang().newConfigurationBuilder()
         .bindImplementation(DataParser.class, pregelConf.getDataParserClass())
-        .bindNamedParameter(PregelParameters.VertexValueCodec.class, pregelConf.getVertexValueCodecClass())
-        .bindNamedParameter(PregelParameters.EdgeCodec.class, pregelConf.getEdgeCodecClass())
-        .bindNamedParameter(PregelParameters.MessageValueCodec.class, pregelConf.getMessageValueCodecClass())
+        .bindNamedParameter(VertexValueCodec.class, pregelConf.getVertexValueCodecClass())
+        .bindNamedParameter(EdgeCodec.class, pregelConf.getEdgeCodecClass())
+        .bindNamedParameter(MessageValueCodec.class, pregelConf.getMessageValueCodecClass())
         .build();
   }
 
@@ -193,7 +194,7 @@ public final class PregelLauncher {
 
     return Configurations.merge(driverConf, etMasterConfiguration, getNCSConfiguration(),
         Tang.Factory.getTang().newConfigurationBuilder()
-            .bindNamedParameter(PregelParameters.SerializedTaskletConf.class, Configurations.toString(taskConf))
+            .bindNamedParameter(SerializedTaskletConf.class, Configurations.toString(taskConf))
             .build());
   }
 }

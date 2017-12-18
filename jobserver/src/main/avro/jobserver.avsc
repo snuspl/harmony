@@ -15,7 +15,7 @@
  */
 [
 {
-  "namespace": "edu.snu.cay.dolphin.jobserver",
+  "namespace": "edu.snu.cay.jobserver",
   "type": "record",
   "name": "JobServerMsg",
   "fields":

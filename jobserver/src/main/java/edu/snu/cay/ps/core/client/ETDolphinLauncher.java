@@ -20,16 +20,14 @@ import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.ps.core.driver.DolphinDriver;
 import edu.snu.cay.ps.core.driver.DriverSideMsgHandler;
 import edu.snu.cay.ps.core.master.ProgressTracker;
-import edu.snu.cay.dolphin.async.core.worker.*;
 import edu.snu.cay.ps.metric.ETDolphinMetricReceiver;
 import edu.snu.cay.ps.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.ps.optimizer.api.Optimizer;
 import edu.snu.cay.ps.optimizer.conf.OptimizerClass;
-import edu.snu.cay.dolphin.async.optimizer.parameters.*;
-import edu.snu.cay.ps.plan.impl.ETPlanExecutorClass;
-import edu.snu.cay.ps.DolphinParameters;
-import edu.snu.cay.ps.core.worker.CachedModelAccessor;
 import edu.snu.cay.ps.optimizer.parameters.*;
+import edu.snu.cay.ps.plan.impl.ETPlanExecutorClass;
+import edu.snu.cay.ps.DolphinParameters.*;
+import edu.snu.cay.ps.core.worker.CachedModelAccessor;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
@@ -133,7 +131,7 @@ public final class ETDolphinLauncher {
 
       final Injector workerParameterInjector = Tang.Factory.getTang().newInjector(workerParamConf);
 
-      final boolean modelCacheEnabled = workerParameterInjector.getNamedInstance(DolphinParameters.ModelCacheEnabled.class);
+      final boolean modelCacheEnabled = workerParameterInjector.getNamedInstance(ModelCacheEnabled.class);
       final Class<? extends ModelAccessor> modelAccessorClass =
           modelCacheEnabled ? CachedModelAccessor.class : ETModelAccessor.class;
 
@@ -209,16 +207,16 @@ public final class ETDolphinLauncher {
 
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(
         // generic params
-        DolphinParameters.NumServers.class, DolphinParameters.ServerMemSize.class, DolphinParameters.NumServerCores.class,
+        NumServers.class, ServerMemSize.class, NumServerCores.class,
         HostToBandwidthFilePath.class, HostToCoreFilePath.class,
-        DolphinParameters.NumWorkers.class, DolphinParameters.WorkerMemSize.class, DolphinParameters.NumWorkerCores.class,
+        NumWorkers.class, WorkerMemSize.class, NumWorkerCores.class,
 
         // ET-specific params
-        DolphinParameters.NumServerHandlerThreads.class, DolphinParameters.NumServerSenderThreads.class,
-        DolphinParameters.ServerHandlerQueueSize.class, DolphinParameters.ServerSenderQueueSize.class,
-        DolphinParameters.NumWorkerHandlerThreads.class, DolphinParameters.NumWorkerSenderThreads.class,
-        DolphinParameters.WorkerHandlerQueueSize.class, DolphinParameters.WorkerSenderQueueSize.class,
-        DolphinParameters.NumServerBlocks.class, DolphinParameters.NumWorkerBlocks.class,
+        NumServerHandlerThreads.class, NumServerSenderThreads.class,
+        ServerHandlerQueueSize.class, ServerSenderQueueSize.class,
+        NumWorkerHandlerThreads.class, NumWorkerSenderThreads.class,
+        WorkerHandlerQueueSize.class, WorkerSenderQueueSize.class,
+        NumServerBlocks.class, NumWorkerBlocks.class,
 
         // optimization params
         DelayAfterOptimizationMs.class, OptimizationIntervalMs.class, OptimizationBenefitThreshold.class,
@@ -234,19 +232,19 @@ public final class ETDolphinLauncher {
         ServerMetricFlushPeriodMs.class,
 
         // model evaluation param
-        DolphinParameters.OfflineModelEvaluation.class);
+        OfflineModelEvaluation.class);
 
     // it's empty now
     final List<Class<? extends Name<?>>> serverParamList = Collections.emptyList();
 
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
-        DolphinParameters.HyperThreadEnabled.class, DolphinParameters.ModelCacheEnabled.class,
-        DolphinParameters.MaxNumEpochs.class, DolphinParameters.NumTotalMiniBatches.class, DolphinParameters.TestDataPath.class);
+        HyperThreadEnabled.class, ModelCacheEnabled.class,
+        MaxNumEpochs.class, NumTotalMiniBatches.class, TestDataPath.class);
 
     // commonly used parameters for ML apps
     final List<Class<? extends Name<?>>> commonAppParamList = Arrays.asList(
-        DolphinParameters.NumFeatures.class, DolphinParameters.Lambda.class, DolphinParameters.DecayRate.class, DolphinParameters.DecayPeriod.class, DolphinParameters.StepSize.class,
-        DolphinParameters.ModelGaussian.class, DolphinParameters.NumFeaturesPerPartition.class
+        NumFeatures.class, Lambda.class, DecayRate.class, DecayPeriod.class, StepSize.class,
+        ModelGaussian.class, NumFeaturesPerPartition.class
     );
 
     // user param list is composed by common app parameters and custom app parameters
@@ -274,8 +272,8 @@ public final class ETDolphinLauncher {
     final Injector commandlineParamInjector = Tang.Factory.getTang().newInjector(commandLineConf);
 
     final Configuration optimizationConf;
-    final int numInitialResources = commandlineParamInjector.getNamedInstance(DolphinParameters.NumWorkers.class)
-        + commandlineParamInjector.getNamedInstance(DolphinParameters.NumServers.class);
+    final int numInitialResources = commandlineParamInjector.getNamedInstance(NumWorkers.class)
+        + commandlineParamInjector.getNamedInstance(NumServers.class);
 
     final Class<? extends Optimizer> optimizerClass =
         (Class<? extends Optimizer>) Class.forName(commandlineParamInjector.getNamedInstance(OptimizerClass.class));

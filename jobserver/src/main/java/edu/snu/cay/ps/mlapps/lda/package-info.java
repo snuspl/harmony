@@ -15,6 +15,6 @@
  */
 
 /**
- * Latent Dirichlet Allocation on dolphin-async.
+ * Latent Dirichlet Allocation on PS.
  */
 package edu.snu.cay.ps.mlapps.lda;

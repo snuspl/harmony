@@ -28,7 +28,7 @@ import edu.snu.cay.utils.StreamingSerializableCodec;
 import javax.inject.Inject;
 
 /**
- * Run Latent Dirichlet Allocation algorithm on dolphin-async.
+ * Run Latent Dirichlet Allocation algorithm on PS.
  * Input dataset should be preprocessed to have continuous (no missing) vocabulary indices.
  */
 public final class LDAET {
