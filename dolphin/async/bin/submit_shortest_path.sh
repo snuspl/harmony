@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./run_shortest_path.sh -local true -max_num_eval_local 3 -num_executors 3 -input file://$(pwd)/inputs/shortest_path -source 0 -executor_mem_size 128 -executor_num_cores 1 -driver_memory 128 -timeout 300000
+# ./submit_shortest_path.sh -num_executors 3 -input file://$(pwd)/inputs/shortest_path -source 0 -executor_mem_size 128 -executor_num_cores 1
 
 SELF_JAR=`echo ../target/dolphin-async-*-shaded.jar`
 
@@ -24,7 +24,7 @@ CLASSPATH=$YARN_HOME/share/hadoop/common/*:$YARN_HOME/share/hadoop/common/lib/*:
 
 YARN_CONF_DIR=$YARN_HOME/etc/hadoop
 
-JOB=edu.snu.cay.dolphin.pregel.graphapps.shortestpath.ShortestPathET
+JOB=edu.snu.cay.dolphin.pregel.graphapps.shortestpath.ShortestPathJob
 
 CMD="java -cp $YARN_CONF_DIR:$SELF_JAR:$CLASSPATH $LOGGING_CONFIG $JOB $*"
 echo $CMD
