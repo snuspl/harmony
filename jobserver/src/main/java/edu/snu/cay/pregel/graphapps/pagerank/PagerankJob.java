@@ -23,7 +23,7 @@ import edu.snu.cay.pregel.jobserver.PregelJobLauncher;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 
 /**
- * Client for non-negative matrix factorization via SGD with JobServer.
+ * Application launching code for Pagerank with JobServer.
  */
 public final class PagerankJob {
 

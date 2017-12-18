@@ -26,7 +26,7 @@ import org.apache.reef.tang.exceptions.InjectionException;
 import java.io.IOException;
 
 /**
- * Application launching code for Shortest path.
+ * Application launching code for Shortest path with JobServer.
  * It calculates all vertices distances from given {@link SourceId}.
  */
 public final class ShortestPathJob {
