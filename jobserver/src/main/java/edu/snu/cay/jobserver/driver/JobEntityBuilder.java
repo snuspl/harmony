@@ -23,10 +23,6 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Created by xyzi on 08/12/2017.
- */
-
-/**
  * A builder interface for {@link JobEntity}.
  * Users should provide job-specific builder implementation.
  */
