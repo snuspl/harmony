@@ -17,7 +17,7 @@ package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
-import edu.snu.cay.services.et.driver.api.ETMaster;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 
@@ -30,5 +30,10 @@ public interface JobEntity {
 
   JobMaster getJobMaster();
 
-  List<AllocatedTable> setupTables(ETMaster etMaster, List<AllocatedExecutor> executors);
+  /**
+   * Setup executor groups and tables for {@link JobMaster#start}.
+   * @param executors executors to use
+   * @return a pair of executor groups and tables
+   */
+  Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> setupExecutorsAndTables(List<AllocatedExecutor> executors);
 }

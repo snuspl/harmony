@@ -112,13 +112,13 @@ public final class JobServerDriver {
     return jobMasterMap.get(jobId);
   }
 
-  public void putJobMaster(final String jobId, final JobMaster jobMaster) {
+  public void registerJobMaster(final String jobId, final JobMaster jobMaster) {
     if (jobMasterMap.put(jobId, jobMaster) != null) {
       throw new RuntimeException();
     }
   }
 
-  public void removeJobMaster(final String jobId) {
+  public void deregisterJobMaster(final String jobId) {
     if (jobMasterMap.remove(jobId) == null) {
       throw new RuntimeException();
     }
@@ -163,7 +163,7 @@ public final class JobServerDriver {
   /**
    * Handles command message from client.
    * There are following commands:
-   *    SUBMIT                    to submit a new job.
+   *    SUBMIT                    to submit a new job, providing a job configuration as an argument.
    *    SHUTDOWN                  to shutdown the job server.
    */
   public final class ClientMessageHandler implements EventHandler<byte[]> {

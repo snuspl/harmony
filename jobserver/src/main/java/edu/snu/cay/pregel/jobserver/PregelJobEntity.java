@@ -22,10 +22,12 @@ import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.driver.api.ETMaster;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -66,29 +68,46 @@ public final class PregelJobEntity implements JobEntity {
   }
 
   @Override
-  public List<AllocatedTable> setupTables(final ETMaster etMaster, final List<AllocatedExecutor> executors) {
-    jobInjector.bindVolatileParameter(PregelParameters.NumWorkers.class, executors.size());
-
-    final Future<AllocatedTable> vertexTableFuture = etMaster.createTable(vertexTableConf, executors);
-    final Future<AllocatedTable> msgTable1Future = etMaster.createTable(msgTable1Conf, executors);
-    final Future<AllocatedTable> msgTable2Future = etMaster.createTable(msgTable2Conf, executors);
-
-    try {
-      final AllocatedTable vertexTable = vertexTableFuture.get();
-      final AllocatedTable msgTable1 = msgTable1Future.get();
-      final AllocatedTable msgTable2 = msgTable2Future.get();
-
-      vertexTable.load(executors, inputPath).get();
-
-      return Arrays.asList(vertexTable, msgTable1, msgTable2);
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
-    }
+  public String getJobId() {
+    return jobId;
   }
 
   @Override
-  public String getJobId() {
-    return jobId;
+  public Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> setupExecutorsAndTables(
+      final List<AllocatedExecutor> executors) {
+    jobInjector.bindVolatileParameter(PregelParameters.NumWorkers.class, executors.size());
+
+    final List<List<AllocatedExecutor>> executorGroups = Collections.singletonList(executors);
+
+    final ETMaster etMaster;
+    try {
+      etMaster = jobInjector.getInstance(ETMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+
+    final List<AllocatedTable> tables = new ArrayList<>(3);
+
+    try {
+      final List<AllocatedExecutor> workers = executorGroups.get(0);
+
+      final Future<AllocatedTable> vertexTableFuture = etMaster.createTable(vertexTableConf, workers);
+      final Future<AllocatedTable> msgTable1Future = etMaster.createTable(msgTable1Conf, workers);
+      final Future<AllocatedTable> msgTable2Future = etMaster.createTable(msgTable2Conf, workers);
+
+      final AllocatedTable vertexTable = vertexTableFuture.get();
+      final AllocatedTable msgTable1 = msgTable1Future.get();
+      final AllocatedTable msgTable2 = msgTable2Future.get();
+      tables.add(vertexTable);
+      tables.add(msgTable1);
+      tables.add(msgTable2);
+
+      vertexTable.load(workers, inputPath).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    return Pair.of(executorGroups, tables);
   }
 
   public static Builder newBuilder() {

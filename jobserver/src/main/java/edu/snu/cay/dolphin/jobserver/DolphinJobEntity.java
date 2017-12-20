@@ -16,17 +16,20 @@
 package edu.snu.cay.dolphin.jobserver;
 
 import edu.snu.cay.dolphin.DolphinParameters;
-import edu.snu.cay.jobserver.driver.JobEntity;
-import edu.snu.cay.jobserver.driver.JobMaster;
-import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
-import edu.snu.cay.services.et.driver.api.AllocatedTable;
-import edu.snu.cay.services.et.driver.api.ETMaster;
-import org.apache.reef.tang.Injector;
-import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.util.Arrays;
 import java.util.List;
+import edu.snu.cay.jobserver.driver.JobEntity;
+import edu.snu.cay.jobserver.driver.JobMaster;
+import edu.snu.cay.services.et.configuration.TableConfiguration;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.reef.tang.Injector;
+import org.apache.reef.tang.exceptions.InjectionException;
+
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -67,25 +70,43 @@ public final class DolphinJobEntity implements JobEntity {
     return jobId;
   }
 
-  public List<AllocatedTable> setupTables(final ETMaster etMaster, final List<AllocatedExecutor> executors) {
+  @Override
+  public Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> setupExecutorsAndTables(
+      final List<AllocatedExecutor> executors) {
     jobInjector.bindVolatileParameter(DolphinParameters.NumWorkers.class, executors.size());
 
-    final Future<AllocatedTable> modelTableFuture = etMaster.createTable(serverTableConf, executors);
-    final Future<AllocatedTable> inputTableFuture = etMaster.createTable(workerTableConf, executors);
+    // collocation mode
+    final List<List<AllocatedExecutor>> executorGroups = Arrays.asList(executors, executors);
 
-    final AllocatedTable modelTable;
-    final AllocatedTable inputTable;
+    final ETMaster etMaster;
     try {
-      modelTable = modelTableFuture.get();
-      inputTable = inputTableFuture.get();
+      etMaster = jobInjector.getInstance(ETMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
 
-      inputTable.load(executors, inputPath).get();
+    final List<AllocatedTable> tables = new ArrayList<>(2);
 
+    try {
+      final List<AllocatedExecutor> servers = executorGroups.get(0);
+      final List<AllocatedExecutor> workers = executorGroups.get(1);
+
+      final Future<AllocatedTable> modelTableFuture =
+          etMaster.createTable(serverTableConf, servers);
+      final Future<AllocatedTable> inputTableFuture =
+          etMaster.createTable(workerTableConf, workers);
+
+      final AllocatedTable modelTable = modelTableFuture.get();
+      final AllocatedTable inputTable = inputTableFuture.get();
+      tables.add(modelTable);
+      tables.add(inputTable);
+
+      inputTable.load(workers, inputPath).get();
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
 
-    return Arrays.asList(inputTable, modelTable);
+    return Pair.of(executorGroups, tables);
   }
 
   public static Builder newBuilder() {

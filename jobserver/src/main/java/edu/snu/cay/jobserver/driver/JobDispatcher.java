@@ -17,6 +17,8 @@ package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.utils.CatchableExecutors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.tang.InjectionFuture;
 
@@ -26,55 +28,52 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * An interface for frameworks to specify how to execute a job with given {@link JobEntity}.
+ * An class for dispatching jobs with a given {@link JobEntity}.
  */
 final class JobDispatcher {
   private static final Logger LOG = Logger.getLogger(JobDispatcher.class.getName());
 
-  private final JobMessageObserver jobMessageObserver;
   private final InjectionFuture<JobServerDriver> jobServerDriverFuture;
   private final InjectionFuture<JobScheduler> jobSchedulerFuture;
+  private final JobMessageObserver jobMessageObserver;
 
   @Inject
-  private JobDispatcher(final JobMessageObserver jobMessageObserver,
-                        final InjectionFuture<JobServerDriver> jobServerDriverFuture,
-                        final InjectionFuture<JobScheduler> jobSchedulerFuture) {
-    this.jobMessageObserver = jobMessageObserver;
+  private JobDispatcher(final InjectionFuture<JobServerDriver> jobServerDriverFuture,
+                        final InjectionFuture<JobScheduler> jobSchedulerFuture,
+                        final JobMessageObserver jobMessageObserver) {
     this.jobServerDriverFuture = jobServerDriverFuture;
     this.jobSchedulerFuture = jobSchedulerFuture;
+    this.jobMessageObserver = jobMessageObserver;
   }
 
   /**
-   * Executes a job.
+   * Executes a job with given executors.
+   * @param jobEntity a job entity
+   * @param executors executors to use
    */
   void executeJob(final JobEntity jobEntity,
-                         final List<AllocatedExecutor> executorList,
-                         final List<AllocatedTable> tableList) {
-    final String jobId = jobEntity.getJobId();
+                  final List<AllocatedExecutor> executors) {
+    CatchableExecutors.newSingleThreadExecutor().submit(() -> {
+      final Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> executorGroupsToTables =
+          jobEntity.setupExecutorsAndTables(executors);
 
-    final String jobStartMsg = String.format("Start executing a job. JobId: %s", jobId);
-    sendMessageToClient(jobStartMsg);
-    LOG.log(Level.INFO, jobStartMsg);
-
-    new Thread(() -> {
       try {
-        LOG.log(Level.FINE, "Spawn new jobMaster with ID: {0}", jobId);
         final JobMaster jobMaster = jobEntity.getJobMaster();
-        jobServerDriverFuture.get().putJobMaster(jobId, jobMaster);
+        jobServerDriverFuture.get().registerJobMaster(jobEntity.getJobId(), jobMaster);
 
-        jobMaster.start(executorList, tableList);
+        sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
+        jobMaster.start(executorGroupsToTables.getLeft(), executorGroupsToTables.getRight());
 
       } finally {
-        final String jobFinishMsg = String.format("Job execution has been finished. JobId: %s", jobId);
-        LOG.log(Level.INFO, jobFinishMsg);
-        sendMessageToClient(jobFinishMsg);
-        jobServerDriverFuture.get().removeJobMaster(jobId);
-        jobSchedulerFuture.get().onJobFinish(executorList.size());
+        sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
+        jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
+        jobSchedulerFuture.get().onJobFinish(jobEntity);
       }
-    }).start();
+    });
   }
 
   private void sendMessageToClient(final String message) {
+    LOG.log(Level.INFO, message);
     jobMessageObserver.sendMessageToClient(message.getBytes());
   }
 }

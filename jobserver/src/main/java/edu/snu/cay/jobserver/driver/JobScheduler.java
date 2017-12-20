@@ -31,9 +31,9 @@ public interface JobScheduler {
 
   /**
    * Invoke when a running job finishes, which means resources become available for other jobs.
-   * @param numReleasedResources the number of released resources by job finish
+   * @param jobEntity a job entity
    */
-  void onJobFinish(int numReleasedResources);
+  void onJobFinish(JobEntity jobEntity);
 
   /**
    * Invoke when the amount of total resources changes,

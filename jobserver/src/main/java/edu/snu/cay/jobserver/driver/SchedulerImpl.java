@@ -16,8 +16,6 @@
 package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
-import edu.snu.cay.services.et.driver.api.AllocatedTable;
-import edu.snu.cay.services.et.driver.api.ETMaster;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -34,14 +32,11 @@ public final class SchedulerImpl implements JobScheduler {
 
   private final ResourcePool resourcePool;
 
-  private final ETMaster etMaster;
   private final JobDispatcher jobDispatcher;
 
   @Inject
-  private SchedulerImpl(final ETMaster etMaster,
-                        final ResourcePool resourcePool,
+  private SchedulerImpl(final ResourcePool resourcePool,
                         final JobDispatcher jobDispatcher) {
-    this.etMaster = etMaster;
     this.resourcePool = resourcePool;
     this.jobDispatcher = jobDispatcher;
   }
@@ -55,9 +50,7 @@ public final class SchedulerImpl implements JobScheduler {
     // pick executors to use, considering resource utilization status and data locality
     final List<AllocatedExecutor> executorsToUse = pickExecutorsToUse(resourcePool.getExecutors(), jobEntity);
 
-    final List<AllocatedTable> tablesToUse = jobEntity.setupTables(etMaster, executorsToUse);
-
-    jobDispatcher.executeJob(jobEntity, executorsToUse, tablesToUse);
+    jobDispatcher.executeJob(jobEntity, executorsToUse);
     return true;
   }
 
@@ -71,7 +64,7 @@ public final class SchedulerImpl implements JobScheduler {
    * Executes waiting jobs if the enough amount of resources become available for them.
    */
   @Override
-  public synchronized void onJobFinish(final int numReleasedResources) {
+  public synchronized void onJobFinish(final JobEntity jobEntity) {
 
   }
 
