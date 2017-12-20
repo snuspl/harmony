@@ -89,7 +89,7 @@ public final class DolphinJobDispatcher implements JobDispatcher {
         try {
           LOG.log(Level.FINE, "Spawn new jobMaster with ID: {0}", jobId);
           final JobMaster jobMaster = dolphinJobEntity.getJobMaster();
-          jobServerDriverFuture.get().putJobMaster(jobId, jobMaster);
+          jobServerDriverFuture.get().registerJobMaster(jobId, jobMaster);
 
           final List<List<AllocatedExecutor>> executorGroups = Arrays.asList(servers, workers);
           final List<AllocatedTable> tables = Arrays.asList(modelTable, inputTable);
@@ -103,7 +103,7 @@ public final class DolphinJobDispatcher implements JobDispatcher {
           final String jobFinishMsg = String.format("Job execution has been finished. JobId: %s", jobId);
           LOG.log(Level.INFO, jobFinishMsg);
           sendMessageToClient(jobFinishMsg);
-          jobServerDriverFuture.get().removeJobMaster(jobId);
+          jobServerDriverFuture.get().deregisterJobMaster(jobId);
           jobSchedulerFuture.get().onJobFinish(workers.size() + servers.size());
         }
 

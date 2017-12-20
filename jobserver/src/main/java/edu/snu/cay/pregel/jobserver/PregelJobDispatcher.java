@@ -90,7 +90,7 @@ public final class PregelJobDispatcher implements JobDispatcher {
         try {
           LOG.log(Level.FINE, "Spawn new jobMaster with ID: {0}", jobId);
           final JobMaster jobMaster = pregelJobEntity.getJobMaster();
-          jobServerDriverFuture.get().putJobMaster(jobId, jobMaster);
+          jobServerDriverFuture.get().registerJobMaster(jobId, jobMaster);
 
           final List<List<AllocatedExecutor>> executorGroups = Collections.singletonList(workers);
           final List<AllocatedTable> tables = Arrays.asList(vertexTable, msgTable1, msgTable2);
@@ -103,7 +103,7 @@ public final class PregelJobDispatcher implements JobDispatcher {
           final String jobFinishMsg = String.format("Job execution has been finished. JobId: %s", jobId);
           LOG.log(Level.INFO, jobFinishMsg);
           sendMessageToClient(jobFinishMsg);
-          jobServerDriverFuture.get().removeJobMaster(jobId);
+          jobServerDriverFuture.get().deregisterJobMaster(jobId);
           jobSchedulerFuture.get().onJobFinish(workers.size());
         }
 
