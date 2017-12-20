@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./run_shortest_path.sh -local true -max_num_eval_local 3 -num_executors 3 -input file://$(pwd)/inputs/shortest_path -source 0 -executor_mem_size 128 -executor_num_cores 1 -driver_memory 128 -timeout 300000
+# ./run_shortest_path.sh -local true -max_num_eval_local 3 -num_pregel_workers 3 -input file://$(pwd)/inputs/shortest_path -source 0 -pregel_worker_mem_size 128 -pregel_worker_num_cores 1 -driver_memory 128 -timeout 300000
 
 SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 

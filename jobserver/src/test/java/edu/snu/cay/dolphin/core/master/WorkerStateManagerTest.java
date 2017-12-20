@@ -125,7 +125,7 @@ public class WorkerStateManagerTest {
     doAnswer(invocation -> {
       final String workerId = invocation.getArgumentAt(0, String.class);
       return runningTaskletMap.get(workerId);
-    }).when(mockedTaskRunner).getRunningTasklet(anyString());
+    }).when(mockedTaskRunner).getWorkerTasklet(anyString());
 
     final WorkerStateManager workerStateManager = injector.getInstance(WorkerStateManager.class);
 

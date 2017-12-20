@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./submit_shortest_path.sh -num_executors 3 -input file://$(pwd)/inputs/shortest_path -source 0 -executor_mem_size 128 -executor_num_cores 1
+# ./submit_shortest_path.sh -input file://$(pwd)/inputs/shortest_path -source 0 -num_worker_threads 1
 
 SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 

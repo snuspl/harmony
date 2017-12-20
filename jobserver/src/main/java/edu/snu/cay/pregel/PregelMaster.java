@@ -78,7 +78,7 @@ public final class PregelMaster {
                        @Parameter(PregelParameters.VertexTableId.class) final String vertexTableId,
                        @Parameter(PregelParameters.MessageTableId.class) final String msgTableId,
                        @Parameter(Parameters.JobId.class) final String jobId,
-                       @Parameter(PregelParameters.NumExecutors.class) final int numWorkers) throws IOException {
+                       @Parameter(PregelParameters.NumWorkers.class) final int numWorkers) throws IOException {
     this.msgCountDownLatch = new CountDownLatch(numWorkers);
     this.workerIds = Collections.synchronizedSet(new HashSet<String>(numWorkers));
     this.isAllVerticesHalt = true;

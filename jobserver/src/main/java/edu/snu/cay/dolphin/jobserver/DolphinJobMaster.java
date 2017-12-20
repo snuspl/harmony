@@ -48,12 +48,9 @@ public final class DolphinJobMaster implements JobMaster {
   }
 
   @Override
-  public void start(final List<List<AllocatedExecutor>> executorGroups, final List<AllocatedTable> tables) {
-    final List<AllocatedExecutor> servers = executorGroups.get(0);
-    final List<AllocatedExecutor> workers = executorGroups.get(1);
-
+  public void start(final List<AllocatedExecutor> executors, final List<AllocatedTable> tables) {
     final AllocatedTable modelTable = tables.get(0);
     final AllocatedTable inputTable = tables.get(1);
-    dolphinMaster.start(servers, workers, modelTable, inputTable);
+    dolphinMaster.start(executors, executors, modelTable, inputTable);
   }
 }

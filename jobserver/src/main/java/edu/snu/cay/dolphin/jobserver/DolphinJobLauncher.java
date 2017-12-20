@@ -25,7 +25,6 @@ import edu.snu.cay.dolphin.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
 import edu.snu.cay.jobserver.client.JobServerClient;
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.jobserver.driver.JobMaster;
@@ -127,7 +126,7 @@ public final class DolphinJobLauncher {
 
     // parameters for master
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
-        MaxNumEpochs.class, NumTotalMiniBatches.class, NumWorkers.class, ServerMetricFlushPeriodMs.class
+        MaxNumEpochs.class, NumTotalMiniBatches.class, ServerMetricFlushPeriodMs.class
     );
 
     // commonly used parameters for ML apps
@@ -142,17 +141,12 @@ public final class DolphinJobLauncher {
 
     // parameters for servers
     final List<Class<? extends Name<?>>> serverParamList = Arrays.asList(
-        NumServers.class, ServerMemSize.class, NumServerCores.class,
-        NumServerHandlerThreads.class, NumServerSenderThreads.class,
-        ServerHandlerQueueSize.class, ServerSenderQueueSize.class,
         NumServerBlocks.class, ServerMetricFlushPeriodMs.class
     );
 
     // parameters for workers
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
-        NumWorkers.class, WorkerMemSize.class, NumWorkerCores.class,
-        NumWorkerHandlerThreads.class, NumWorkerSenderThreads.class,
-        WorkerHandlerQueueSize.class, WorkerSenderQueueSize.class,
+        NumTrainerThreads.class,
         NumWorkerBlocks.class, HyperThreadEnabled.class, MaxNumEpochs.class,
         NumTotalMiniBatches.class, TestDataPath.class, InputDir.class
     );
@@ -185,7 +179,6 @@ public final class DolphinJobLauncher {
         .bindImplementation(JobMaster.class, DolphinJobMaster.class)
         .bindImplementation(JobEntity.class, DolphinJobEntity.class)
         .bindImplementation(JobEntityBuilder.class, DolphinJobEntityBuilder.class)
-        .bindImplementation(JobDispatcher.class, DolphinJobDispatcher.class)
         .bindNamedParameter(ETDolphinLauncher.SerializedServerConf.class, Configurations.toString(serverConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedWorkerConf.class, Configurations.toString(workerConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedParamConf.class, Configurations.toString(userParamConf))

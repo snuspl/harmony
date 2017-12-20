@@ -15,6 +15,12 @@
  */
 package edu.snu.cay.jobserver.driver;
 
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
+
+import java.util.List;
+
 /**
  * A class that encapsulates all information required to execute a job.
  */
@@ -22,11 +28,7 @@ public interface JobEntity {
 
   String getJobId();
 
-  int getNumExecutors();
-
   JobMaster getJobMaster();
 
-  String getInputPath();
-
-  void executeJob();
+  List<AllocatedTable> setupTables(ETMaster etMaster, List<AllocatedExecutor> executors);
 }

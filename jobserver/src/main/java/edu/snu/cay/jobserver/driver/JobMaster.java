@@ -35,6 +35,6 @@ public interface JobMaster {
    * Start running a job with given executors and tables.
    * It returns after checking the result of tasks.
    */
-  void start(List<List<AllocatedExecutor>> executorGroups,
+  void start(List<AllocatedExecutor> executors,
              List<AllocatedTable> tables);
 }

@@ -73,19 +73,24 @@ public final class PregelLauncher {
         ChkpCommitPath.class, ChkpTempPath.class);
 
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(
-        InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
+        InputDir.class, NumWorkers.class, WorkerMemSize.class, WorkerNumCores.class);
+
+    final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(HyperThreadEnabled.class,
+        NumWorkerThreads.class);
 
     final CommandLine cl = new CommandLine();
     clientParamList.forEach(cl::registerShortNameOfClass);
     driverParamList.forEach(cl::registerShortNameOfClass);
+    workerParamList.forEach(cl::registerShortNameOfClass);
     userParamList.forEach(cl::registerShortNameOfClass);
 
     final Configuration commandLineConf = cl.processCommandLine(args).getBuilder().build();
     final Configuration clientConf = ConfigurationUtils.extractParameterConf(clientParamList, commandLineConf);
     final Configuration driverConf = ConfigurationUtils.extractParameterConf(driverParamList, commandLineConf);
+    final Configuration workerConf = ConfigurationUtils.extractParameterConf(workerParamList, commandLineConf);
     final Configuration userConf = ConfigurationUtils.extractParameterConf(userParamList, commandLineConf);
 
-    return Arrays.asList(clientConf, driverConf, userConf);
+    return Arrays.asList(clientConf, driverConf, workerConf, userConf);
   }
 
   private static Configuration getYarnRuntimeConfiguration(final double heapSlack) {
@@ -129,7 +134,8 @@ public final class PregelLauncher {
 
       final Configuration clientParamConf = configurations.get(0);
       final Configuration driverParamConf = configurations.get(1);
-      final Configuration userParamConf = configurations.get(2);
+      final Configuration workerParamConf = configurations.get(2);
+      final Configuration userParamConf = configurations.get(3);
 
       final Injector clientParameterInjector = Tang.Factory.getTang().newInjector(clientParamConf);
       // runtime configuration
@@ -140,7 +146,7 @@ public final class PregelLauncher {
               clientParameterInjector.getNamedInstance(JVMHeapSlack.class)) :
           getYarnRuntimeConfiguration(clientParameterInjector.getNamedInstance(JVMHeapSlack.class));
 
-      final Configuration taskConf = Configurations.merge(userParamConf,
+      final Configuration taskConf = Configurations.merge(userParamConf, workerParamConf,
           Tang.Factory.getTang().newConfigurationBuilder()
               .bindImplementation(Computation.class, pregelConf.getComputationClass())
               .bindImplementation(MessageCombiner.class, pregelConf.getMessageCombinerClass())

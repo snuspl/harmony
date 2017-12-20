@@ -15,13 +15,20 @@
  */
 package edu.snu.cay.pregel.jobserver;
 
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobMaster;
-import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
+import edu.snu.cay.pregel.PregelParameters;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * Pregel's {@link JobEntity} implementation.
@@ -30,8 +37,6 @@ public final class PregelJobEntity implements JobEntity {
   private final Injector jobInjector;
   private final String jobId;
 
-  private final int numWorkers;
-  private final ExecutorConfiguration workerExecutorConf;
   private final TableConfiguration vertexTableConf;
   private final TableConfiguration msgTable1Conf;
   private final TableConfiguration msgTable2Conf;
@@ -39,16 +44,12 @@ public final class PregelJobEntity implements JobEntity {
 
   private PregelJobEntity(final Injector jobInjector,
                           final String jobId,
-                          final int numWorkers,
-                          final ExecutorConfiguration workerExecutorConf,
                           final TableConfiguration vertexTableConf,
                           final TableConfiguration msgTable1Conf,
                           final TableConfiguration msgTable2Conf,
                           final String inputPath) {
     this.jobInjector = jobInjector;
     this.jobId = jobId;
-    this.numWorkers = numWorkers;
-    this.workerExecutorConf = workerExecutorConf;
     this.vertexTableConf = vertexTableConf;
     this.msgTable1Conf = msgTable1Conf;
     this.msgTable2Conf = msgTable2Conf;
@@ -65,48 +66,29 @@ public final class PregelJobEntity implements JobEntity {
   }
 
   @Override
-  public String getJobId() {
-    return jobId;
-  }
+  public List<AllocatedTable> setupTables(final ETMaster etMaster, final List<AllocatedExecutor> executors) {
+    jobInjector.bindVolatileParameter(PregelParameters.NumWorkers.class, executors.size());
 
-  @Override
-  public int getNumExecutors() {
-    return numWorkers;
-  }
+    final Future<AllocatedTable> vertexTableFuture = etMaster.createTable(vertexTableConf, executors);
+    final Future<AllocatedTable> msgTable1Future = etMaster.createTable(msgTable1Conf, executors);
+    final Future<AllocatedTable> msgTable2Future = etMaster.createTable(msgTable2Conf, executors);
 
-  public int getNumWorkers() {
-    return numWorkers;
-  }
-
-  public ExecutorConfiguration getWorkerExecutorConf() {
-    return workerExecutorConf;
-  }
-
-
-  public TableConfiguration getVertexTableConf() {
-    return vertexTableConf;
-  }
-
-  public TableConfiguration getMsgTable1Conf() {
-    return msgTable1Conf;
-  }
-
-  public TableConfiguration getMsgTable2Conf() {
-    return msgTable2Conf;
-  }
-
-  @Override
-  public String getInputPath() {
-    return inputPath;
-  }
-
-  @Override
-  public void executeJob() {
     try {
-      jobInjector.getInstance(JobDispatcher.class).executeJob(this);
-    } catch (InjectionException e) {
+      final AllocatedTable vertexTable = vertexTableFuture.get();
+      final AllocatedTable msgTable1 = msgTable1Future.get();
+      final AllocatedTable msgTable2 = msgTable2Future.get();
+
+      vertexTable.load(executors, inputPath).get();
+
+      return Arrays.asList(vertexTable, msgTable1, msgTable2);
+    } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public String getJobId() {
+    return jobId;
   }
 
   public static Builder newBuilder() {
@@ -118,8 +100,6 @@ public final class PregelJobEntity implements JobEntity {
     private Injector jobInjector;
     private String jobId;
 
-    private int numWorkers;
-    private ExecutorConfiguration workerExecutorConf;
     private TableConfiguration vetexTableConf;
     private TableConfiguration msgTable1Conf;
     private TableConfiguration msgTable2Conf;
@@ -135,16 +115,6 @@ public final class PregelJobEntity implements JobEntity {
 
     public Builder setJobId(final String jobId) {
       this.jobId = jobId;
-      return this;
-    }
-
-    public Builder setNumWorkers(final int numWorkers) {
-      this.numWorkers = numWorkers;
-      return this;
-    }
-
-    public Builder setWorkerExecutorConf(final ExecutorConfiguration workerExecutorConf) {
-      this.workerExecutorConf = workerExecutorConf;
       return this;
     }
 
@@ -170,8 +140,7 @@ public final class PregelJobEntity implements JobEntity {
 
     @Override
     public PregelJobEntity build() {
-      return new PregelJobEntity(jobInjector, jobId, numWorkers, workerExecutorConf,
-          vetexTableConf, msgTable1Conf, msgTable2Conf, inputPath);
+      return new PregelJobEntity(jobInjector, jobId, vetexTableConf, msgTable1Conf, msgTable2Conf, inputPath);
     }
   }
 }

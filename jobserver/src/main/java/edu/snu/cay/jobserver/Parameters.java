@@ -32,18 +32,45 @@ public final class Parameters {
 
   }
 
+  @NamedParameter(doc = "The number of executors in a cluster. We assume homogeneous environment.",
+      short_name = "num_executors")
+  public final class NumExecutors implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "executor_mem_size")
+  public final class ExecutorMemSize implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "executor_num_cores")
+  public final class ExecutorNumCores implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "executor_num_tasklets")
+  public final class ExecutorNumTasklets implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "handler_queue_size")
+  public final class HandlerQueueSize implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "sender_queue_size")
+  public final class SenderQueueSize implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "handler_num_threads")
+  public final class HandlerNumThreads implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "", short_name = "sender_num_threads")
+  public final class SenderNumThreads implements Name<Integer> {
+  }
+
   @NamedParameter(doc = "An identifier of App.")
   public final class AppIdentifier implements Name<String> {
-
   }
 
   @NamedParameter(doc = "Job identifier", default_value = "job")
   public final class JobId implements Name<String> {
-  }
-
-  @NamedParameter(doc = "The number of total available resources in a cluster",
-      short_name = "num_total_resources")
-  public final class NumTotalResources implements Name<Integer> {
   }
 
   @NamedParameter(doc = "A class of the scheduler",

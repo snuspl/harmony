@@ -15,13 +15,20 @@
  */
 package edu.snu.cay.dolphin.jobserver;
 
-import edu.snu.cay.jobserver.driver.JobDispatcher;
+import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobMaster;
-import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * Dolphin's {@link JobEntity} implementation.
@@ -30,31 +37,18 @@ public final class DolphinJobEntity implements JobEntity {
   private final Injector jobInjector;
   private final String jobId;
 
-  private final int numServers;
-  private final ExecutorConfiguration serverExecutorConf;
   private final TableConfiguration serverTableConf;
-
-  private final int numWorkers;
-  private final ExecutorConfiguration workerExecutorConf;
   private final TableConfiguration workerTableConf;
   private final String inputPath;
 
   private DolphinJobEntity(final Injector jobInjector,
                            final String jobId,
-                           final int numServers,
-                           final ExecutorConfiguration serverExecutorConf,
                            final TableConfiguration serverTableConf,
-                           final int numWorkers,
-                           final ExecutorConfiguration workerExecutorConf,
                            final TableConfiguration workerTableConf,
                            final String inputPath) {
     this.jobInjector = jobInjector;
     this.jobId = jobId;
-    this.numServers = numServers;
-    this.serverExecutorConf = serverExecutorConf;
     this.serverTableConf = serverTableConf;
-    this.numWorkers = numWorkers;
-    this.workerExecutorConf = workerExecutorConf;
     this.workerTableConf = workerTableConf;
     this.inputPath = inputPath;
   }
@@ -73,47 +67,25 @@ public final class DolphinJobEntity implements JobEntity {
     return jobId;
   }
 
-  @Override
-  public int getNumExecutors() {
-    return numServers + numWorkers;
-  }
+  public List<AllocatedTable> setupTables(final ETMaster etMaster, final List<AllocatedExecutor> executors) {
+    jobInjector.bindVolatileParameter(DolphinParameters.NumWorkers.class, executors.size());
 
-  public int getNumServers() {
-    return numServers;
-  }
+    final Future<AllocatedTable> modelTableFuture = etMaster.createTable(serverTableConf, executors);
+    final Future<AllocatedTable> inputTableFuture = etMaster.createTable(workerTableConf, executors);
 
-  public ExecutorConfiguration getServerExecutorConf() {
-    return serverExecutorConf;
-  }
-
-  public TableConfiguration getServerTableConf() {
-    return serverTableConf;
-  }
-
-  public int getNumWorkers() {
-    return numWorkers;
-  }
-
-  public ExecutorConfiguration getWorkerExecutorConf() {
-    return workerExecutorConf;
-  }
-
-  public TableConfiguration getWorkerTableConf() {
-    return workerTableConf;
-  }
-
-  @Override
-  public String getInputPath() {
-    return inputPath;
-  }
-
-  @Override
-  public void executeJob() {
+    final AllocatedTable modelTable;
+    final AllocatedTable inputTable;
     try {
-      jobInjector.getInstance(JobDispatcher.class).executeJob(this);
-    } catch (InjectionException e) {
+      modelTable = modelTableFuture.get();
+      inputTable = inputTableFuture.get();
+
+      inputTable.load(executors, inputPath).get();
+
+    } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
+
+    return Arrays.asList(inputTable, modelTable);
   }
 
   public static Builder newBuilder() {
@@ -125,12 +97,7 @@ public final class DolphinJobEntity implements JobEntity {
     private Injector jobInjector;
     private String jobId;
 
-    private int numServers;
-    private ExecutorConfiguration serverExecutorConf;
     private TableConfiguration serverTableConf;
-
-    private int numWorkers;
-    private ExecutorConfiguration workerExecutorConf;
     private TableConfiguration workerTableConf;
     private String inputPath;
 
@@ -147,28 +114,8 @@ public final class DolphinJobEntity implements JobEntity {
       return this;
     }
 
-    public Builder setNumServers(final int numServers) {
-      this.numServers = numServers;
-      return this;
-    }
-
-    public Builder setServerExecutorConf(final ExecutorConfiguration serverExecutorConf) {
-      this.serverExecutorConf = serverExecutorConf;
-      return this;
-    }
-
     public Builder setServerTableConf(final TableConfiguration serverTableConf) {
       this.serverTableConf = serverTableConf;
-      return this;
-    }
-
-    public Builder setNumWorkers(final int numWorkers) {
-      this.numWorkers = numWorkers;
-      return this;
-    }
-
-    public Builder setWorkerExecutorConf(final ExecutorConfiguration workerExecutorConf) {
-      this.workerExecutorConf = workerExecutorConf;
       return this;
     }
 
@@ -184,8 +131,7 @@ public final class DolphinJobEntity implements JobEntity {
 
     @Override
     public DolphinJobEntity build() {
-      return new DolphinJobEntity(jobInjector, jobId, numServers, serverExecutorConf, serverTableConf,
-          numWorkers, workerExecutorConf, workerTableConf, inputPath);
+      return new DolphinJobEntity(jobInjector, jobId, serverTableConf, workerTableConf, inputPath);
     }
   }
 }

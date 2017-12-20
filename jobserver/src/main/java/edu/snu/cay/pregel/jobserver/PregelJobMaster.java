@@ -44,12 +44,10 @@ public final class PregelJobMaster implements JobMaster {
   }
 
   @Override
-  public void start(final List<List<AllocatedExecutor>> executorGroups, final List<AllocatedTable> tables) {
-    final List<AllocatedExecutor> workers = executorGroups.get(0);
-
+  public void start(final List<AllocatedExecutor> executors, final List<AllocatedTable> tables) {
     final AllocatedTable vertexTable = tables.get(0);
     final AllocatedTable msgTable1 = tables.get(1);
     final AllocatedTable msgTable2 = tables.get(2);
-    pregelMaster.start(workers, vertexTable, msgTable1, msgTable2);
+    pregelMaster.start(executors, vertexTable, msgTable1, msgTable2);
   }
 }

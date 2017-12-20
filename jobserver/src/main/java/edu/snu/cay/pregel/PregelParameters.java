@@ -30,18 +30,29 @@ public final class PregelParameters {
 
   }
 
-  @NamedParameter(doc = "The number of executors", short_name = "num_executors")
-  public final class NumExecutors implements Name<Integer> {
+  @NamedParameter(doc = "The number of workers", short_name = "num_pregel_workers")
+  public final class NumWorkers implements Name<Integer> {
 
   }
 
-  @NamedParameter(doc = "Desired memory size for each executor (MBs)", short_name = "executor_mem_size")
-  public final class ExecutorMemSize implements Name<Integer> {
+  @NamedParameter(doc = "Desired memory size for each worker (MBs)", short_name = "pregel_worker_mem_size")
+  public final class WorkerMemSize implements Name<Integer> {
   }
 
-  @NamedParameter(doc = "The number of CPU cores for each executor", short_name = "executor_num_cores")
-  public final class ExecutorNumCores implements Name<Integer> {
+  @NamedParameter(doc = "The number of CPU cores for each worker", short_name = "pregel_worker_num_cores")
+  public final class WorkerNumCores implements Name<Integer> {
 
+  }
+
+  @NamedParameter(doc = "The number of worker threads",
+      short_name = "num_worker_threads",
+      default_value = NumWorkerThreads.UNSET_VALUE)
+  public final class NumWorkerThreads implements Name<Integer> {
+    public static final String UNSET_VALUE = "0";
+
+    private NumWorkerThreads() {
+
+    }
   }
 
   @NamedParameter(doc = "configuration for worker tasklet class, serialized as a string")

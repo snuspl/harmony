@@ -20,9 +20,6 @@ import edu.snu.cay.dolphin.core.client.ETDolphinLauncher;
 import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobEntityBuilder;
-import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
-import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
-import edu.snu.cay.services.et.configuration.ResourceConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
@@ -77,40 +74,16 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     // prepare server-side configurations
     final Configuration serverConf = ConfigurationUtils.fromString(serializedServerConf);
     final Injector serverInjector = Tang.Factory.getTang().newInjector(serverConf);
-    final int numServers = serverInjector.getNamedInstance(NumServers.class);
-    final int numServerCores = serverInjector.getNamedInstance(NumServerCores.class);
-    final int serverMemSize = serverInjector.getNamedInstance(ServerMemSize.class);
-    final int numServerSenderThreads = serverInjector.getNamedInstance(NumServerSenderThreads.class);
-    final int numServerHandlerThreads = serverInjector.getNamedInstance(NumServerHandlerThreads.class);
-    final int serverSenderQueueSize = serverInjector.getNamedInstance(ServerSenderQueueSize.class);
-    final int serverHandlerQueueSize = serverInjector.getNamedInstance(ServerHandlerQueueSize.class);
     final int numServerBlocks = serverInjector.getNamedInstance(NumServerBlocks.class);
 
-    final ResourceConfiguration serverResourceConf = buildResourceConf(numServerCores, serverMemSize);
-    final RemoteAccessConfiguration serverRemoteAccessConf = buildRemoteAccessConf(
-        numServerSenderThreads, serverSenderQueueSize, numServerHandlerThreads, serverHandlerQueueSize);
-
-    final ExecutorConfiguration serverExecutorConf = buildExecutorConf(serverResourceConf, serverRemoteAccessConf);
     final TableConfiguration serverTableConf = buildServerTableConf(modelTableId,
         serverInjector, numServerBlocks, userParamConf);
 
     // prepare worker-side configurations
     final Configuration workerConf = ConfigurationUtils.fromString(serializedWorkerConf);
     final Injector workerInjector = Tang.Factory.getTang().newInjector(workerConf);
-    final int numWorkers = workerInjector.getNamedInstance(NumWorkers.class);
-    final int numWorkerCores = workerInjector.getNamedInstance(NumWorkerCores.class);
-    final int workerMemSize = workerInjector.getNamedInstance(WorkerMemSize.class);
-    final int numWorkerSenderThreads = workerInjector.getNamedInstance(NumWorkerSenderThreads.class);
-    final int numWorkerHandlerThreads = workerInjector.getNamedInstance(NumWorkerHandlerThreads.class);
-    final int workerSenderQueueSize = workerInjector.getNamedInstance(WorkerSenderQueueSize.class);
-    final int workerHandlerQueueSize = workerInjector.getNamedInstance(WorkerHandlerQueueSize.class);
     final int numWorkerBlocks = workerInjector.getNamedInstance(NumWorkerBlocks.class);
 
-    final ResourceConfiguration workerResourceConf = buildResourceConf(numWorkerCores, workerMemSize);
-    final RemoteAccessConfiguration workerRemoteAccessConf = buildRemoteAccessConf(
-        numWorkerSenderThreads, workerSenderQueueSize, numWorkerHandlerThreads, workerHandlerQueueSize);
-
-    final ExecutorConfiguration workerExecutorConf = buildExecutorConf(workerResourceConf, workerRemoteAccessConf);
     final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId,
         workerInjector, numWorkerBlocks, userParamConf);
     final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
@@ -118,41 +91,9 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     return DolphinJobEntity.newBuilder()
         .setJobInjector(jobInjector)
         .setJobId(dolphinJobId)
-        .setNumServers(numServers)
-        .setServerExecutorConf(serverExecutorConf)
         .setServerTableConf(serverTableConf)
-        .setNumWorkers(numWorkers)
-        .setWorkerExecutorConf(workerExecutorConf)
         .setWorkerTableConf(workerTableConf)
         .setInputPath(inputPath)
-        .build();
-  }
-
-
-  private static ResourceConfiguration buildResourceConf(final int numCores, final int memSize) {
-    return ResourceConfiguration.newBuilder()
-        .setNumCores(numCores)
-        .setMemSizeInMB(memSize)
-        .build();
-  }
-
-  private static RemoteAccessConfiguration buildRemoteAccessConf(final int numSenderThreads,
-                                                                 final int senderQueueSize,
-                                                                 final int numHandlerThreads,
-                                                                 final int handlerQueueSize) {
-    return RemoteAccessConfiguration.newBuilder()
-        .setNumSenderThreads(numSenderThreads)
-        .setSenderQueueSize(senderQueueSize)
-        .setNumHandlerThreads(numHandlerThreads)
-        .setHandlerQueueSize(handlerQueueSize)
-        .build();
-  }
-
-  private static ExecutorConfiguration buildExecutorConf(final ResourceConfiguration resourceConf,
-                                                         final RemoteAccessConfiguration remoteAccessConf) {
-    return ExecutorConfiguration.newBuilder()
-        .setResourceConf(resourceConf)
-        .setRemoteAccessConf(remoteAccessConf)
         .build();
   }
 

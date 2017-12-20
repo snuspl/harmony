@@ -168,13 +168,12 @@ public final class DolphinMaster {
   public void start(final List<AllocatedExecutor> servers, final List<AllocatedExecutor> workers,
                     final AllocatedTable modelTable, final AllocatedTable trainingDataTable) {
     try {
-      servers.forEach(server -> metricManager.startMetricCollection(server.getId(), getServerMetricConf()));
+      // TODO #00: tasklet-level metric collection
       workers.forEach(worker -> metricManager.startMetricCollection(worker.getId(), getWorkerMetricConf()));
 
       final List<TaskletResult> taskletResults = taskRunner.run(workers, servers);
       checkTaskResults(taskletResults);
 
-      servers.forEach(server -> metricManager.stopMetricCollection(server.getId()));
       workers.forEach(worker -> metricManager.stopMetricCollection(worker.getId()));
     } catch (Exception e) {
       throw new RuntimeException("Dolphin job has been failed", e);

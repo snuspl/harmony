@@ -50,7 +50,7 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
 
   @Inject
   private ETModelAccessor(@Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
-                  final TableAccessor tableAccessor) throws TableNotExistException {
+                          final TableAccessor tableAccessor) throws TableNotExistException {
     this.modelTable = tableAccessor.getTable(modelTableId);
   }
 

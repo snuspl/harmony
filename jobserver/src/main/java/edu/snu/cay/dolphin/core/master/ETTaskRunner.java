@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.dolphin.core.master;
 
-import edu.snu.cay.dolphin.DolphinParameters;
+import edu.snu.cay.dolphin.core.server.ServerTasklet;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.dolphin.core.worker.WorkerTasklet;
 import edu.snu.cay.jobserver.Parameters;
@@ -55,7 +55,8 @@ public final class ETTaskRunner {
   private final Map<String, AllocatedExecutor> workerExecutors = new ConcurrentHashMap<>();
   private final Map<String, AllocatedExecutor> serverExecutors = new ConcurrentHashMap<>();
 
-  private final Map<String, RunningTasklet> executorIdToTasklet = new ConcurrentHashMap<>();
+  private final Map<String, RunningTasklet> workerExecutorIdToTasklet = new ConcurrentHashMap<>();
+  private final Map<String, RunningTasklet> serverExecutorIdToTasklet = new ConcurrentHashMap<>();
 
   @Inject
   private ETTaskRunner(final JobLogger jobLogger,
@@ -63,15 +64,13 @@ public final class ETTaskRunner {
                        final JobMessageObserver jobMessageObserver,
                        final ETMaster etMaster,
                        final WorkerStateManager workerStateManager,
-                       @Parameter(Parameters.JobId.class) final String jobId,
-                       @Parameter(DolphinParameters.NumWorkers.class) final int numWorkers) {
+                       @Parameter(Parameters.JobId.class) final String jobId) {
     this.jobLogger = jobLogger;
     this.etMaster = etMaster;
     this.jobMessageObserver = jobMessageObserver;
     this.etDolphinMasterFuture = dolphinMasterFuture;
     this.workerStateManager = workerStateManager;
     this.jobId = jobId;
-    jobLogger.log(Level.INFO, "Initialized with NumWorkers: {0}", numWorkers);
   }
 
   /**
@@ -86,9 +85,10 @@ public final class ETTaskRunner {
     servers.forEach(server -> serverExecutors.put(server.getId(), server));
 
     // submit dummy tasks to servers
-    servers.forEach(server -> server.submitTasklet(etDolphinMasterFuture.get().getServerTaskletConf()));
+    servers.forEach(server -> server.submitTasklet(etDolphinMasterFuture.get().getServerTaskletConf())
+        .addListener(runningTasklet -> serverExecutorIdToTasklet.put(server.getId(), runningTasklet)));
     workers.forEach(worker -> worker.submitTasklet(etDolphinMasterFuture.get().getWorkerTaskletConf())
-        .addListener(runningTasklet -> executorIdToTasklet.put(worker.getId(), runningTasklet)));
+        .addListener(runningTasklet -> workerExecutorIdToTasklet.put(worker.getId(), runningTasklet)));
 
     jobLogger.log(Level.INFO, "Wait for workers to finish run stage");
 
@@ -105,8 +105,8 @@ public final class ETTaskRunner {
     return waitAndGetTaskResult();
   }
 
-  public RunningTasklet getRunningTasklet(final String executorId) {
-    return executorIdToTasklet.get(executorId);
+  public RunningTasklet getWorkerTasklet(final String executorId) {
+    return workerExecutorIdToTasklet.get(executorId);
   }
 
   /**
@@ -135,22 +135,26 @@ public final class ETTaskRunner {
       }
 
       workerExecutors.put(executor.getId(), executor);
-      executorIdToTasklet.put(addedWorker, tasklet);
+      workerExecutorIdToTasklet.put(addedWorker, tasklet);
     }
 
     for (final String addedServer : addedServers) {
+      final RunningTasklet tasklet;
       final AllocatedExecutor executor;
       try {
         executor = etMaster.getExecutor(addedServer);
+        tasklet = executor.getRunningTasklet(jobId + "-" + ServerTasklet.TASKLET_ID);
       } catch (ExecutorNotExistException e) {
         throw new RuntimeException(e);
       }
       serverExecutors.put(executor.getId(), executor);
+      serverExecutorIdToTasklet.put(addedServer, tasklet);
     }
 
     workerExecutors.keySet().removeAll(deletedWorkers);
     serverExecutors.keySet().removeAll(deletedServers);
-    executorIdToTasklet.keySet().removeAll(deletedWorkers);
+    workerExecutorIdToTasklet.keySet().removeAll(deletedWorkers);
+    serverExecutorIdToTasklet.keySet().removeAll(deletedServers);
 
     final int numAfterWorkers = workerExecutors.size();
     final int numAfterServers = serverExecutors.size();
@@ -164,15 +168,17 @@ public final class ETTaskRunner {
   }
 
   private List<TaskletResult> waitAndGetTaskResult() {
-    final List<TaskletResult> taskletResultList = new ArrayList<>(executorIdToTasklet.size());
+    final List<TaskletResult> taskletResultList = new ArrayList<>(workerExecutorIdToTasklet.size());
 
-    executorIdToTasklet.values().forEach(task -> {
+    workerExecutorIdToTasklet.values().forEach(task -> {
       try {
         taskletResultList.add(task.getTaskResult());
       } catch (InterruptedException e) {
         throw new RuntimeException("Exception while waiting for the task results", e);
       }
     });
+
+    serverExecutorIdToTasklet.values().forEach(RunningTasklet::stop);
 
     jobLogger.log(Level.INFO, "Task finished");
     return taskletResultList;
