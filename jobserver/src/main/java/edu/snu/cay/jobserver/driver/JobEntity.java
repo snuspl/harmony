@@ -31,7 +31,16 @@ public interface JobEntity {
 
   JobMaster getJobMaster();
 
+  /**
+   * Setup executors.
+   * @return executor groups
+   */
   List<List<AllocatedExecutor>> setupExecutors();
 
+  /**
+   * Setup tables with the given executors.
+   * @param executorGroups executor groups
+   * @return tables
+   */
   List<AllocatedTable> setupTables(List<List<AllocatedExecutor>> executorGroups);
 }
