@@ -20,7 +20,6 @@ import edu.snu.cay.jobserver.Parameters.AppIdentifier;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
 import edu.snu.cay.jobserver.client.JobServerClient;
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.jobserver.driver.JobMaster;
@@ -142,7 +141,6 @@ public final class PregelJobLauncher {
         .bindImplementation(JobMaster.class, PregelJobMaster.class)
         .bindImplementation(JobEntity.class, PregelJobEntity.class)
         .bindImplementation(JobEntityBuilder.class, PregelJobEntityBuilder.class)
-        .bindImplementation(JobDispatcher.class, PregelJobDispatcher.class)
         .bindNamedParameter(SerializedTaskletConf.class, Configurations.toString(taskletConf))
         .build());
   }

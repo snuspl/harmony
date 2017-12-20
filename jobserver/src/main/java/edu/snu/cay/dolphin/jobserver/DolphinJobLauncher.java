@@ -25,7 +25,6 @@ import edu.snu.cay.dolphin.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
 import edu.snu.cay.jobserver.client.JobServerClient;
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobEntityBuilder;
 import edu.snu.cay.jobserver.driver.JobMaster;
@@ -185,7 +184,6 @@ public final class DolphinJobLauncher {
         .bindImplementation(JobMaster.class, DolphinJobMaster.class)
         .bindImplementation(JobEntity.class, DolphinJobEntity.class)
         .bindImplementation(JobEntityBuilder.class, DolphinJobEntityBuilder.class)
-        .bindImplementation(JobDispatcher.class, DolphinJobDispatcher.class)
         .bindNamedParameter(ETDolphinLauncher.SerializedServerConf.class, Configurations.toString(serverConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedWorkerConf.class, Configurations.toString(workerConf))
         .bindNamedParameter(ETDolphinLauncher.SerializedParamConf.class, Configurations.toString(userParamConf))

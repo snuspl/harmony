@@ -36,10 +36,14 @@ public final class FIFOJobScheduler implements JobScheduler {
   private final int numTotalResources;
   private int numAvailableResources;
 
+  private final JobDispatcher jobDispatcher;
+
   @Inject
-  private FIFOJobScheduler(@Parameter(Parameters.NumTotalResources.class) final int numTotalResources) {
+  private FIFOJobScheduler(@Parameter(Parameters.NumTotalResources.class) final int numTotalResources,
+                           final JobDispatcher jobDispatcher) {
     this.numTotalResources = numTotalResources;
     this.numAvailableResources = numTotalResources;
+    this.jobDispatcher = jobDispatcher;
   }
 
   /**
@@ -99,7 +103,8 @@ public final class FIFOJobScheduler implements JobScheduler {
           new Object[]{jobEntity.getJobId(), numAvailableResources, numAvailableResources - numResourcesToUse});
 
       numAvailableResources -= numResourcesToUse;
-      jobEntity.executeJob();
+
+      jobDispatcher.executeJob(jobEntity);
     }
 
     return execute;

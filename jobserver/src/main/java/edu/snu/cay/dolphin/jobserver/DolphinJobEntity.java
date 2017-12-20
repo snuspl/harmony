@@ -15,18 +15,29 @@
  */
 package edu.snu.cay.dolphin.jobserver;
 
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Dolphin's {@link JobEntity} implementation.
  */
 public final class DolphinJobEntity implements JobEntity {
+  private static final Logger LOG = Logger.getLogger(DolphinJobEntity.class.getName());
+
   private final Injector jobInjector;
   private final String jobId;
 
@@ -78,42 +89,67 @@ public final class DolphinJobEntity implements JobEntity {
     return numServers + numWorkers;
   }
 
-  public int getNumServers() {
-    return numServers;
-  }
-
-  public ExecutorConfiguration getServerExecutorConf() {
-    return serverExecutorConf;
-  }
-
-  public TableConfiguration getServerTableConf() {
-    return serverTableConf;
-  }
-
-  public int getNumWorkers() {
-    return numWorkers;
-  }
-
-  public ExecutorConfiguration getWorkerExecutorConf() {
-    return workerExecutorConf;
-  }
-
-  public TableConfiguration getWorkerTableConf() {
-    return workerTableConf;
-  }
-
   @Override
-  public String getInputPath() {
-    return inputPath;
-  }
-
-  @Override
-  public void executeJob() {
+  public List<List<AllocatedExecutor>> setupExecutors() {
+    final ETMaster etMaster;
     try {
-      jobInjector.getInstance(JobDispatcher.class).executeJob(this);
+      etMaster = jobInjector.getInstance(ETMaster.class);
     } catch (InjectionException e) {
       throw new RuntimeException(e);
     }
+
+    final List<List<AllocatedExecutor>> executorGroups = new ArrayList<>(2);
+
+    final Future<List<AllocatedExecutor>> serversFuture = etMaster
+        .addExecutors(numServers, serverExecutorConf);
+    final Future<List<AllocatedExecutor>> workersFuture = etMaster
+        .addExecutors(numWorkers, workerExecutorConf);
+
+    try {
+      final List<AllocatedExecutor> servers = serversFuture.get();
+      final List<AllocatedExecutor> workers = workersFuture.get();
+      executorGroups.add(servers);
+      executorGroups.add(workers);
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    return executorGroups;
+  }
+
+  @Override
+  public List<AllocatedTable> setupTables(final List<List<AllocatedExecutor>> executorGroups) {
+    final ETMaster etMaster;
+    try {
+      etMaster = jobInjector.getInstance(ETMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+    LOG.log(Level.INFO, "ETMaster: {0}", etMaster);
+
+    final List<AllocatedTable> tables = new ArrayList<>(2);
+
+    try {
+      final List<AllocatedExecutor> servers = executorGroups.get(0);
+      final List<AllocatedExecutor> workers = executorGroups.get(1);
+
+      final Future<AllocatedTable> modelTableFuture =
+          etMaster.createTable(serverTableConf, servers);
+      final Future<AllocatedTable> inputTableFuture =
+          etMaster.createTable(workerTableConf, workers);
+
+      final AllocatedTable modelTable = modelTableFuture.get();
+      final AllocatedTable inputTable = inputTableFuture.get();
+      tables.add(modelTable);
+      tables.add(inputTable);
+
+      modelTable.subscribe(workers).get();
+      inputTable.load(workers, inputPath).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    return tables;
   }
 
   public static Builder newBuilder() {

@@ -15,13 +15,20 @@
  */
 package edu.snu.cay.pregel.jobserver;
 
-import edu.snu.cay.jobserver.driver.JobDispatcher;
 import edu.snu.cay.jobserver.driver.JobEntity;
 import edu.snu.cay.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * Pregel's {@link JobEntity} implementation.
@@ -65,6 +72,63 @@ public final class PregelJobEntity implements JobEntity {
   }
 
   @Override
+  public List<List<AllocatedExecutor>> setupExecutors() {
+    final ETMaster etMaster;
+    try {
+      etMaster = jobInjector.getInstance(ETMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+
+    final List<List<AllocatedExecutor>> executorGroups = new ArrayList<>(1);
+
+    try {
+      final Future<List<AllocatedExecutor>> workersFuture = etMaster.addExecutors(numWorkers, workerExecutorConf);
+
+      final List<AllocatedExecutor> workers = workersFuture.get();
+      executorGroups.add(workers);
+
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    return executorGroups;
+  }
+
+  @Override
+  public List<AllocatedTable> setupTables(final List<List<AllocatedExecutor>> executorGroups) {
+    final ETMaster etMaster;
+    try {
+      etMaster = jobInjector.getInstance(ETMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+
+    final List<AllocatedTable> tables = new ArrayList<>(3);
+
+    try {
+      final List<AllocatedExecutor> workers = executorGroups.get(0);
+
+      final Future<AllocatedTable> vertexTableFuture = etMaster.createTable(vertexTableConf, workers);
+      final Future<AllocatedTable> msgTable1Future = etMaster.createTable(msgTable1Conf, workers);
+      final Future<AllocatedTable> msgTable2Future = etMaster.createTable(msgTable2Conf, workers);
+
+      final AllocatedTable vertexTable = vertexTableFuture.get();
+      final AllocatedTable msgTable1 = msgTable1Future.get();
+      final AllocatedTable msgTable2 = msgTable2Future.get();
+      tables.add(vertexTable);
+      tables.add(msgTable1);
+      tables.add(msgTable2);
+
+      vertexTable.load(workers, inputPath).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
+    return tables;
+  }
+
+  @Override
   public String getJobId() {
     return jobId;
   }
@@ -72,41 +136,6 @@ public final class PregelJobEntity implements JobEntity {
   @Override
   public int getNumExecutors() {
     return numWorkers;
-  }
-
-  public int getNumWorkers() {
-    return numWorkers;
-  }
-
-  public ExecutorConfiguration getWorkerExecutorConf() {
-    return workerExecutorConf;
-  }
-
-
-  public TableConfiguration getVertexTableConf() {
-    return vertexTableConf;
-  }
-
-  public TableConfiguration getMsgTable1Conf() {
-    return msgTable1Conf;
-  }
-
-  public TableConfiguration getMsgTable2Conf() {
-    return msgTable2Conf;
-  }
-
-  @Override
-  public String getInputPath() {
-    return inputPath;
-  }
-
-  @Override
-  public void executeJob() {
-    try {
-      jobInjector.getInstance(JobDispatcher.class).executeJob(this);
-    } catch (InjectionException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   public static Builder newBuilder() {
