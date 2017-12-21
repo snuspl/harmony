@@ -146,7 +146,7 @@ public final class JobServerDriver {
         try {
           final String serializedConf = result[1];
           final Configuration jobConf = ConfigurationUtils.fromString(serializedConf);
-          final JobEntity jobEntity = JobEntityBuilder.get(jobBaseInjector, jobConf).build();
+          final JobEntity jobEntity = JobEntity.getJobEntity(jobBaseInjector, jobConf);
 
           final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
 

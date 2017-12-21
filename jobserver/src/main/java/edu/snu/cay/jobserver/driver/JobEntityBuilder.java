@@ -15,8 +15,6 @@
  */
 package edu.snu.cay.jobserver.driver;
 
-import org.apache.reef.tang.Configuration;
-import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.io.IOException;
@@ -24,20 +22,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A builder interface for {@link JobEntity}.
- * Users should provide job-specific builder implementation.
+ * Users should provide a job-specific builder implementation.
  */
 public interface JobEntityBuilder {
   AtomicInteger JOB_COUNTER = new AtomicInteger(0);
 
-  static JobEntityBuilder get(final Injector jobBaseInjector, final Configuration jobConf) throws InjectionException {
-    final Injector jobInjector = jobBaseInjector.forkInjector(jobConf);
-    return jobInjector.getInstance(JobEntityBuilder.class);
-  }
-
   /**
-   * Build a JobEntityImpl from a given job configuration.
-   * @return a decoded {@link JobEntity}
+   * Builds a JobEntity.
+   * @return a {@link JobEntity}
    * @throws InjectionException
+   * @throws IOException
    */
   JobEntity build() throws InjectionException, IOException;
 }
