@@ -55,7 +55,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
 
   @Override
   public JobEntity build() throws InjectionException, IOException {
-    // generate different dolphin job id for each job
+    // generate different job id for each dolphin job instance
     final int jobCount = JOB_COUNTER.getAndIncrement();
 
     final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
@@ -127,7 +127,6 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setInputPath(inputPath)
         .build();
   }
-
 
   private static ResourceConfiguration buildResourceConf(final int numCores, final int memSize) {
     return ResourceConfiguration.newBuilder()
