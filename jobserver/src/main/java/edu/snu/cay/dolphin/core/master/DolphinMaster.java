@@ -168,7 +168,7 @@ public final class DolphinMaster {
   public void start(final List<AllocatedExecutor> servers, final List<AllocatedExecutor> workers,
                     final AllocatedTable modelTable, final AllocatedTable trainingDataTable) {
     try {
-      // TODO #00: tasklet-level metric collection
+      // TODO #5: tasklet-level metric collection
       workers.forEach(worker -> metricManager.startMetricCollection(worker.getId(), getWorkerMetricConf()));
 
       final List<TaskletResult> taskletResults = taskRunner.run(workers, servers);

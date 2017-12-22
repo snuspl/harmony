@@ -21,17 +21,12 @@ import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 /**
- * A basic implementation of job scheduler based on FIFO policy.
- * It submits jobs in order, whenever resources are available.
+ * A simple implementation of job scheduler that immediately launches job on arrival using all executors for each job.
  */
 public final class SchedulerImpl implements JobScheduler {
-  private static final Logger LOG = Logger.getLogger(SchedulerImpl.class.getName());
-
   private final ResourcePool resourcePool;
-
   private final JobDispatcher jobDispatcher;
 
   @Inject
@@ -42,30 +37,27 @@ public final class SchedulerImpl implements JobScheduler {
   }
 
   /**
-   * Execute a new job immediately, if there're enough free resources.
-   * Otherwise, put it into a queue so it can be executed when resources become available.
+   * Execute a new job immediately.
    */
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
-    // pick executors to use, considering resource utilization status and data locality
     final List<AllocatedExecutor> executorsToUse = pickExecutorsToUse(resourcePool.getExecutors(), jobEntity);
 
     jobDispatcher.executeJob(jobEntity, executorsToUse);
     return true;
   }
 
+  /**
+   * Simply pick all executors.
+   */
   private List<AllocatedExecutor> pickExecutorsToUse(
       final Map<String, AllocatedExecutor> executorMap, final JobEntity jobEntity) {
-    // TODO #00: simply use all executors
     return new ArrayList<>(executorMap.values());
   }
 
-  /**
-   * Executes waiting jobs if the enough amount of resources become available for them.
-   */
   @Override
   public synchronized void onJobFinish(final JobEntity jobEntity) {
-
+    // do nothing
   }
 
   @Override
