@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./start_jobserver.sh -num_total_resources 10 -max_num_eval_local 10 -local true -timeout 300000 -scheduler edu.snu.cay.jobserver.driver.FIFOJobScheduler
+# ./start_jobserver.sh -max_num_eval_local 5 -local true -timeout 300000 -scheduler edu.snu.cay.jobserver.driver.SchedulerImpl -num_executors 5 -executor_mem_size 128 -executor_num_cores 1 -executor_num_tasklets 4 -handler_queue_size 1024 -sender_queue_size 1024 -handler_num_threads 2 -sender_num_threads 2
 
 SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 

@@ -17,6 +17,7 @@ package edu.snu.cay.jobserver.client;
 
 import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.jobserver.Parameters;
+import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.jobserver.driver.JobScheduler;
 import edu.snu.cay.jobserver.driver.DriverSideMsgHandler;
 import edu.snu.cay.jobserver.driver.JobServerDriver;
@@ -124,7 +125,9 @@ public final class JobServerClient {
 
     // parameters for driver (job server)
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(DriverMemory.class,
-        Parameters.NumTotalResources.class, Parameters.SchedulerClass.class);
+        NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class, ExecutorNumTasklets.class,
+        HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class,
+        SchedulerClass.class);
 
     final CommandLine cl = new CommandLine();
     clientParamList.forEach(cl::registerShortNameOfClass);

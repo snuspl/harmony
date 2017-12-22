@@ -22,9 +22,6 @@ import edu.snu.cay.pregel.PregelParameters;
 import edu.snu.cay.pregel.common.DefaultVertexCodec;
 import edu.snu.cay.pregel.common.MessageCodec;
 import edu.snu.cay.pregel.common.MessageUpdateFunction;
-import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
-import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
-import edu.snu.cay.services.et.configuration.ResourceConfiguration;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
@@ -63,11 +60,6 @@ public final class PregelJobEntityBuilder implements JobEntityBuilder {
     final String vertexTableId = PregelParameters.VertexTableId.DEFAULT_VALUE + jobCount;
     final String msgTableId = PregelParameters.MessageTableId.DEFAULT_VALUE + jobCount;
 
-    final int workerNumCores = jobInjector.getNamedInstance(PregelParameters.ExecutorNumCores.class);
-    final int workerMemSize = jobInjector.getNamedInstance(PregelParameters.ExecutorMemSize.class);
-
-    final ExecutorConfiguration executorConf = buildExecutorConf(workerNumCores, workerMemSize);
-
     final DataParser dataParser = jobInjector.getInstance(DataParser.class);
     final StreamingCodec vertexValueCodec = jobInjector.getNamedInstance(PregelParameters.VertexValueCodec.class);
     final StreamingCodec edgeCodec = jobInjector.getNamedInstance(PregelParameters.EdgeCodec.class);
@@ -82,7 +74,6 @@ public final class PregelJobEntityBuilder implements JobEntityBuilder {
     final TableConfiguration msgTable2Conf = buildMsgTableConf(msgValueCodec,
         msgTableId + PregelParameters.MSG_TABLE_2_ID_POSTFIX);
 
-    final int numWorkers = jobInjector.getNamedInstance(PregelParameters.NumExecutors.class);
     final String inputDir = jobInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
 
     jobInjector.bindVolatileParameter(Parameters.JobId.class, pregelJobId);
@@ -92,31 +83,12 @@ public final class PregelJobEntityBuilder implements JobEntityBuilder {
     return PregelJobEntity.newBuilder()
         .setJobInjector(jobInjector)
         .setJobId(pregelJobId)
-        .setNumWorkers(numWorkers)
-        .setWorkerExecutorConf(executorConf)
         .setVertexTableConf(vertexTableConf)
         .setMsgTable1Conf(msgTable1Conf)
         .setMsgTable2Conf(msgTable2Conf)
         .setInputPath(inputDir)
         .build();
   }
-
-  private ExecutorConfiguration buildExecutorConf(final int workerNumCores,
-                                                  final int workerMemSize) {
-    return ExecutorConfiguration.newBuilder()
-        .setResourceConf(ResourceConfiguration.newBuilder()
-            .setNumCores(workerNumCores)
-            .setMemSizeInMB(workerMemSize)
-            .build())
-        .setRemoteAccessConf(RemoteAccessConfiguration.newBuilder()
-            .setHandlerQueueSize(2048)
-            .setNumHandlerThreads(4)
-            .setSenderQueueSize(2048)
-            .setNumSenderThreads(4)
-            .build())
-        .build();
-  }
-
 
   /**
    * Build a configuration of vertex table.

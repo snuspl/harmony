@@ -27,7 +27,7 @@ import javax.inject.Inject;
 import java.util.List;
 
 /**
- * JobMaster implmentation for Dolphin.
+ * JobMaster implementation for Dolphin.
  */
 public final class DolphinJobMaster implements JobMaster {
 

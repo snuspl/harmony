@@ -19,6 +19,7 @@ import com.google.common.collect.Sets;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorEntry;
 import edu.snu.cay.common.math.linalg.VectorFactory;
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.core.worker.TrainingDataProvider;
@@ -86,7 +87,8 @@ final class NMFTrainer implements Trainer<NMFData> {
                      @Parameter(DolphinParameters.DecayPeriod.class) final int decayPeriod,
                      @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches,
                      @Parameter(NMFParameters.PrintMatrices.class) final boolean printMatrices,
-                     @Parameter(DolphinParameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
+                     @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
+                     @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                      final NMFModelGenerator modelGenerator,
                      final TrainingDataProvider<NMFData> trainingDataProvider) {
     this.modelAccessor = modelAccessor;
@@ -107,10 +109,11 @@ final class NMFTrainer implements Trainer<NMFData> {
     this.trainingDataProvider = trainingDataProvider;
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
-    this.numTrainerThreads = Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1);
-    this.executor = CatchableExecutors.newFixedThreadPool(numTrainerThreads);
+    this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
+        Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
+        numTrainerThreads;
+    this.executor = CatchableExecutors.newFixedThreadPool(this.numTrainerThreads);
 
-    // Note that this number of trainer threads does not consider hyper-thread.
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", numTrainerThreads);
     LOG.log(Level.INFO, "Step size = {0}", stepSize);
     LOG.log(Level.INFO, "Number of total mini-batches in an epoch = {0}", numTotalMiniBatches);

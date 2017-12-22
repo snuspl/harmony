@@ -15,8 +15,9 @@
  */
 package edu.snu.cay.pregel.jobserver;
 
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.common.param.Parameters.InputDir;
-import edu.snu.cay.jobserver.Parameters.AppIdentifier;
+import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
 import edu.snu.cay.jobserver.client.JobServerClient;
@@ -75,9 +76,11 @@ public final class PregelJobLauncher {
 
       final List<Configuration> configurations = parseCommandLine(args, pregelConf.getUserParamList());
       final Configuration masterParamConf = configurations.get(0);
-      final Configuration userParamConf = configurations.get(1);
+      final Configuration workerParamConf = configurations.get(1);
+      final Configuration userParamConf = configurations.get(2);
 
-      final Configuration taskletConf = Configurations.merge(userParamConf, getTaskletConf(pregelConf));
+      final Configuration taskletConf = Configurations.merge(userParamConf, workerParamConf,
+          getTaskletConf(pregelConf));
 
       final Configuration masterConf = Configurations.merge(masterParamConf, getMasterConf(pregelConf));
 
@@ -101,16 +104,20 @@ public final class PregelJobLauncher {
 
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
         InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
+    final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(Parameters.HyperThreadEnabled.class,
+        NumWorkerThreads.class);
 
     final CommandLine cl = new CommandLine();
     masterParamList.forEach(cl::registerShortNameOfClass);
+    workerParamList.forEach(cl::registerShortNameOfClass);
     userParamList.forEach(cl::registerShortNameOfClass);
 
     final Configuration commandLineConf = cl.processCommandLine(args).getBuilder().build();
     final Configuration masterConf = ConfigurationUtils.extractParameterConf(masterParamList, commandLineConf);
+    final Configuration workerConf = ConfigurationUtils.extractParameterConf(workerParamList, commandLineConf);
     final Configuration userConf = ConfigurationUtils.extractParameterConf(userParamList, commandLineConf);
 
-    return Arrays.asList(masterConf, userConf);
+    return Arrays.asList(masterConf, workerConf, userConf);
   }
 
   private static Configuration getMasterConf(final PregelConfiguration pregelConf) {

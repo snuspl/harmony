@@ -17,6 +17,7 @@ package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
@@ -50,25 +51,14 @@ public interface JobEntity {
   String getJobId();
 
   /**
-   * @return the number of executors for this job
-   */
-  int getNumExecutors();
-
-  /**
    * @return a {@link JobMaster}
    */
   JobMaster getJobMaster();
 
   /**
-   * Setup executors.
-   * @return executor groups
+   * Setup executor groups and tables for {@link JobMaster#start}.
+   * @param executors executors to use
+   * @return a pair of executor groups and tables
    */
-  List<List<AllocatedExecutor>> setupExecutors();
-
-  /**
-   * Setup tables with the given executors.
-   * @param executorGroups executor groups
-   * @return tables
-   */
-  List<AllocatedTable> setupTables(List<List<AllocatedExecutor>> executorGroups);
+  Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> setupExecutorsAndTables(List<AllocatedExecutor> executors);
 }

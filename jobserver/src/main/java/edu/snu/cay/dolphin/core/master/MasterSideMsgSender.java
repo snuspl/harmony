@@ -53,7 +53,7 @@ final class MasterSideMsgSender {
    */
   void sendReleaseMsg(final String workerId) {
     try {
-      taskRunnerFuture.get().getRunningTasklet(workerId).send(serializedReleaseMsg);
+      taskRunnerFuture.get().getWorkerTasklet(workerId).send(serializedReleaseMsg);
     } catch (NetworkException e) {
       jobLogger.log(Level.INFO, String.format("Fail to send release msg to worker %s.", workerId), e);
     }
@@ -72,7 +72,7 @@ final class MasterSideMsgSender {
         .build();
 
     try {
-      taskRunnerFuture.get().getRunningTasklet(workerId).send(AvroUtils.toBytes(msg, DolphinMsg.class));
+      taskRunnerFuture.get().getWorkerTasklet(workerId).send(AvroUtils.toBytes(msg, DolphinMsg.class));
     } catch (NetworkException e) {
       jobLogger.log(Level.INFO, String.format("Fail to send ModelEvalAns msg to worker %s.", workerId), e);
     }

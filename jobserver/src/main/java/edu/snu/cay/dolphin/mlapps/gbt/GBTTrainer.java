@@ -16,6 +16,7 @@
 package edu.snu.cay.dolphin.mlapps.gbt;
 
 import edu.snu.cay.common.math.linalg.Vector;
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.core.worker.ETModelAccessor;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
@@ -144,7 +145,7 @@ final class GBTTrainer implements Trainer<GBTData> {
                      @Parameter(GBTParameters.TreeMaxDepth.class) final int treeMaxDepth,
                      @Parameter(GBTParameters.LeafMinSize.class) final int leafMinSize,
                      @Parameter(DolphinParameters.MaxNumEpochs.class) final int maxNumEpochs,
-                     @Parameter(DolphinParameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
+                     @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                      @Parameter(GBTParameters.NumKeys.class) final int numKeys,
                      final GBTMetadataParser metadataParser) {
     this.modelAccessor = modelAccessor;

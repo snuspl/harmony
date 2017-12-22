@@ -18,6 +18,7 @@ package edu.snu.cay.jobserver.driver;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.utils.CatchableExecutors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.tang.InjectionFuture;
 
@@ -46,27 +47,27 @@ final class JobDispatcher {
   }
 
   /**
-   * Executes a job.
+   * Executes a job with given executors.
+   * @param jobEntity a job entity
+   * @param executors executors to use
    */
-  void executeJob(final JobEntity jobEntity) {
-    sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
+  void executeJob(final JobEntity jobEntity,
+                  final List<AllocatedExecutor> executors) {
     CatchableExecutors.newSingleThreadExecutor().submit(() -> {
+      final Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> executorGroupsToTables =
+          jobEntity.setupExecutorsAndTables(executors);
+
       try {
         final JobMaster jobMaster = jobEntity.getJobMaster();
         jobServerDriverFuture.get().registerJobMaster(jobEntity.getJobId(), jobMaster);
 
-        LOG.log(Level.INFO, "Preparing executors and tables for job: {0}", jobEntity.getJobId());
-        final List<List<AllocatedExecutor>> executorGroups = jobEntity.setupExecutors();
-        final List<AllocatedTable> tables = jobEntity.setupTables(executorGroups);
-
-        jobMaster.start(executorGroups, tables);
-
-        executorGroups.forEach(executors -> executors.forEach(AllocatedExecutor::close));
+        sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
+        jobMaster.start(executorGroupsToTables.getLeft(), executorGroupsToTables.getRight());
 
       } finally {
         sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
         jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
-        jobSchedulerFuture.get().onJobFinish(jobEntity.getNumExecutors());
+        jobSchedulerFuture.get().onJobFinish(jobEntity);
       }
     });
   }

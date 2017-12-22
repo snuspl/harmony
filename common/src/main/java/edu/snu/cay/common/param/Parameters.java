@@ -82,6 +82,11 @@ public final class Parameters {
   public final class OptimizationBenefitThreshold implements Name<Double> {
   }
 
+  @NamedParameter(doc = "Whether the hyper-thread is enabled, which determines the proper number of trainer threads.",
+      short_name = "hyper_thread_enabled", default_value = "false")
+  public final class HyperThreadEnabled implements Name<Boolean> {
+  }
+
   @NamedParameter(doc = "Network bandwidth of machines to be used if not specified. " +
       "Its default value is 1G (approx. 1.07E9) bps.",
       short_name = "default_bandwidth",

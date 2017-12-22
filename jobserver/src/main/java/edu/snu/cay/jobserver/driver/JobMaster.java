@@ -32,7 +32,7 @@ public interface JobMaster {
   void onMsg(String srcId, byte[] bytes);
 
   /**
-   * Start running a job with given executors and tables.
+   * Start running a job with given executor groups and tables.
    * It returns after checking the result of tasks.
    */
   void start(List<List<AllocatedExecutor>> executorGroups,

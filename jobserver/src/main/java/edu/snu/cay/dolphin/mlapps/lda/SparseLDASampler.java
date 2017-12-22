@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.mlapps.lda;
 
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.mlapps.lda.LDAParameters.*;
@@ -63,7 +64,8 @@ final class SparseLDASampler {
                            @Parameter(Beta.class) final double beta,
                            @Parameter(NumTopics.class) final int numTopics,
                            @Parameter(NumVocabs.class) final int numVocabs,
-                           @Parameter(DolphinParameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
+                           @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
+                           @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                            final ModelHolder<LDAModel> modelHolder) {
     this.alpha = alpha;
     this.beta = beta;
@@ -72,8 +74,11 @@ final class SparseLDASampler {
     this.modelHolder = modelHolder;
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
-    this.numTrainerThreads = Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1);
-    this.executor = CatchableExecutors.newFixedThreadPool(numTrainerThreads);
+    this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
+        Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
+        numTrainerThreads;
+    this.executor = CatchableExecutors.newFixedThreadPool(this.numTrainerThreads);
+    LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
   }
 
   List<TopicChanges> sample(final Collection<Document> documents) {

@@ -16,6 +16,7 @@
 package edu.snu.cay.pregel;
 
 import com.google.common.collect.Lists;
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.pregel.graph.api.Computation;
 import edu.snu.cay.pregel.graph.api.Vertex;
 import edu.snu.cay.pregel.graph.impl.ComputationCallable;
@@ -60,40 +61,45 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
 
   private final Table<Long, Vertex<V, E>, ?> vertexTable;
 
+  private final int numWorkerThreads;
+
   @Inject
   private PregelWorkerTask(final MessageManager<Long, M> messageManager,
                            final WorkerMsgManager workerMsgManager,
                            final Computation<V, E, M> computation,
                            final TableAccessor tableAccessor,
+                           @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
+                           @Parameter(PregelParameters.NumWorkerThreads.class) final int numWorkerThreads,
                            @Parameter(PregelParameters.VertexTableId.class) final String vertexTableId)
       throws TableNotExistException {
     this.messageManager = messageManager;
     this.workerMsgManager = workerMsgManager;
     this.computation = computation;
     this.vertexTable = tableAccessor.getTable(vertexTableId);
+    this.numWorkerThreads = numWorkerThreads == Integer.parseInt(PregelParameters.NumWorkerThreads.UNSET_VALUE) ?
+        Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
+        numWorkerThreads;
   }
 
   @Override
   public void run() throws Exception {
 
     LOG.log(Level.INFO, "Pregel task starts.");
-
-    final int numThreads = Runtime.getRuntime().availableProcessors();
-    final ExecutorService executorService = CatchableExecutors.newFixedThreadPool(numThreads);
+    final ExecutorService executorService = CatchableExecutors.newFixedThreadPool(numWorkerThreads);
 
     int superStepCount = 0;
     // run supersteps until all vertices halt
     // each loop is a superstep
     while (true) {
       computation.initialize(superStepCount);
-      final List<Future<Integer>> futureList = new ArrayList<>(numThreads);
+      final List<Future<Integer>> futureList = new ArrayList<>(numWorkerThreads);
 
       // partition local graph-dataset as the number of threads
       final Map<Long, Vertex<V, E>> vertexMap = vertexTable.getLocalTablet().getDataMap();
-      final List<Partition<V, E>> vertexPartitions = partitionVertices(vertexMap, numThreads);
+      final List<Partition<V, E>> vertexPartitions = partitionVertices(vertexMap, numWorkerThreads);
 
       // compute each partition with a thread pool
-      for (int threadIdx = 0; threadIdx < numThreads; threadIdx++) {
+      for (int threadIdx = 0; threadIdx < numWorkerThreads; threadIdx++) {
         final Partition<V, E> partition = vertexPartitions.get(threadIdx);
         final Callable<Integer> computationCallable =
             new ComputationCallable<>(computation, partition, messageManager.getCurrentMessageTable());

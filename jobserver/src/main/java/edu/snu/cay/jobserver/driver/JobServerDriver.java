@@ -16,7 +16,9 @@
 package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.ETMaster;
+import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ConfigurationUtils;
+import edu.snu.cay.utils.StateMachine;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.driver.context.FailedContext;
 import org.apache.reef.driver.evaluator.FailedEvaluator;
@@ -32,7 +34,7 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -52,6 +54,8 @@ public final class JobServerDriver {
   private final JobServerStatusManager jobServerStatusManager;
   private final JobScheduler jobScheduler;
 
+  private final ResourcePool resourcePool;
+
   private final Injector jobBaseInjector;
 
   /**
@@ -59,19 +63,42 @@ public final class JobServerDriver {
    */
   private final Map<String, JobMaster> jobMasterMap = new ConcurrentHashMap<>();
 
-  private final AtomicBoolean isClosed = new AtomicBoolean(false);
+  private final StateMachine stateMachine;
+
+  private final ExecutorService submitCommandHandler = CatchableExecutors.newFixedThreadPool(4);
+  private final ExecutorService shutdownCommandHandler = CatchableExecutors.newFixedThreadPool(1);
 
   @Inject
   private JobServerDriver(final ETMaster etMaster,
                           final JobMessageObserver jobMessageObserver,
                           final Injector jobBaseInjector,
                           final JobServerStatusManager jobServerStatusManager,
-                          final JobScheduler jobScheduler)
+                          final JobScheduler jobScheduler,
+                          final ResourcePool resourcePool)
       throws IOException, InjectionException {
     this.jobMessageObserver = jobMessageObserver;
     this.jobBaseInjector = jobBaseInjector;
     this.jobServerStatusManager = jobServerStatusManager;
     this.jobScheduler = jobScheduler;
+    this.resourcePool = resourcePool;
+    this.stateMachine = initStateMachine();
+  }
+
+  private enum State {
+    NOT_INIT,
+    INIT,
+    CLOSED
+  }
+
+  private static StateMachine initStateMachine() {
+    return StateMachine.newBuilder()
+        .addState(State.NOT_INIT, "JobServer is not initialized yet.")
+        .addState(State.INIT, "JobServer has been initialized. It can handle commands from clients.")
+        .addState(State.CLOSED, "JobServer has been closed. It cannot handle anymore commands.")
+        .addTransition(State.NOT_INIT, State.INIT, "JobServer is initialized")
+        .addTransition(State.INIT, State.CLOSED, "JobServer is closed.")
+        .setInitialState(State.NOT_INIT)
+        .build();
   }
 
   /**
@@ -87,7 +114,7 @@ public final class JobServerDriver {
    * @param jobId a job Id
    * @param jobMaster a {@link JobMaster}
    */
-  public void registerJobMaster(final String jobId, final JobMaster jobMaster) {
+  void registerJobMaster(final String jobId, final JobMaster jobMaster) {
     if (jobMasterMap.put(jobId, jobMaster) != null) {
       throw new RuntimeException();
     }
@@ -97,7 +124,7 @@ public final class JobServerDriver {
    * Deregisters a {@link JobMaster} upon job finish.
    * @param jobId a job Id
    */
-  public void deregisterJobMaster(final String jobId) {
+  void deregisterJobMaster(final String jobId) {
     if (jobMasterMap.remove(jobId) == null) {
       throw new RuntimeException();
     }
@@ -109,23 +136,33 @@ public final class JobServerDriver {
   public final class StartHandler implements EventHandler<StartTime> {
     @Override
     public void onNext(final StartTime startTime) {
-      sendMessageToClient("Now, Job Server is ready to receive commands");
+      CatchableExecutors.newSingleThreadExecutor().submit(JobServerDriver.this::init);
     }
   }
 
+  private synchronized void init() {
+    stateMachine.checkState(State.NOT_INIT);
+
+    resourcePool.init();
+    sendMessageToClient("Now, Job Server is ready to receive commands");
+
+    stateMachine.setState(State.INIT);
+  }
+
   /**
-   * Initiates a shutdown in which previously submitted jobs are executed, but no new jobs will be accepted.
-   * Invocation has no additional effect if already shut down.
+   * Showdown JobServer immediately by forcibly closing all executors.
    */
-  private void shutdown() {
-    final String shutdownMsg = "Initiates shutdown of JobServer";
-
-    sendMessageToClient(shutdownMsg);
-    LOG.log(Level.INFO, shutdownMsg);
-
-    if (isClosed.compareAndSet(false, true)) {
-      jobServerStatusManager.finishJobServer();
+  private synchronized void shutdown() {
+    if (stateMachine.getCurrentState() != State.INIT) {
+      return;
     }
+
+    sendMessageToClient("Shutdown JobServer");
+
+    stateMachine.setState(State.CLOSED);
+
+    jobServerStatusManager.finishJobServer();
+    resourcePool.close();
   }
 
   /**
@@ -143,34 +180,35 @@ public final class JobServerDriver {
       final String command = result[0];
 
       // ignore commands
-      if (isClosed.get()) {
-        final String rejectMsg = String.format("Job Server is being shut down. Rejected command: %s", command);
-        LOG.log(Level.INFO, rejectMsg);
-        sendMessageToClient(rejectMsg);
+      if (stateMachine.getCurrentState() == State.NOT_INIT) {
+        sendMessageToClient(String.format("Job Server is not initialized yet. Rejected command: %s", command));
+        return;
+      } else if (stateMachine.getCurrentState() == State.CLOSED) {
+        sendMessageToClient(String.format("Job Server is being shut down. Rejected command: %s", command));
         return;
       }
 
       switch (command) {
       case SUBMIT_COMMAND:
-        try {
-          final String serializedConf = result[1];
-          final Configuration jobConf = ConfigurationUtils.fromString(serializedConf);
-          final JobEntity jobEntity = JobEntity.getJobEntity(jobBaseInjector, jobConf);
+        submitCommandHandler.submit(() -> {
+          try {
+            final String serializedConf = result[1];
+            final Configuration jobConf = ConfigurationUtils.fromString(serializedConf);
+            final JobEntity jobEntity = JobEntity.getJobEntity(jobBaseInjector, jobConf);
 
-          final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
+            final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
 
-          final String jobAcceptMsg = isAccepted ?
-              String.format("Accept. JobId: %s", jobEntity.getJobId()) :
-              String.format("Reject. JobId: %s", jobEntity.getJobId());
-          sendMessageToClient(jobAcceptMsg);
-          LOG.log(Level.INFO, jobAcceptMsg);
+            sendMessageToClient(isAccepted ?
+                String.format("Accept. JobId: %s", jobEntity.getJobId()) :
+                String.format("Reject. JobId: %s", jobEntity.getJobId()));
 
-        } catch (InjectionException | IOException e) {
-          throw new RuntimeException("The given job configuration is incomplete", e);
-        }
+          } catch (InjectionException | IOException e) {
+            throw new RuntimeException("The given job configuration is incomplete", e);
+          }
+        });
         break;
       case SHUTDOWN_COMMAND:
-        shutdown();
+        shutdownCommandHandler.submit(JobServerDriver.this::shutdown);
         break;
       default:
         throw new RuntimeException("There is unexpected command");
@@ -212,6 +250,7 @@ public final class JobServerDriver {
   }
 
   private void sendMessageToClient(final String message) {
+    LOG.log(Level.INFO, message);
     jobMessageObserver.sendMessageToClient(message.getBytes());
   }
 }

@@ -63,18 +63,13 @@ public final class DolphinParameters {
   public final class NumServerBlocks implements Name<Integer> {
   }
 
-  @NamedParameter(doc = "Whether the hyper-thread is enabled, which determines the proper number of trainer threads.",
-      short_name = "hyper_thread_enabled", default_value = "false")
-  public final class HyperThreadEnabled implements Name<Boolean> {
-  }
-
   @NamedParameter(doc = "Whether the model cache is enabled.",
       short_name = "model_cache_enabled", default_value = "false")
   public final class ModelCacheEnabled implements Name<Boolean> {
   }
 
   @NamedParameter(doc = "Desired memory size for each worker evaluator (MBs)",
-                  short_name = "worker_mem_size",
+                  short_name = "dolphin_worker_mem_size",
                   default_value = "128")
   public final class WorkerMemSize implements Name<Integer> {
   }
@@ -86,19 +81,19 @@ public final class DolphinParameters {
   }
 
   @NamedParameter(doc = "The number of workers",
-                  short_name = "num_workers",
+                  short_name = "num_dolphin_workers",
                   default_value = "1")
   public final class NumWorkers implements Name<Integer> {
   }
 
   @NamedParameter(doc = "The number of servers",
-                  short_name = "number_servers",
+                  short_name = "num_servers",
                   default_value = "1")
   public final class NumServers implements Name<Integer> {
   }
 
   @NamedParameter(doc = "The number of CPU cores for each worker evaluator",
-                  short_name = "num_worker_cores",
+                  short_name = "num_dolphin_worker_cores",
                   default_value = "1")
   public final class NumWorkerCores implements Name<Integer> {
   }
@@ -107,6 +102,17 @@ public final class DolphinParameters {
                   short_name = "num_server_cores",
                   default_value = "1")
   public final class NumServerCores implements Name<Integer> {
+  }
+
+  @NamedParameter(doc = "The number of trainer threads",
+                  short_name = "num_trainer_threads",
+                  default_value = NumTrainerThreads.UNSET_VALUE)
+  public final class NumTrainerThreads implements Name<Integer> {
+    public static final String UNSET_VALUE = "0";
+
+    private NumTrainerThreads() {
+
+    }
   }
 
   @NamedParameter(doc = "The queue size to handle remote access messages at server",

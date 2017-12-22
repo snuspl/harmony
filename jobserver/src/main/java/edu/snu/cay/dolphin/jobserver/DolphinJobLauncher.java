@@ -126,7 +126,7 @@ public final class DolphinJobLauncher {
 
     // parameters for master
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
-        MaxNumEpochs.class, NumTotalMiniBatches.class, NumWorkers.class, ServerMetricFlushPeriodMs.class
+        MaxNumEpochs.class, NumTotalMiniBatches.class, ServerMetricFlushPeriodMs.class
     );
 
     // commonly used parameters for ML apps
@@ -141,17 +141,12 @@ public final class DolphinJobLauncher {
 
     // parameters for servers
     final List<Class<? extends Name<?>>> serverParamList = Arrays.asList(
-        NumServers.class, ServerMemSize.class, NumServerCores.class,
-        NumServerHandlerThreads.class, NumServerSenderThreads.class,
-        ServerHandlerQueueSize.class, ServerSenderQueueSize.class,
         NumServerBlocks.class, ServerMetricFlushPeriodMs.class
     );
 
     // parameters for workers
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
-        NumWorkers.class, WorkerMemSize.class, NumWorkerCores.class,
-        NumWorkerHandlerThreads.class, NumWorkerSenderThreads.class,
-        WorkerHandlerQueueSize.class, WorkerSenderQueueSize.class,
+        NumTrainerThreads.class,
         NumWorkerBlocks.class, HyperThreadEnabled.class, MaxNumEpochs.class,
         NumTotalMiniBatches.class, TestDataPath.class, InputDir.class
     );

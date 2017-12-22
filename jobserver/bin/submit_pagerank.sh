@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./submit_pagerank.sh -num_executors 3 -input file://$(pwd)/inputs/adj_list -executor_mem_size 128 -executor_num_cores 1
+# ./submit_pagerank.sh -input file://$(pwd)/inputs/adj_list -num_worker_threads 1
 
 SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 

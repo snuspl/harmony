@@ -26,7 +26,7 @@ import javax.inject.Inject;
 import java.util.List;
 
 /**
- * JobMaster implmentation for Pregel.
+ * JobMaster implementation for Pregel.
  */
 public final class PregelJobMaster implements JobMaster {
 

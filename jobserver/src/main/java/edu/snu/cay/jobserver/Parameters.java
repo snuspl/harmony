@@ -32,6 +32,46 @@ public final class Parameters {
 
   }
 
+  @NamedParameter(doc = "The number of workers", short_name = "num_executors")
+  public final class NumExecutors implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "Desired memory size for each executor (MBs)", short_name = "executor_mem_size")
+  public final class ExecutorMemSize implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "The number of CPU cores for each executor", short_name = "executor_num_cores")
+  public final class ExecutorNumCores implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "The maximum number of tasklets in an executor", short_name = "executor_num_tasklets")
+  public final class ExecutorNumTasklets implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "Max number of ops that can be queued in op handler", short_name = "handler_queue_size")
+  public final class HandlerQueueSize implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "Max number of ops that can be queued for each sender thread", short_name = "sender_queue_size")
+  public final class SenderQueueSize implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "The number of threads to handle remote access messages", short_name = "handler_num_threads")
+  public final class HandlerNumThreads implements Name<Integer> {
+
+  }
+
+  @NamedParameter(doc = "The number of threads to send remote access messages", short_name = "sender_num_threads")
+  public final class SenderNumThreads implements Name<Integer> {
+
+  }
+
   @NamedParameter(doc = "An identifier of App.")
   public final class AppIdentifier implements Name<String> {
 
@@ -41,14 +81,9 @@ public final class Parameters {
   public final class JobId implements Name<String> {
   }
 
-  @NamedParameter(doc = "The number of total available resources in a cluster",
-      short_name = "num_total_resources")
-  public final class NumTotalResources implements Name<Integer> {
-  }
-
   @NamedParameter(doc = "A class of the scheduler",
       short_name = "scheduler",
-      default_value = "edu.snu.cay.jobserver.driver.FIFOJobScheduler")
+      default_value = "edu.snu.cay.jobserver.driver.SchedulerImpl")
   public final class SchedulerClass implements Name<String> {
   }
 }
