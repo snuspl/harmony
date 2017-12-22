@@ -18,7 +18,11 @@ package edu.snu.cay.jobserver.driver;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.reef.tang.Configuration;
+import org.apache.reef.tang.Injector;
+import org.apache.reef.tang.exceptions.InjectionException;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -26,8 +30,29 @@ import java.util.List;
  */
 public interface JobEntity {
 
+  /**
+   * Gets a {@link JobEntity} from an injector forked from {@code jobBaseInjector} with {@code jobConf}.
+   * It internally uses {@link JobEntityBuilder}.
+   * @param jobBaseInjector a job base injector
+   * @param jobConf a job configuration
+   * @return a {@link JobEntity}
+   * @throws InjectionException
+   * @throws IOException
+   */
+  static JobEntity getJobEntity(final Injector jobBaseInjector, final Configuration jobConf)
+      throws InjectionException, IOException {
+    final Injector jobInjector = jobBaseInjector.forkInjector(jobConf);
+    return jobInjector.getInstance(JobEntityBuilder.class).build();
+  }
+
+  /**
+   * @return the job Id
+   */
   String getJobId();
 
+  /**
+   * @return a {@link JobMaster}
+   */
   JobMaster getJobMaster();
 
   /**

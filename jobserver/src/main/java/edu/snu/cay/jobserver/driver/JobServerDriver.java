@@ -112,12 +112,21 @@ public final class JobServerDriver {
     return jobMasterMap.get(jobId);
   }
 
+  /**
+   * Register a {@link JobMaster} upon job start.
+   * @param jobId a job Id
+   * @param jobMaster a {@link JobMaster}
+   */
   public void registerJobMaster(final String jobId, final JobMaster jobMaster) {
     if (jobMasterMap.put(jobId, jobMaster) != null) {
       throw new RuntimeException();
     }
   }
 
+  /**
+   * Deregisters a {@link JobMaster} upon job finish.
+   * @param jobId a job Id
+   */
   public void deregisterJobMaster(final String jobId) {
     if (jobMasterMap.remove(jobId) == null) {
       throw new RuntimeException();
@@ -188,7 +197,7 @@ public final class JobServerDriver {
           try {
             final String serializedConf = result[1];
             final Configuration jobConf = ConfigurationUtils.fromString(serializedConf);
-            final JobEntity jobEntity = JobEntityBuilder.get(jobBaseInjector, jobConf).build();
+            final JobEntity jobEntity = JobEntity.getJobEntity(jobBaseInjector, jobConf);
 
             final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
 

@@ -17,7 +17,7 @@ package edu.snu.cay.pregel.jobserver;
 
 import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.common.param.Parameters.InputDir;
-import edu.snu.cay.jobserver.Parameters.AppIdentifier;
+import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.jobserver.client.CommandListener;
 import edu.snu.cay.jobserver.client.CommandSender;
 import edu.snu.cay.jobserver.client.JobServerClient;
@@ -41,7 +41,6 @@ import org.apache.reef.tang.formats.CommandLine;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -103,7 +102,8 @@ public final class PregelJobLauncher {
                                                       final List<Class<? extends Name<?>>> userParamList)
       throws IOException {
 
-    final List<Class<? extends Name<?>>> masterParamList = Collections.singletonList(InputDir.class);
+    final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
+        InputDir.class, NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class);
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(Parameters.HyperThreadEnabled.class,
         NumWorkerThreads.class);
 

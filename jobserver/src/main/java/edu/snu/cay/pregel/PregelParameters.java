@@ -37,6 +37,7 @@ public final class PregelParameters {
 
   @NamedParameter(doc = "Desired memory size for each worker (MBs)", short_name = "pregel_worker_mem_size")
   public final class WorkerMemSize implements Name<Integer> {
+
   }
 
   @NamedParameter(doc = "The number of CPU cores for each worker", short_name = "pregel_worker_num_cores")

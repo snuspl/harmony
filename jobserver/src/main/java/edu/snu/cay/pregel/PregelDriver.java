@@ -67,6 +67,7 @@ public final class PregelDriver {
                        @Parameter(PregelParameters.NumWorkers.class) final int numWorkers,
                        @Parameter(PregelParameters.WorkerMemSize.class) final int workerMemSize,
                        @Parameter(PregelParameters.WorkerNumCores.class) final int workerNumCores,
+
                        @Parameter(Parameters.InputDir.class) final String inputDir,
                        final PregelMaster pregelMaster,
                        final DataParser dataParser,

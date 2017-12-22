@@ -32,41 +32,49 @@ public final class Parameters {
 
   }
 
-  @NamedParameter(doc = "The number of executors in a cluster. We assume homogeneous environment.",
-      short_name = "num_executors")
+  @NamedParameter(doc = "The number of workers", short_name = "num_executors")
   public final class NumExecutors implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "executor_mem_size")
+  @NamedParameter(doc = "Desired memory size for each executor (MBs)", short_name = "executor_mem_size")
   public final class ExecutorMemSize implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "executor_num_cores")
+  @NamedParameter(doc = "The number of CPU cores for each executor", short_name = "executor_num_cores")
   public final class ExecutorNumCores implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "executor_num_tasklets")
+  @NamedParameter(doc = "The maximum number of tasklets in an executor", short_name = "executor_num_tasklets")
   public final class ExecutorNumTasklets implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "handler_queue_size")
+  @NamedParameter(doc = "Max number of ops that can be queued in op handler", short_name = "handler_queue_size")
   public final class HandlerQueueSize implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "sender_queue_size")
+  @NamedParameter(doc = "Max number of ops that can be queued for each sender thread", short_name = "sender_queue_size")
   public final class SenderQueueSize implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "handler_num_threads")
+  @NamedParameter(doc = "The number of threads to handle remote access messages", short_name = "handler_num_threads")
   public final class HandlerNumThreads implements Name<Integer> {
+
   }
 
-  @NamedParameter(doc = "", short_name = "sender_num_threads")
+  @NamedParameter(doc = "The number of threads to send remote access messages", short_name = "sender_num_threads")
   public final class SenderNumThreads implements Name<Integer> {
+
   }
 
   @NamedParameter(doc = "An identifier of App.")
   public final class AppIdentifier implements Name<String> {
+
   }
 
   @NamedParameter(doc = "Job identifier", default_value = "job")
