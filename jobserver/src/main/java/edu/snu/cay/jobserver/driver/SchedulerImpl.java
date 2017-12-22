@@ -62,6 +62,6 @@ public final class SchedulerImpl implements JobScheduler {
 
   @Override
   public synchronized void onResourceChange(final int delta) {
-    throw new UnsupportedOperationException("Resource availability is not supported for now");
+    throw new UnsupportedOperationException("Changes in Resource availability are not supported for now");
   }
 }
