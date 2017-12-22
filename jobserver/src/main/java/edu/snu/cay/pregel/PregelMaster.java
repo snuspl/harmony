@@ -37,7 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -48,7 +47,7 @@ import java.util.logging.Logger;
 @DriverSide
 public final class PregelMaster {
   private static final Logger LOG = Logger.getLogger(PregelMaster.class.getName());
-  private static final String WORKER_PREFIX = "Worker-";
+  private static final String WORKER_TASKLET_ID = "Worker";
 
   private final Set<String> workerIds;
 
@@ -63,7 +62,6 @@ public final class PregelMaster {
   private volatile CountDownLatch msgCountDownLatch;
 
   private final int numWorkers;
-  private final AtomicInteger workerCounter = new AtomicInteger(0);
 
   private final Configuration taskConf;
   private final String vertexTableId;
@@ -94,8 +92,6 @@ public final class PregelMaster {
                     final AllocatedTable vertexTable,
                     final AllocatedTable msgTable1,
                     final AllocatedTable msgTable2) {
-    initControlThread();
-
     final List<Future<RunningTasklet>> taskletFutureList = new ArrayList<>();
     executors.forEach(executor -> taskletFutureList.add(executor.submitTasklet(buildTaskletConf())));
 
@@ -108,12 +104,14 @@ public final class PregelMaster {
       }
     });
 
+    initControlThread();
+
     TaskletUtils.waitAndCheckTaskletResult(taskletFutureList, true);
   }
 
   private TaskletConfiguration buildTaskletConf() {
     return TaskletConfiguration.newBuilder()
-        .setId(WORKER_PREFIX + workerCounter.getAndIncrement())
+        .setId(jobId + "-" + WORKER_TASKLET_ID)
         .setTaskletClass(PregelWorkerTask.class)
         .setTaskletMsgHandlerClass(WorkerMsgManager.class)
         .setUserParamConf(Configurations.merge(
@@ -126,7 +124,6 @@ public final class PregelMaster {
   }
 
   private void initControlThread() {
-
     LOG.log(Level.INFO, "Start a thread that controls workers...");
     // submit a runnable that controls workers' supersteps.
     new Thread(() -> {
