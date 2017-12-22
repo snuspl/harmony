@@ -33,7 +33,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /**
- * Created by xyzi on 30/11/2017.
+ * A resource pool for JobServer, where resource unit is ET executor.
+ * All executors are homogeneous and their specification is determined by commandline arguments in {@link Parameters}.
  */
 final class ResourcePool {
 
@@ -70,6 +71,9 @@ final class ResourcePool {
         .build();
   }
 
+  /**
+   * Initialize resource pool by acquiring all executors from ET.
+   */
   void init() {
     try {
       final List<AllocatedExecutor> executors = etMaster.addExecutors(numExecutors, executorConfiguration).get();
@@ -80,6 +84,9 @@ final class ResourcePool {
     }
   }
 
+  /**
+   * Close resource pool by releasing all executors.
+   */
   void close() {
     final List<Future> executorCloseFutures = new ArrayList<>(executorMap.size());
 
@@ -94,7 +101,9 @@ final class ResourcePool {
     });
   }
 
-
+  /**
+   * @return all existing executors in the pool
+   */
   Map<String, AllocatedExecutor> getExecutors() {
     return Collections.unmodifiableMap(executorMap);
   }

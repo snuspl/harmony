@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -63,8 +62,6 @@ public final class JobServerDriver {
    * It maintains {@link JobMaster}s of running jobs.
    */
   private final Map<String, JobMaster> jobMasterMap = new ConcurrentHashMap<>();
-
-  private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
   private final StateMachine stateMachine;
 
@@ -117,7 +114,7 @@ public final class JobServerDriver {
    * @param jobId a job Id
    * @param jobMaster a {@link JobMaster}
    */
-  public void registerJobMaster(final String jobId, final JobMaster jobMaster) {
+  void registerJobMaster(final String jobId, final JobMaster jobMaster) {
     if (jobMasterMap.put(jobId, jobMaster) != null) {
       throw new RuntimeException();
     }
@@ -127,7 +124,7 @@ public final class JobServerDriver {
    * Deregisters a {@link JobMaster} upon job finish.
    * @param jobId a job Id
    */
-  public void deregisterJobMaster(final String jobId) {
+  void deregisterJobMaster(final String jobId) {
     if (jobMasterMap.remove(jobId) == null) {
       throw new RuntimeException();
     }
@@ -153,20 +150,19 @@ public final class JobServerDriver {
   }
 
   /**
-   * Initiates a shutdown in which previously submitted jobs are executed, but no new jobs will be accepted.
-   * Invocation has no additional effect if already shut down.
+   * Showdown JobServer immediately by forcibly closing all executors.
    */
-  private void shutdown() {
-    final String shutdownMsg = "Initiates shutdown of JobServer";
-
-    sendMessageToClient(shutdownMsg);
-    LOG.log(Level.INFO, shutdownMsg);
-
-    resourcePool.close();
-
-    if (isClosed.compareAndSet(false, true)) {
-      jobServerStatusManager.finishJobServer();
+  private synchronized void shutdown() {
+    if (stateMachine.getCurrentState() != State.INIT) {
+      return;
     }
+
+    sendMessageToClient("Shutdown JobServer");
+
+    stateMachine.setState(State.CLOSED);
+
+    jobServerStatusManager.finishJobServer();
+    resourcePool.close();
   }
 
   /**
@@ -184,10 +180,11 @@ public final class JobServerDriver {
       final String command = result[0];
 
       // ignore commands
-      if (isClosed.get()) {
-        final String rejectMsg = String.format("Job Server is being shut down. Rejected command: %s", command);
-        LOG.log(Level.INFO, rejectMsg);
-        sendMessageToClient(rejectMsg);
+      if (stateMachine.getCurrentState() == State.NOT_INIT) {
+        sendMessageToClient(String.format("Job Server is not initialized yet. Rejected command: %s", command));
+        return;
+      } else if (stateMachine.getCurrentState() == State.CLOSED) {
+        sendMessageToClient(String.format("Job Server is being shut down. Rejected command: %s", command));
         return;
       }
 
@@ -201,11 +198,9 @@ public final class JobServerDriver {
 
             final boolean isAccepted = jobScheduler.onJobArrival(jobEntity);
 
-            final String jobAcceptMsg = isAccepted ?
+            sendMessageToClient(isAccepted ?
                 String.format("Accept. JobId: %s", jobEntity.getJobId()) :
-                String.format("Reject. JobId: %s", jobEntity.getJobId());
-            sendMessageToClient(jobAcceptMsg);
-            LOG.log(Level.INFO, jobAcceptMsg);
+                String.format("Reject. JobId: %s", jobEntity.getJobId()));
 
           } catch (InjectionException | IOException e) {
             throw new RuntimeException("The given job configuration is incomplete", e);
@@ -255,6 +250,7 @@ public final class JobServerDriver {
   }
 
   private void sendMessageToClient(final String message) {
+    LOG.log(Level.INFO, message);
     jobMessageObserver.sendMessageToClient(message.getBytes());
   }
 }
