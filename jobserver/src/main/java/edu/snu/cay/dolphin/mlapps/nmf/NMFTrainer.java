@@ -77,6 +77,8 @@ final class NMFTrainer implements Trainer<NMFData> {
 
   private final TrainingDataProvider<NMFData> trainingDataProvider;
 
+  private final Table<Integer, Vector, Vector> localModelTable;
+
   @Inject
   private NMFTrainer(final ModelAccessor<Integer, Vector, Vector> modelAccessor,
                      final VectorFactory vectorFactory,
@@ -134,6 +136,9 @@ final class NMFTrainer implements Trainer<NMFData> {
     final List<Integer> keys = getKeys(instances);
     final NMFModel model = pullModels(keys);
 
+    // initialize local LMatrix
+    final NMFLocalModel localModel = getLocalModel(keys);
+
     // collect gradients computed in each thread
     final List<Future<Map<Integer, Vector>>> futures = new ArrayList<>(numTrainerThreads);
     try {
@@ -153,7 +158,10 @@ final class NMFTrainer implements Trainer<NMFData> {
               break;
             }
 
-            drainedInstances.forEach(instance -> updateGradient(instance, model, threadRGradient));
+            final Map<Integer, Vector> lMatrix = localModel.getLMatrix();
+
+            drainedInstances.forEach(instance -> updateGradient(instance, lMatrix.get(instance.getRowIndex()),
+                model, threadRGradient));
             drainedInstances.clear();
             count += numDrained;
           }
@@ -192,11 +200,13 @@ final class NMFTrainer implements Trainer<NMFData> {
                                                  final Collection<NMFData> testData,
                                                  final Table modelTable) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
-    final NMFModel model = pullModelToEvaluate(getKeys(inputData), modelTable);
+    final List<Integer> keys = getKeys(inputData);
+    final NMFModel model = pullModelToEvaluate(keys, modelTable);
+    final NMFLocalModel localModel = getLocalModel(keys);
 
     LOG.log(Level.INFO, "Start computing loss value");
     final Map<CharSequence, Double> map = new HashMap<>();
-    map.put("loss", (double) computeLoss(inputData, model));
+    map.put("loss", (double) computeLoss(inputData, localModel, model));
 
     return map;
   }
@@ -210,6 +220,15 @@ final class NMFTrainer implements Trainer<NMFData> {
     return new NMFModel(rMatrix);
   }
 
+  private NMFLocalModel getLocalModel(final List<Integer> keys) {
+    final Map<Integer, Vector> lMatrix = new HashMap<>(keys.size());
+    final List<Vector> vectors = modelAccessor.pull(keys, localModelTable);
+     for (int i = 0; i < keys.size(); ++i) {
+      lMatrix.put(keys.get(i), vectors.get(i));
+    }
+    return new NMFLocalModel(lMatrix);
+  }
+
   @Override
   public void cleanup() {
     // print generated matrices
@@ -220,9 +239,13 @@ final class NMFTrainer implements Trainer<NMFData> {
     final Collection<NMFData> workload = trainingDataProvider.getEpochData();
 
     final StringBuilder lsb = new StringBuilder();
+
+    final List<Integer> keys = getKeys(workload);
+
+    final NMFLocalModel localModel = getLocalModel(keys);
     for (final NMFData datum : workload) {
       lsb.append(String.format("L(%d, *):", datum.getRowIndex()));
-      for (final VectorEntry valueEntry : datum.getVector()) {
+      for (final VectorEntry valueEntry : localModel.getLMatrix().get(datum.getRowIndex())) {
         lsb.append(' ');
         lsb.append(valueEntry.value());
       }
@@ -260,13 +283,12 @@ final class NMFTrainer implements Trainer<NMFData> {
   /**
    * Processes one training data instance and update the intermediate model.
    * @param datum training data instance
+   * @param lVec L_{i, *} : i-th row of L
    * @param model up-to-date NMFModel which is pulled from server
    * @param threadRGradient gradient matrix to update {@param model}
-
    */
-  private void updateGradient(final NMFData datum, final NMFModel model,
+  private void updateGradient(final NMFData datum, final Vector lVec, final NMFModel model,
                               final Map<Integer, Vector> threadRGradient) {
-    final Vector lVec = datum.getVector(); // L_{i, *} : i-th row of L
     final Vector lGradSum;
     if (lambda != 0.0f) {
       // l2 regularization term. 2 * lambda * L_{i, *}
@@ -297,7 +319,7 @@ final class NMFTrainer implements Trainer<NMFData> {
     }
 
     // update L matrix
-    modelGenerator.getValidVector(lVec.axpy(-stepSize, lGradSum));
+    modelAccessor.push(datum.getRowIndex(), lGradSum, localModelTable);
   }
 
   /**
@@ -336,12 +358,15 @@ final class NMFTrainer implements Trainer<NMFData> {
    * @param instances The training data instances to evaluate training loss.
    * @return the loss value, computed by the sum of the errors.
    */
-  private float computeLoss(final Collection<NMFData> instances, final NMFModel model) {
+  private float computeLoss(final Collection<NMFData> instances,
+                            final NMFLocalModel nmfLocalModel,
+                            final NMFModel model) {
     final Map<Integer, Vector> rMatrix = model.getRMatrix();
+    final Map<Integer, Vector> lMatrix = nmfLocalModel.getLMatrix();
 
     float loss = 0.0f;
     for (final NMFData datum : instances) {
-      final Vector lVec = datum.getVector(); // L_{i, *} : i-th row of L
+      final Vector lVec = lMatrix.get(datum.getRowIndex()); // L_{i, *} : i-th row of L
       for (final Pair<Integer, Float> column : datum.getColumns()) { // a pair of column index and value
         final int colIdx = column.getFirst();
         final Vector rVec = rMatrix.get(colIdx); // R_{*, j} : j-th column of R

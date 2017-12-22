@@ -37,11 +37,9 @@ import java.util.List;
  * In this format, one-based indexing is used.
  */
 final class NMFETDataParser implements DataParser<NMFData> {
-  private final NMFModelGenerator modelGenerator;
-
   @Inject
-  private NMFETDataParser(final NMFModelGenerator modelGenerator) {
-    this.modelGenerator = modelGenerator;
+  private NMFETDataParser() {
+
   }
 
   private List<Pair<Integer, Float>> parseColumns(final String columnsString) {
@@ -101,7 +99,7 @@ final class NMFETDataParser implements DataParser<NMFData> {
         throw new RuntimeException("Failed to parse: invalid indices. It should be greater than zero");
       }
 
-      result.add(new NMFData(rowIndex, parseColumns(split[1].trim()), modelGenerator.createRandomVector()));
+      result.add(new NMFData(rowIndex, parseColumns(split[1].trim())));
     }
     return result;
   }

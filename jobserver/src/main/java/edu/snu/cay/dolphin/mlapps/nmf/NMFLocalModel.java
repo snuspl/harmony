@@ -16,32 +16,26 @@
 package edu.snu.cay.dolphin.mlapps.nmf;
 
 import edu.snu.cay.common.math.linalg.Vector;
-import edu.snu.cay.utils.Copyable;
 
 import java.util.Map;
 
 /**
  * Encapsulates the model data in NMF app.
  */
-final class NMFModel implements Copyable<NMFModel> {
+final class NMFLocalModel {
   /**
-   * Column-wise representation of right matrix.
+   * Row-wise representation of left matrix.
    */
-  private final Map<Integer, Vector> rMatrix;
+  private final Map<Integer, Vector> lMatrix;
 
-  NMFModel(final Map<Integer, Vector> rMatrix) {
-    this.rMatrix = rMatrix;
-  }
-
-  @Override
-  public NMFModel copyOf() {
-    return new NMFModel(rMatrix);
+  NMFLocalModel(final Map<Integer, Vector> lMatrix) {
+    this.lMatrix = lMatrix;
   }
 
   /**
-   * @return the R matrix
+   * @return the L matrix
    */
-  Map<Integer, Vector> getRMatrix() {
-    return rMatrix;
+  Map<Integer, Vector> getLMatrix() {
+    return lMatrix;
   }
 }

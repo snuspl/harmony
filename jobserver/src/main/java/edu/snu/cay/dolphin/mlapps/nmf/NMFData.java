@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.dolphin.mlapps.nmf;
 
-import edu.snu.cay.common.math.linalg.Vector;
 import org.apache.reef.io.network.util.Pair;
 
 import java.util.List;
@@ -27,14 +26,11 @@ final class NMFData {
 
   private final int rowIndex;
   private final List<Pair<Integer, Float>> columns;
-  private final Vector vector;
 
   NMFData(final int rowIndex,
-          final List<Pair<Integer, Float>> columns,
-          final Vector vector) {
+          final List<Pair<Integer, Float>> columns) {
     this.rowIndex = rowIndex;
     this.columns = columns;
-    this.vector = vector;
   }
 
   int getRowIndex() {
@@ -43,9 +39,5 @@ final class NMFData {
 
   List<Pair<Integer, Float>> getColumns() {
     return columns;
-  }
-
-  Vector getVector() {
-    return vector;
   }
 }

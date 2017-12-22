@@ -15,8 +15,6 @@
  */
 package edu.snu.cay.dolphin.mlapps.nmf;
 
-import edu.snu.cay.common.math.linalg.Vector;
-import edu.snu.cay.dolphin.mlapps.serialization.DenseVectorCodec;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.network.util.Pair;
 import org.apache.reef.io.serialization.Codec;
@@ -27,17 +25,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
-  private final DenseVectorCodec denseVectorCodec;
 
   @Inject
-  private NMFDataCodec(final DenseVectorCodec denseVectorCodec) {
-    this.denseVectorCodec = denseVectorCodec;
+  private NMFDataCodec() {
+
   }
 
   @Override
   public byte[] encode(final NMFData nmfData) {
-    final int numBytes =
-        denseVectorCodec.getNumBytes(nmfData.getVector()) + getNumBytes(nmfData.getColumns()) + Integer.BYTES;
+    final int numBytes = getNumBytes(nmfData.getColumns()) + Integer.BYTES;
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream(numBytes);
          DataOutputStream daos = new DataOutputStream(baos)) {
       encodeToStream(nmfData, daos);
@@ -61,7 +57,6 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
     try {
       daos.writeInt(nmfData.getRowIndex());
       encodeColumns(nmfData.getColumns(), daos);
-      denseVectorCodec.encodeToStream(nmfData.getVector(), daos);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
@@ -72,8 +67,7 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
     try {
       final int rowIndex = dais.readInt();
       final List<Pair<Integer, Float>> columns = decodeColumns(dais);
-      final Vector vector = denseVectorCodec.decodeFromStream(dais);
-      return new NMFData(rowIndex, columns, vector);
+      return new NMFData(rowIndex, columns);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
