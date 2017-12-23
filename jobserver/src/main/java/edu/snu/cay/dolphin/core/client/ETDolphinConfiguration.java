@@ -42,6 +42,7 @@ import java.util.List;
 @ClientSide
 public final class ETDolphinConfiguration {
   private final Class<? extends Trainer> trainerClass;
+  private final boolean hasInputDataKey;
   private final Class<? extends DataParser> inputParserClass;
   private final Class<? extends StreamingCodec> inputKeyCodecClass;
   private final Class<? extends StreamingCodec> inputValueCodecClass;
@@ -55,6 +56,7 @@ public final class ETDolphinConfiguration {
   private final Configuration serverConfiguration;
 
   private ETDolphinConfiguration(final Class<? extends Trainer> trainerClass,
+                                 final boolean hasInputDataKey,
                                  final Class<? extends DataParser> inputParserClass,
                                  final Class<? extends StreamingCodec> inputKeyCodecClass,
                                  final Class<? extends StreamingCodec> inputValueCodecClass,
@@ -66,6 +68,7 @@ public final class ETDolphinConfiguration {
                                  final Configuration workerConfiguration,
                                  final Configuration serverConfiguration) {
     this.trainerClass = trainerClass;
+    this.hasInputDataKey = hasInputDataKey;
     this.inputParserClass = inputParserClass;
     this.inputKeyCodecClass = inputKeyCodecClass;
     this.inputValueCodecClass = inputValueCodecClass;
@@ -80,6 +83,10 @@ public final class ETDolphinConfiguration {
 
   public Class<? extends Trainer> getTrainerClass() {
     return trainerClass;
+  }
+
+  public boolean hasInputDataKey() {
+    return hasInputDataKey;
   }
 
   public Class<? extends DataParser> getInputParserClass() {
@@ -128,6 +135,7 @@ public final class ETDolphinConfiguration {
 
   public static class Builder implements org.apache.reef.util.Builder<ETDolphinConfiguration> {
     private Class<? extends Trainer> trainerClass;
+    private boolean hasInputDataKey = false;
     private Class<? extends DataParser> inputParserClass;
     private Class<? extends StreamingCodec> inputKeyCodecClass = StreamingSerializableCodec.class;
     private Class<? extends StreamingCodec> inputValueCodecClass = StreamingSerializableCodec.class;
@@ -143,6 +151,11 @@ public final class ETDolphinConfiguration {
 
     public Builder setTrainerClass(final Class<? extends Trainer> trainerClass) {
       this.trainerClass = trainerClass;
+      return this;
+    }
+
+    public Builder setHasInputDataKey() {
+      this.hasInputDataKey = true;
       return this;
     }
 
@@ -202,7 +215,8 @@ public final class ETDolphinConfiguration {
       BuilderUtils.notNull(inputParserClass);
       BuilderUtils.notNull(modelUpdateFunctionClass);
 
-      return new ETDolphinConfiguration(trainerClass, inputParserClass, inputKeyCodecClass, inputValueCodecClass,
+      return new ETDolphinConfiguration(trainerClass,
+          hasInputDataKey, inputParserClass, inputKeyCodecClass, inputValueCodecClass,
           modelUpdateFunctionClass, modelKeyCodecClass, modelValueCodecClass, modelUpdateValueCodecClass,
           parameterClassList, workerConfiguration, serverConfiguration);
     }

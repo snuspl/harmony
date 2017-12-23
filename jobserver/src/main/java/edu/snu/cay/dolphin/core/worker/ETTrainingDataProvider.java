@@ -35,12 +35,12 @@ import java.util.logging.Logger;
  * @param <V> type of the training data
  */
 @TaskSide
-public final class ETTrainingDataProvider<V> implements TrainingDataProvider<V> {
+public final class ETTrainingDataProvider<K, V> implements TrainingDataProvider<K, V> {
   private static final Logger LOG = Logger.getLogger(ETTrainingDataProvider.class.getName());
 
-  private volatile Iterator<Block<?, V, ?>> blockIterator = Iterators.emptyIterator();
+  private volatile Iterator<Block<K, V, Object>> blockIterator = Iterators.emptyIterator();
 
-  private final Table<?, V, Object> trainingDataTable;
+  private final Table<K, V, Object> trainingDataTable;
 
   @Inject
   private ETTrainingDataProvider(@Parameter(DolphinParameters.InputTableId.class) final String inputTableId,
@@ -50,7 +50,7 @@ public final class ETTrainingDataProvider<V> implements TrainingDataProvider<V> 
 
   @Override
   public void prepareDataForEpoch() {
-    final Tablet tablet = trainingDataTable.getLocalTablet();
+    final Tablet<K, V, Object> tablet = trainingDataTable.getLocalTablet();
 
     LOG.log(Level.INFO, "Number of blocks: {0}, data items: {1}",
         new Object[]{tablet.getNumBlocks(), tablet.getNumDataItems()});
@@ -59,15 +59,15 @@ public final class ETTrainingDataProvider<V> implements TrainingDataProvider<V> 
   }
 
   @Override
-  public Collection<V> getNextBatchData() {
+  public Collection<Map.Entry<K, V>> getNextBatchData() {
     if (blockIterator.hasNext()) {
-      final Map<?, V> batchData = blockIterator.next().getAll();
-      final List<V> valueList = new ArrayList<>(batchData.values());
+      final Map<K, V> batchData = blockIterator.next().getAll();
+      final List<Map.Entry<K, V>> entryList = new ArrayList<>(batchData.entrySet());
 
-      Collections.shuffle(valueList); // shuffle to avoid bias
+      Collections.shuffle(entryList); // shuffle to avoid bias
 
       LOG.log(Level.INFO, "Size of training data for next mini-batch: {0}", batchData.size());
-      return valueList;
+      return entryList;
     }
 
     LOG.log(Level.INFO, "no more training data for current epoch");
@@ -75,8 +75,8 @@ public final class ETTrainingDataProvider<V> implements TrainingDataProvider<V> 
   }
 
   @Override
-  public Collection<V> getEpochData() {
-    return trainingDataTable.getLocalTablet().getDataMap().values();
+  public Collection<Map.Entry<K, V>> getEpochData() {
+    return trainingDataTable.getLocalTablet().getDataMap().entrySet();
   }
   
   @Override

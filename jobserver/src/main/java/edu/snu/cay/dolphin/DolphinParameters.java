@@ -39,6 +39,10 @@ public final class DolphinParameters {
     }
   }
 
+  @NamedParameter(doc = "Whether this app's input data has key or not", default_value = "false")
+  public final class HasInputDataKey implements Name<Boolean> {
+  }
+
   @NamedParameter(doc = "Starting epoch index for each worker")
   public final class StartingEpochIdx implements Name<Integer> {
   }

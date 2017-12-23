@@ -81,20 +81,20 @@ final class SparseLDASampler {
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
   }
 
-  List<TopicChanges> sample(final Collection<Document> documents) {
+  List<TopicChanges> sample(final Collection<Map.Entry<Long, Document>> documentPairs) {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
-    final BlockingQueue<Document> instances = new ArrayBlockingQueue<>(documents.size());
-    instances.addAll(documents);
+    final BlockingQueue<Map.Entry<Long, Document>> instances = new ArrayBlockingQueue<>(documentPairs.size());
+    instances.addAll(documentPairs);
 
     final List<Future<TopicChanges>> futures = new ArrayList<>(numTrainerThreads);
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
       // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = Math.max(documents.size() / numTrainerThreads / numTrainerThreads, 1);
+      final int drainSize = Math.max(documentPairs.size() / numTrainerThreads / numTrainerThreads, 1);
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final Future<TopicChanges> future = executor.submit(() -> {
-          final List<Document> drainedInstances = new ArrayList<>(drainSize);
+          final List<Map.Entry<Long, Document>> drainedInstances = new ArrayList<>(drainSize);
           final LDAModel model = modelHolder.getModel()
               .orElseThrow(() -> new RuntimeException(MSG_GET_MODEL_FAILED));
 
@@ -127,10 +127,11 @@ final class SparseLDASampler {
 
   /**
    * Processes one training data instance and update the intermediate model.
-   * @param document training data instance
+   * @param documentPair training data instance
    * @param model the latest model
    */
-  private void updateModel(final Document document, final LDAModel model) {
+  private void updateModel(final Map.Entry<Long, Document> documentPair, final LDAModel model) {
+    final Document document = documentPair.getValue();
     final int[] topicSummaryVector = model.getTopicSummaryVector();
     final Map<Integer, int[]> wordTopicVectors = model.getWordTopicVectors();
 

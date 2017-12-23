@@ -36,6 +36,7 @@ import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpCommitPath;
 import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpTempPath;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
+import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.services.et.metric.configuration.MetricServiceDriverConf;
 import edu.snu.cay.services.et.plan.api.PlanExecutor;
 import org.apache.commons.cli.ParseException;
@@ -143,9 +144,11 @@ public final class ETDolphinLauncher {
               .bindImplementation(DataParser.class, dolphinConf.getInputParserClass())
               .bindImplementation(TrainingDataProvider.class, ETTrainingDataProvider.class)
               .bindImplementation(ModelAccessor.class, modelAccessorClass)
-              .bindImplementation(UpdateFunction.class, dolphinConf.getModelUpdateFunctionClass())
+              .bindImplementation(UpdateFunction.class, modelCacheEnabled ?
+                  dolphinConf.getModelUpdateFunctionClass() : VoidUpdateFunction.class)
               .bindNamedParameter(KeyCodec.class, dolphinConf.getInputKeyCodecClass())
               .bindNamedParameter(ValueCodec.class, dolphinConf.getInputValueCodecClass())
+              .bindNamedParameter(HasInputDataKey.class, Boolean.toString(dolphinConf.hasInputDataKey()))
               .build());
 
       final Injector clientParameterInjector = Tang.Factory.getTang().newInjector(clientParamConf);

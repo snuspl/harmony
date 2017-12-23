@@ -32,6 +32,8 @@ import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
+import edu.snu.cay.services.et.evaluator.impl.NoneKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 import org.apache.reef.driver.client.JobMessageObserver;
@@ -169,6 +171,7 @@ public final class DolphinDriver {
     final StreamingCodec keyCodec = workerInjector.getNamedInstance(KeyCodec.class);
     final StreamingCodec valueCodec = workerInjector.getNamedInstance(ValueCodec.class);
     final DataParser dataParser = workerInjector.getInstance(DataParser.class);
+    final boolean hasInputDataKey = workerInjector.getNamedInstance(DolphinParameters.HasInputDataKey.class);
 
     return TableConfiguration.newBuilder()
         .setId(DolphinParameters.InputTableId.DEFAULT_VALUE)
@@ -178,8 +181,9 @@ public final class DolphinDriver {
         .setUpdateFunctionClass(VoidUpdateFunction.class)
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
-        .setIsOrderedTable(true)
+        .setIsOrderedTable(false)
         .setDataParserClass(dataParser.getClass())
+        .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
         .setUserParamConf(userParamConf)
         .build();
   }
