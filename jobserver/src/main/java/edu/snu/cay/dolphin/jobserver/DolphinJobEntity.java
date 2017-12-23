@@ -80,7 +80,8 @@ public final class DolphinJobEntity implements JobEntity {
       final List<AllocatedExecutor> executors) {
     jobInjector.bindVolatileParameter(DolphinParameters.NumWorkers.class, executors.size());
 
-    // support collocation only
+    // only PS collocation is supported; all workers and servers are co-located at executors
+    // (i.e., executors = servers = workers).
     final List<List<AllocatedExecutor>> executorGroups = Arrays.asList(executors, executors);
 
     final ETMaster etMaster;
