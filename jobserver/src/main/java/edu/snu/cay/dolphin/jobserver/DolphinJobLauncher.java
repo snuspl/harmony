@@ -113,12 +113,14 @@ public final class DolphinJobLauncher {
         final Configuration localModelTableConf = Tang.Factory.getTang().newConfigurationBuilder()
             .bindNamedParameter(ETDolphinLauncher.SerializedLocalModelTableConf.class,
                 ConfigurationUtils.SERIALIZER.toString(
-                    Tang.Factory.getTang().newConfigurationBuilder()
-                        .bindImplementation(UpdateFunction.class, dolphinConf.getLocalModelUpdateFunctionClass())
-                        .bindNamedParameter(KeyCodec.class, dolphinConf.getLocalModelKeyCodecClass())
-                        .bindNamedParameter(ValueCodec.class, dolphinConf.getLocalModelValueCodecClass())
-                        .bindNamedParameter(UpdateValueCodec.class, dolphinConf.getLocalModelUpdateValueCodecClass())
-                        .build()
+                    Configurations.merge(userParamConf,
+                        Tang.Factory.getTang().newConfigurationBuilder()
+                            .bindImplementation(UpdateFunction.class, dolphinConf.getLocalModelUpdateFunctionClass())
+                            .bindNamedParameter(KeyCodec.class, dolphinConf.getLocalModelKeyCodecClass())
+                            .bindNamedParameter(ValueCodec.class, dolphinConf.getLocalModelValueCodecClass())
+                            .bindNamedParameter(UpdateValueCodec.class,
+                                dolphinConf.getLocalModelUpdateValueCodecClass())
+                            .build())
                 )).build();
 
         workerConf = Configurations.merge(workerConf, localModelTableConf);

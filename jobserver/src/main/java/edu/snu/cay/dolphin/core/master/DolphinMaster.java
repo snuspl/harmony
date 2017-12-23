@@ -68,6 +68,7 @@ public final class DolphinMaster {
   private final boolean offlineModelEval; // whether to perform model evaluation offline or online
   private final String modelTableId;
   private final String inputTableId;
+  private final String localModelTableId;
   private final Configuration workerConf;
 
   @Inject
@@ -81,6 +82,7 @@ public final class DolphinMaster {
                         @Parameter(Parameters.JobId.class) final String jobId,
                         @Parameter(ModelTableId.class) final String modelTableId,
                         @Parameter(InputTableId.class) final String inputTableId,
+                        @Parameter(LocalModelTableId.class) final String localModelTableId,
                         @Parameter(OfflineModelEvaluation.class) final boolean offlineModelEval,
                         @Parameter(ServerMetricFlushPeriodMs.class) final long serverMetricFlushPeriodMs,
                         @Parameter(ETDolphinLauncher.SerializedWorkerConf.class) final String serializedWorkerConf)
@@ -95,6 +97,7 @@ public final class DolphinMaster {
     this.jobId = jobId;
     this.modelTableId = modelTableId;
     this.inputTableId = inputTableId;
+    this.localModelTableId = localModelTableId;
     this.workerConf = confSerializer.fromString(serializedWorkerConf);
     this.offlineModelEval = offlineModelEval;
   }
@@ -110,6 +113,7 @@ public final class DolphinMaster {
                 .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
                 .bindNamedParameter(ModelTableId.class, modelTableId)
                 .bindNamedParameter(InputTableId.class, inputTableId)
+                .bindNamedParameter(LocalModelTableId.class, localModelTableId)
                 .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
                 .build(),
             workerConf)).build();
@@ -126,6 +130,7 @@ public final class DolphinMaster {
                 .bindNamedParameter(StartingEpochIdx.class, Integer.toString(progressTracker.getGlobalMinEpochIdx()))
                 .bindNamedParameter(ModelTableId.class, modelTableId)
                 .bindNamedParameter(InputTableId.class, inputTableId)
+                .bindNamedParameter(LocalModelTableId.class, localModelTableId)
                 .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
                 .build(),
             workerConf))
