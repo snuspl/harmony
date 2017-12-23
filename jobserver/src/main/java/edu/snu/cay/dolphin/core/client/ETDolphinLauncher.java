@@ -36,8 +36,10 @@ import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpCommitPath;
 import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpTempPath;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
+import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.services.et.metric.configuration.MetricServiceDriverConf;
 import edu.snu.cay.services.et.plan.api.PlanExecutor;
+import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.commons.cli.ParseException;
 import org.apache.reef.annotations.audience.ClientSide;
 import org.apache.reef.client.DriverConfiguration;
@@ -53,7 +55,6 @@ import org.apache.reef.tang.*;
 import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 import org.apache.reef.tang.exceptions.InjectionException;
-import org.apache.reef.tang.formats.AvroConfigurationSerializer;
 import org.apache.reef.tang.formats.CommandLine;
 import org.apache.reef.tang.formats.ConfigurationSerializer;
 import org.apache.reef.util.EnvironmentUtils;
@@ -88,6 +89,10 @@ public final class ETDolphinLauncher {
 
   @NamedParameter(doc = "configuration for server class, serialized as a string")
   public final class SerializedServerConf implements Name<String> {
+  }
+
+  @NamedParameter(doc = "configuration for local model table, serialized as a string")
+  public final class SerializedLocalModelTableConf implements Name<String> {
   }
 
   /**
@@ -136,17 +141,38 @@ public final class ETDolphinLauncher {
           modelCacheEnabled ? CachedModelAccessor.class : ETModelAccessor.class;
 
       // worker conf
-      final Configuration workerConf = Configurations.merge(
+      Configuration workerConf = Configurations.merge(
           workerParamConf, userParamConf,
           Tang.Factory.getTang().newConfigurationBuilder()
               .bindImplementation(Trainer.class, dolphinConf.getTrainerClass())
               .bindImplementation(DataParser.class, dolphinConf.getInputParserClass())
               .bindImplementation(TrainingDataProvider.class, ETTrainingDataProvider.class)
               .bindImplementation(ModelAccessor.class, modelAccessorClass)
-              .bindImplementation(UpdateFunction.class, dolphinConf.getModelUpdateFunctionClass())
+              .bindImplementation(UpdateFunction.class, modelCacheEnabled ?
+                  dolphinConf.getModelUpdateFunctionClass() : VoidUpdateFunction.class)
               .bindNamedParameter(KeyCodec.class, dolphinConf.getInputKeyCodecClass())
               .bindNamedParameter(ValueCodec.class, dolphinConf.getInputValueCodecClass())
+              .bindNamedParameter(HasLocalModelTable.class, Boolean.toString(dolphinConf.hasLocalModelTable()))
+              .bindNamedParameter(HasInputDataKey.class, Boolean.toString(dolphinConf.hasInputDataKey()))
               .build());
+
+      if (dolphinConf.hasLocalModelTable()) {
+        final Configuration localModelTableConf = Tang.Factory.getTang().newConfigurationBuilder()
+            .bindNamedParameter(SerializedLocalModelTableConf.class,
+                ConfigurationUtils.SERIALIZER.toString(
+                    Configurations.merge(userParamConf,
+                        Tang.Factory.getTang().newConfigurationBuilder()
+                            .bindImplementation(UpdateFunction.class, dolphinConf.getLocalModelUpdateFunctionClass())
+                            .bindNamedParameter(KeyCodec.class, dolphinConf.getLocalModelKeyCodecClass())
+                            .bindNamedParameter(ValueCodec.class, dolphinConf.getLocalModelValueCodecClass())
+                            .bindNamedParameter(UpdateValueCodec.class,
+                                dolphinConf.getLocalModelUpdateValueCodecClass())
+                            .build())
+                )).build();
+
+        workerConf = Configurations.merge(workerConf, localModelTableConf);
+      }
+
 
       final Injector clientParameterInjector = Tang.Factory.getTang().newInjector(clientParamConf);
       // runtime configuration
@@ -341,7 +367,7 @@ public final class ETDolphinLauncher {
         .set(MetricServiceDriverConf.METRIC_RECEIVER_IMPL, ETDolphinMetricReceiver.class)
         .build();
 
-    final ConfigurationSerializer confSerializer = new AvroConfigurationSerializer();
+    final ConfigurationSerializer confSerializer = ConfigurationUtils.SERIALIZER;
 
     return Configurations.merge(driverConf, etMasterConfiguration, metricServiceConf, getNCSConfiguration(),
         Tang.Factory.getTang().newConfigurationBuilder()

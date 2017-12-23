@@ -17,7 +17,8 @@ package edu.snu.cay.dolphin.mlapps.lda;
 
 import edu.snu.cay.dolphin.core.client.ETDolphinConfiguration;
 import edu.snu.cay.dolphin.jobserver.DolphinJobLauncher;
-import edu.snu.cay.utils.StreamingSerializableCodec;
+import edu.snu.cay.utils.IntegerCodec;
+import edu.snu.cay.utils.LongCodec;
 import org.apache.reef.io.serialization.SerializableCodec;
 
 import javax.inject.Inject;
@@ -36,12 +37,15 @@ public final class LDAJob {
     DolphinJobLauncher.submitJob("LDA", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(LDATrainer.class)
         .setInputParserClass(LDAETDataParser.class)
-        .setInputKeyCodecClass(StreamingSerializableCodec.class)
+        .setInputKeyCodecClass(LongCodec.class)
         .setInputValueCodecClass(LDADataCodec.class)
-        .setModelUpdateFunctionClass(LDAETModelUpdateFunction.class)
-        .setModelKeyCodecClass(StreamingSerializableCodec.class)
+        .setModelKeyCodecClass(IntegerCodec.class)
         .setModelValueCodecClass(SparseArrayCodec.class)
         .setModelUpdateValueCodecClass(SerializableCodec.class)
+        .setModelUpdateFunctionClass(LDAETModelUpdateFunction.class)
+        .setHasLocalModelTable()
+        .setLocalModelKeyCodecClass(LongCodec.class)
+        .setLocalModelValueCodecClass(LDALocalModelCodec.class)
         .addParameterClass(LDAParameters.Alpha.class)
         .addParameterClass(LDAParameters.Beta.class)
         .addParameterClass(LDAParameters.NumTopics.class)

@@ -38,10 +38,11 @@ import java.util.Map;
  * can also be received as constructor parameters, given that the parameter itself is tagged with
  * {@link org.apache.reef.tang.annotations.Parameter} and an actual value is given for the parameter via command line.
  *
- * @param <D> type of the training data
+ * @param <K> type of key
+ * @param <V> type of the training data
  */
 @TaskSide
-public interface Trainer<D> {
+public interface Trainer<K, V> {
 
   /**
    * Pre-run method that initializes the global settings (e.g., model parameters).
@@ -53,7 +54,7 @@ public interface Trainer<D> {
    * Main method of this trainer, which is called every mini-batch.
    * @param miniBatchTrainingData the training data to process in the batch
    */
-  void runMiniBatch(Collection<D> miniBatchTrainingData);
+  void runMiniBatch(Collection<Map.Entry<K, V>> miniBatchTrainingData);
 
   /**
    * EventHandler that is called when an epoch is finished.
@@ -68,7 +69,8 @@ public interface Trainer<D> {
    * @param modelTable a model table to evaluate
    * @return the result value of evaluation
    */
-  Map<CharSequence, Double> evaluateModel(Collection<D> inputData, Collection<D> testData, Table modelTable);
+  Map<CharSequence, Double> evaluateModel(Collection<Map.Entry<K, V>> inputData,
+                                          Collection<V> testData, Table modelTable);
 
   /**
    * Post-run method executed after {@code run} but before task termination, exactly once.

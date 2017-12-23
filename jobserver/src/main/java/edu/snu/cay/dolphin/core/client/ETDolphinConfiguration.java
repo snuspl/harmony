@@ -18,6 +18,7 @@ package edu.snu.cay.dolphin.core.client;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 import org.apache.reef.annotations.audience.ClientSide;
 import org.apache.reef.io.network.impl.StreamingCodec;
@@ -42,6 +43,7 @@ import java.util.List;
 @ClientSide
 public final class ETDolphinConfiguration {
   private final Class<? extends Trainer> trainerClass;
+  private final boolean hasInputDataKey;
   private final Class<? extends DataParser> inputParserClass;
   private final Class<? extends StreamingCodec> inputKeyCodecClass;
   private final Class<? extends StreamingCodec> inputValueCodecClass;
@@ -50,11 +52,19 @@ public final class ETDolphinConfiguration {
   private final Class<? extends StreamingCodec> modelValueCodecClass;
   private final Class<? extends Codec> modelUpdateValueCodecClass;
 
+  // local model table is optional
+  private final boolean hasLocalModelTable;
+  private final Class<? extends UpdateFunction> localModelUpdateFunctionClass;
+  private final Class<? extends StreamingCodec> localModelKeyCodecClass;
+  private final Class<? extends StreamingCodec> localModelValueCodecClass;
+  private final Class<? extends Codec> localModelUpdateValueCodecClass;
+
   private final List<Class<? extends Name<?>>> parameterClassList;
   private final Configuration workerConfiguration;
   private final Configuration serverConfiguration;
 
   private ETDolphinConfiguration(final Class<? extends Trainer> trainerClass,
+                                 final boolean hasInputDataKey,
                                  final Class<? extends DataParser> inputParserClass,
                                  final Class<? extends StreamingCodec> inputKeyCodecClass,
                                  final Class<? extends StreamingCodec> inputValueCodecClass,
@@ -62,10 +72,16 @@ public final class ETDolphinConfiguration {
                                  final Class<? extends StreamingCodec> modelKeyCodecClass,
                                  final Class<? extends StreamingCodec> modelValueCodecClass,
                                  final Class<? extends Codec> modelUpdateValueCodecClass,
+                                 final boolean hasLocalModelTable,
+                                 final Class<? extends UpdateFunction> localModelUpdateFunctionClass,
+                                 final Class<? extends StreamingCodec> localModelKeyCodecClass,
+                                 final Class<? extends StreamingCodec> localModelValueCodecClass,
+                                 final Class<? extends Codec> localModelUpdateValueCodecClass,
                                  final List<Class<? extends Name<?>>> parameterClassList,
                                  final Configuration workerConfiguration,
                                  final Configuration serverConfiguration) {
     this.trainerClass = trainerClass;
+    this.hasInputDataKey = hasInputDataKey;
     this.inputParserClass = inputParserClass;
     this.inputKeyCodecClass = inputKeyCodecClass;
     this.inputValueCodecClass = inputValueCodecClass;
@@ -73,6 +89,11 @@ public final class ETDolphinConfiguration {
     this.modelKeyCodecClass = modelKeyCodecClass;
     this.modelValueCodecClass = modelValueCodecClass;
     this.modelUpdateValueCodecClass = modelUpdateValueCodecClass;
+    this.hasLocalModelTable = hasLocalModelTable;
+    this.localModelUpdateFunctionClass = localModelUpdateFunctionClass;
+    this.localModelKeyCodecClass = localModelKeyCodecClass;
+    this.localModelValueCodecClass = localModelValueCodecClass;
+    this.localModelUpdateValueCodecClass = localModelUpdateValueCodecClass;
     this.parameterClassList = parameterClassList;
     this.workerConfiguration = workerConfiguration;
     this.serverConfiguration = serverConfiguration;
@@ -80,6 +101,10 @@ public final class ETDolphinConfiguration {
 
   public Class<? extends Trainer> getTrainerClass() {
     return trainerClass;
+  }
+
+  public boolean hasInputDataKey() {
+    return hasInputDataKey;
   }
 
   public Class<? extends DataParser> getInputParserClass() {
@@ -110,6 +135,26 @@ public final class ETDolphinConfiguration {
     return modelUpdateValueCodecClass;
   }
 
+  public boolean hasLocalModelTable() {
+    return hasLocalModelTable;
+  }
+
+  public Class<? extends UpdateFunction> getLocalModelUpdateFunctionClass() {
+    return localModelUpdateFunctionClass;
+  }
+
+  public Class<? extends StreamingCodec> getLocalModelKeyCodecClass() {
+    return localModelKeyCodecClass;
+  }
+
+  public Class<? extends StreamingCodec> getLocalModelValueCodecClass() {
+    return localModelValueCodecClass;
+  }
+
+  public Class<? extends Codec> getLocalModelUpdateValueCodecClass() {
+    return localModelUpdateValueCodecClass;
+  }
+
   public List<Class<? extends Name<?>>> getParameterClassList() {
     return parameterClassList;
   }
@@ -128,6 +173,7 @@ public final class ETDolphinConfiguration {
 
   public static class Builder implements org.apache.reef.util.Builder<ETDolphinConfiguration> {
     private Class<? extends Trainer> trainerClass;
+    private boolean hasInputDataKey = false;
     private Class<? extends DataParser> inputParserClass;
     private Class<? extends StreamingCodec> inputKeyCodecClass = StreamingSerializableCodec.class;
     private Class<? extends StreamingCodec> inputValueCodecClass = StreamingSerializableCodec.class;
@@ -137,12 +183,24 @@ public final class ETDolphinConfiguration {
     private Class<? extends StreamingCodec> modelValueCodecClass = StreamingSerializableCodec.class;
     private Class<? extends Codec> modelUpdateValueCodecClass = SerializableCodec.class;
 
+    // local model table is optional
+    private boolean hasLocalModelTable = false;
+    private Class<? extends UpdateFunction> localModelUpdateFunctionClass = VoidUpdateFunction.class;
+    private Class<? extends StreamingCodec> localModelKeyCodecClass = StreamingSerializableCodec.class;
+    private Class<? extends StreamingCodec> localModelValueCodecClass = StreamingSerializableCodec.class;
+    private Class<? extends Codec> localModelUpdateValueCodecClass = SerializableCodec.class;
+
     private List<Class<? extends Name<?>>> parameterClassList = new LinkedList<>();
     private Configuration workerConfiguration = Tang.Factory.getTang().newConfigurationBuilder().build();
     private Configuration serverConfiguration = Tang.Factory.getTang().newConfigurationBuilder().build();
 
     public Builder setTrainerClass(final Class<? extends Trainer> trainerClass) {
       this.trainerClass = trainerClass;
+      return this;
+    }
+
+    public Builder setHasInputDataKey() {
+      this.hasInputDataKey = true;
       return this;
     }
 
@@ -181,6 +239,32 @@ public final class ETDolphinConfiguration {
       return this;
     }
 
+    public Builder setHasLocalModelTable() {
+      this.hasLocalModelTable = true;
+      return this;
+    }
+
+    public Builder setLocalModelUpdateFunctionClass(
+        final Class<? extends UpdateFunction> localModelUpdateFunctionClass) {
+      this.localModelUpdateFunctionClass = localModelUpdateFunctionClass;
+      return this;
+    }
+
+    public Builder setLocalModelKeyCodecClass(final Class<? extends StreamingCodec> localModelKeyCodecClass) {
+      this.localModelKeyCodecClass = localModelKeyCodecClass;
+      return this;
+    }
+
+    public Builder setLocalModelValueCodecClass(final Class<? extends StreamingCodec> localModelValueCodecClass) {
+      this.localModelValueCodecClass = localModelValueCodecClass;
+      return this;
+    }
+
+    public Builder setLocalModelUpdateValueCodecClass(final Class<? extends Codec> localModelUpdateValueCodecClass) {
+      this.localModelUpdateValueCodecClass = localModelUpdateValueCodecClass;
+      return this;
+    }
+
     public Builder addParameterClass(final Class<? extends Name<?>> parameterClass) {
       this.parameterClassList.add(parameterClass);
       return this;
@@ -202,9 +286,11 @@ public final class ETDolphinConfiguration {
       BuilderUtils.notNull(inputParserClass);
       BuilderUtils.notNull(modelUpdateFunctionClass);
 
-      return new ETDolphinConfiguration(trainerClass, inputParserClass, inputKeyCodecClass, inputValueCodecClass,
+      return new ETDolphinConfiguration(trainerClass,
+          hasInputDataKey, inputParserClass, inputKeyCodecClass, inputValueCodecClass,
           modelUpdateFunctionClass, modelKeyCodecClass, modelValueCodecClass, modelUpdateValueCodecClass,
-          parameterClassList, workerConfiguration, serverConfiguration);
+          hasLocalModelTable, localModelUpdateFunctionClass, localModelKeyCodecClass, localModelValueCodecClass,
+          localModelUpdateValueCodecClass, parameterClassList, workerConfiguration, serverConfiguration);
     }
   }
 }

@@ -78,19 +78,6 @@ public interface ModelAccessor<K, P, V> {
   List<V> pull(List<K> keys);
 
   /**
-   * Updates a value associated with a {@code key} using a {@code deltaValue}.
-   * @param key key of model parameter
-   * @param deltaValue value to push to the servers
-   */
-  void push(K key, P deltaValue, Table<K, V, P> aModelTable);
-
-  /**
-   * Updates the values associated with the keys using deltaValues.
-   * @param keyToDeltaValueMap a mapping between keys and values to push to the servers
-   */
-  void push(Map<K, P> keyToDeltaValueMap, Table<K, V, P> aModelTable);
-
-  /**
    * Do {@link #pull(List)} with a given table.
    * @param keys a list of keys of model parameter
    * @param aModelTable a table to read value from

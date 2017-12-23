@@ -15,8 +15,8 @@
  */
 package edu.snu.cay.dolphin.mlapps.nmf;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.io.network.impl.StreamingCodec;
-import org.apache.reef.io.network.util.Pair;
 import org.apache.reef.io.serialization.Codec;
 
 import javax.inject.Inject;
@@ -33,7 +33,7 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
 
   @Override
   public byte[] encode(final NMFData nmfData) {
-    final int numBytes = getNumBytes(nmfData.getColumns()) + Integer.BYTES;
+    final int numBytes = getNumBytes(nmfData.getColumns());
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream(numBytes);
          DataOutputStream daos = new DataOutputStream(baos)) {
       encodeToStream(nmfData, daos);
@@ -55,7 +55,6 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
   @Override
   public void encodeToStream(final NMFData nmfData, final DataOutputStream daos) {
     try {
-      daos.writeInt(nmfData.getRowIndex());
       encodeColumns(nmfData.getColumns(), daos);
     } catch (final IOException e) {
       throw new RuntimeException(e);
@@ -65,9 +64,8 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
   @Override
   public NMFData decodeFromStream(final DataInputStream dais) {
     try {
-      final int rowIndex = dais.readInt();
       final List<Pair<Integer, Float>> columns = decodeColumns(dais);
-      return new NMFData(rowIndex, columns);
+      return new NMFData(columns);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
@@ -86,8 +84,8 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
                              final DataOutputStream daos) throws IOException {
     daos.writeInt(columns.size());
     for (final Pair<Integer, Float> column : columns) {
-      daos.writeInt(column.getFirst());
-      daos.writeFloat(column.getSecond());
+      daos.writeInt(column.getLeft());
+      daos.writeFloat(column.getRight());
     }
   }
 
@@ -98,7 +96,7 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
     for (int i = 0; i < size; i++) {
       final int first = dais.readInt();
       final float second = dais.readFloat();
-      columns.add(new Pair<>(first, second));
+      columns.add(Pair.of(first, second));
     }
     return columns;
   }

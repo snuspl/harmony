@@ -20,7 +20,6 @@ import edu.snu.cay.common.math.linalg.MatrixFactory;
 import edu.snu.cay.common.math.linalg.VectorFactory;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.dolphin.DolphinParameters.*;
-import edu.snu.cay.dolphin.core.worker.ETModelAccessor;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.services.et.evaluator.api.Table;
@@ -42,7 +41,7 @@ import java.util.logging.Logger;
  * The trainer computes and pushes the optimal model value for all the dimensions to
  * minimize the objective function - square loss with l1 regularization.
  */
-final class LassoTrainer implements Trainer<LassoData> {
+final class LassoTrainer implements Trainer<Long, LassoData> {
   private static final Logger LOG = Logger.getLogger(LassoTrainer.class.getName());
 
   /**
@@ -134,7 +133,7 @@ final class LassoTrainer implements Trainer<LassoData> {
    * 3) Push value to server.
    */
   @Override
-  public void runMiniBatch(final Collection<LassoData> miniBatchTrainingData) {
+  public void runMiniBatch(final Collection<Map.Entry<Long, LassoData>> miniBatchTrainingData) {
     final int numInstancesToProcess = miniBatchTrainingData.size();
 
     pullModels();
@@ -186,14 +185,14 @@ final class LassoTrainer implements Trainer<LassoData> {
   }
 
   @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection<LassoData> inputData,
+  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, LassoData>> inputData,
                                                  final Collection<LassoData> testData,
                                                  final Table modelTable) {
     // Calculate the loss value.
     pullModels(modelTable);
 
-    final double trainingLoss = computeLoss(inputData);
-    final double testLoss = computeLoss(testData);
+    final double trainingLoss = computeLoss(inputData, null);
+    final double testLoss = computeLoss(null, testData);
 
     LOG.log(Level.INFO, "Training Loss: {0}, Test Loss: {1}", new Object[] {trainingLoss, testLoss});
 
@@ -209,13 +208,13 @@ final class LassoTrainer implements Trainer<LassoData> {
    * @param instances training data examples
    * @return the pair of feature matrix and vector composed of y values.
    */
-  private Pair<Matrix, Vector> convertToFeaturesAndValues(final Collection<LassoData> instances) {
+  private Pair<Matrix, Vector> convertToFeaturesAndValues(final Collection<Map.Entry<Long, LassoData>> instances) {
     final List<Vector> features = new LinkedList<>();
     final Vector values = vectorFactory.createDenseZeros(instances.size());
     int instanceIdx = 0;
-    for (final LassoData instance : instances) {
-      features.add(instance.getFeature());
-      values.set(instanceIdx++, instance.getValue());
+    for (final Map.Entry<Long, LassoData> instance : instances) {
+      features.add(instance.getValue().getFeature());
+      values.set(instanceIdx++, instance.getValue().getValue());
     }
     return Pair.of(matrixFactory.horzcatVecSparse(features).transpose(), values);
   }
@@ -237,7 +236,7 @@ final class LassoTrainer implements Trainer<LassoData> {
    * Pull up-to-date model parameters from server.
    */
   private void pullModels(final Table modelTable) {
-    final List<Vector> partialModels = ((ETModelAccessor) modelAccessor).pull(modelPartitionIndices, modelTable);
+    final List<Vector> partialModels = modelAccessor.pull(modelPartitionIndices, modelTable);
     oldModel = vectorFactory.concatDense(partialModels);
     newModel = oldModel.copy();
   }
@@ -278,14 +277,24 @@ final class LassoTrainer implements Trainer<LassoData> {
   /**
    * Compute the loss value for the data.
    */
-  private double computeLoss(final Collection<LassoData> data) {
+  private double computeLoss(final Collection<Map.Entry<Long, LassoData>> kvData,
+                             final Collection<LassoData> data) {
     double squaredErrorSum = 0;
 
-    for (final LassoData entry : data) {
-      final Vector feature = entry.getFeature();
-      final double value = entry.getValue();
-      final double prediction = predict(feature);
-      squaredErrorSum += (value - prediction) * (value - prediction);
+    if (kvData == null) {
+      for (final LassoData entry : data) {
+        final Vector feature = entry.getFeature();
+        final double value = entry.getValue();
+        final double prediction = predict(feature);
+        squaredErrorSum += (value - prediction) * (value - prediction);
+      }
+    } else {
+      for (final Map.Entry<Long, LassoData> entry : kvData) {
+        final Vector feature = entry.getValue().getFeature();
+        final double value = entry.getValue().getValue();
+        final double prediction = predict(feature);
+        squaredErrorSum += (value - prediction) * (value - prediction);
+      }
     }
 
     return squaredErrorSum;

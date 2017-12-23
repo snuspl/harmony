@@ -20,7 +20,7 @@ import edu.snu.cay.common.math.linalg.Vector;
 import java.util.Map;
 
 /**
- * Encapsulates the model data in NMF app.
+ * Encapsulates the worker-local model data in NMF app.
  */
 final class NMFLocalModel {
   /**

@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.mlapps.nmf;
 
 import edu.snu.cay.services.et.evaluator.api.DataParser;
-import org.apache.reef.io.network.util.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -36,7 +36,7 @@ import java.util.List;
  * </p>
  * In this format, one-based indexing is used.
  */
-final class NMFETDataParser implements DataParser<NMFData> {
+final class NMFETDataParser implements DataParser<Pair<Integer, NMFData>> {
   @Inject
   private NMFETDataParser() {
 
@@ -72,14 +72,14 @@ final class NMFETDataParser implements DataParser<NMFData> {
       if (value < 0) {
         throw new RuntimeException("Failed to parse: numbers should be greater than or equal to zero.");
       }
-      result.add(new Pair<>(index, value));
+      result.add(Pair.of(index, value));
     }
     return result;
   }
 
   @Override
-  public List<NMFData> parse(final Collection<String> rawData) {
-    final List<NMFData> result = new LinkedList<>();
+  public List<Pair<Integer, NMFData>> parse(final Collection<String> rawData) {
+    final List<Pair<Integer, NMFData>> result = new LinkedList<>();
 
     for (final String value : rawData) {
       final String line = value.trim();
@@ -99,7 +99,7 @@ final class NMFETDataParser implements DataParser<NMFData> {
         throw new RuntimeException("Failed to parse: invalid indices. It should be greater than zero");
       }
 
-      result.add(new NMFData(rowIndex, parseColumns(split[1].trim())));
+      result.add(Pair.of(rowIndex, new NMFData(parseColumns(split[1].trim()))));
     }
     return result;
   }

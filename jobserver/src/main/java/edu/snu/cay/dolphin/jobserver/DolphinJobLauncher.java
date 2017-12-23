@@ -34,6 +34,7 @@ import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
 import edu.snu.cay.services.et.configuration.parameters.ValueCodec;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.annotations.audience.ClientSide;
 import org.apache.reef.tang.*;
 import org.apache.reef.tang.annotations.Name;
@@ -95,7 +96,7 @@ public final class DolphinJobLauncher {
               .build());
 
       // worker conf. workers will be spawned with this configuration
-      final Configuration workerConf = Configurations.merge(
+      Configuration workerConf = Configurations.merge(
           workerParamConf, userParamConf,
           Tang.Factory.getTang().newConfigurationBuilder()
               .bindImplementation(Trainer.class, dolphinConf.getTrainerClass())
@@ -104,7 +105,24 @@ public final class DolphinJobLauncher {
               .bindImplementation(ModelAccessor.class, ETModelAccessor.class)
               .bindNamedParameter(KeyCodec.class, dolphinConf.getInputKeyCodecClass())
               .bindNamedParameter(ValueCodec.class, dolphinConf.getInputValueCodecClass())
+              .bindNamedParameter(HasLocalModelTable.class, Boolean.toString(dolphinConf.hasLocalModelTable()))
+              .bindNamedParameter(HasInputDataKey.class, Boolean.toString(dolphinConf.hasInputDataKey()))
               .build());
+
+      if (dolphinConf.hasLocalModelTable()) {
+        final Configuration localModelTableConf = Tang.Factory.getTang().newConfigurationBuilder()
+            .bindNamedParameter(ETDolphinLauncher.SerializedLocalModelTableConf.class,
+                ConfigurationUtils.SERIALIZER.toString(
+                    Tang.Factory.getTang().newConfigurationBuilder()
+                        .bindImplementation(UpdateFunction.class, dolphinConf.getLocalModelUpdateFunctionClass())
+                        .bindNamedParameter(KeyCodec.class, dolphinConf.getLocalModelKeyCodecClass())
+                        .bindNamedParameter(ValueCodec.class, dolphinConf.getLocalModelValueCodecClass())
+                        .bindNamedParameter(UpdateValueCodec.class, dolphinConf.getLocalModelUpdateValueCodecClass())
+                        .build()
+                )).build();
+
+        workerConf = Configurations.merge(workerConf, localModelTableConf);
+      }
 
       // job configuration. driver will use this configuration to spawn a job
       final Configuration jobConf = getJobConfiguration(appId, masterParamConf, serverConf, workerConf, userParamConf);

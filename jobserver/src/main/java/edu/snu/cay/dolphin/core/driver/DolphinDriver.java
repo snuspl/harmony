@@ -32,6 +32,8 @@ import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
+import edu.snu.cay.services.et.evaluator.impl.NoneKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.utils.StreamingSerializableCodec;
 import org.apache.reef.driver.client.JobMessageObserver;
@@ -54,6 +56,7 @@ import org.apache.reef.wake.time.event.StartTime;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
@@ -85,6 +88,7 @@ public final class DolphinDriver {
   private final TableConfiguration workerTableConf;
   private final TableConfiguration serverTableConf;
   private final String inputPath;
+  private final Optional<TableConfiguration> workerLocalModelTableConfOptional;
 
   @Inject
   private DolphinDriver(final DolphinMaster dolphinMaster,
@@ -141,6 +145,19 @@ public final class DolphinDriver {
         numWorkerHandlerThreads, workerHandlerQueueSize);
     this.workerTableConf = buildWorkerTableConf(workerInjector, numWorkerBlocks, userParamConf);
     this.inputPath = workerInjector.getNamedInstance(Parameters.InputDir.class);
+
+    final boolean hasLocalModelTable = workerInjector.getNamedInstance(DolphinParameters.HasLocalModelTable.class);
+    if (hasLocalModelTable) {
+      final Injector workerLocalModelTableInjector = Tang.Factory.getTang().newInjector(
+          confSerializer.fromString(workerInjector.getNamedInstance(
+              ETDolphinLauncher.SerializedLocalModelTableConf.class)));
+      final TableConfiguration localModelTableConf = buildWorkerLocalModelTableConf(workerLocalModelTableInjector,
+          numWorkerBlocks, userParamConf);
+      this.workerLocalModelTableConfOptional = Optional.of(localModelTableConf);
+    } else {
+      this.workerLocalModelTableConfOptional = Optional.empty();
+    }
+
     optimizationOrchestrator.start();
   }
 
@@ -169,6 +186,7 @@ public final class DolphinDriver {
     final StreamingCodec keyCodec = workerInjector.getNamedInstance(KeyCodec.class);
     final StreamingCodec valueCodec = workerInjector.getNamedInstance(ValueCodec.class);
     final DataParser dataParser = workerInjector.getInstance(DataParser.class);
+    final boolean hasInputDataKey = workerInjector.getNamedInstance(DolphinParameters.HasInputDataKey.class);
 
     return TableConfiguration.newBuilder()
         .setId(DolphinParameters.InputTableId.DEFAULT_VALUE)
@@ -178,8 +196,31 @@ public final class DolphinDriver {
         .setUpdateFunctionClass(VoidUpdateFunction.class)
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
-        .setIsOrderedTable(true)
+        .setIsOrderedTable(false)
         .setDataParserClass(dataParser.getClass())
+        .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
+        .setUserParamConf(userParamConf)
+        .build();
+  }
+
+  private static TableConfiguration buildWorkerLocalModelTableConf(final Injector localModelTableInjector,
+                                                                   final int numTotalBlocks,
+                                                                   final Configuration userParamConf)
+      throws InjectionException {
+    final StreamingCodec keyCodec = localModelTableInjector.getNamedInstance(KeyCodec.class);
+    final StreamingCodec valueCodec = localModelTableInjector.getNamedInstance(ValueCodec.class);
+    final Codec updateValueCodec = localModelTableInjector.getNamedInstance(UpdateValueCodec.class);
+    final UpdateFunction updateFunction = localModelTableInjector.getInstance(UpdateFunction.class);
+
+    return TableConfiguration.newBuilder()
+        .setId(DolphinParameters.LocalModelTableId.DEFAULT_VALUE)
+        .setKeyCodecClass(keyCodec.getClass())
+        .setValueCodecClass(valueCodec.getClass())
+        .setUpdateValueCodecClass(updateValueCodec.getClass())
+        .setUpdateFunctionClass(updateFunction.getClass())
+        .setNumTotalBlocks(numTotalBlocks)
+        .setIsMutableTable(true)
+        .setIsOrderedTable(false)
         .setUserParamConf(userParamConf)
         .build();
   }
@@ -232,6 +273,13 @@ public final class DolphinDriver {
         new Thread(() -> {
           final Future<AllocatedTable> modelTableFuture = etMaster.createTable(serverTableConf, servers);
           final Future<AllocatedTable> inputTableFuture = etMaster.createTable(workerTableConf, workers);
+          if (workerLocalModelTableConfOptional.isPresent()) {
+            try {
+              etMaster.createTable(workerLocalModelTableConfOptional.get(), workers).get();
+            } catch (InterruptedException | ExecutionException e) {
+              throw new RuntimeException(e);
+            }
+          }
 
           try {
             final AllocatedTable modelTable = modelTableFuture.get();

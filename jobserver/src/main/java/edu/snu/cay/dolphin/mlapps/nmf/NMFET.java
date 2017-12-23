@@ -19,7 +19,6 @@ import edu.snu.cay.dolphin.core.client.ETDolphinConfiguration;
 import edu.snu.cay.dolphin.core.client.ETDolphinLauncher;
 import edu.snu.cay.dolphin.mlapps.serialization.DenseVectorCodec;
 import edu.snu.cay.utils.IntegerCodec;
-import edu.snu.cay.utils.LongCodec;
 
 import static edu.snu.cay.dolphin.mlapps.nmf.NMFParameters.*;
 
@@ -37,13 +36,19 @@ public final class NMFET {
   public static void main(final String[] args) {
     ETDolphinLauncher.launch("NMFET", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(NMFTrainer.class)
+        .setHasInputDataKey()
         .setInputParserClass(NMFETDataParser.class)
-        .setInputKeyCodecClass(LongCodec.class)
+        .setInputKeyCodecClass(IntegerCodec.class)
         .setInputValueCodecClass(NMFDataCodec.class)
-        .setModelUpdateFunctionClass(NMFETModelUpdateFunction.class)
         .setModelKeyCodecClass(IntegerCodec.class)
         .setModelValueCodecClass(DenseVectorCodec.class)
         .setModelUpdateValueCodecClass(DenseVectorCodec.class)
+        .setModelUpdateFunctionClass(NMFETModelUpdateFunction.class)
+        .setHasLocalModelTable()
+        .setLocalModelKeyCodecClass(IntegerCodec.class)
+        .setLocalModelValueCodecClass(DenseVectorCodec.class)
+        .setLocalModelUpdateValueCodecClass(DenseVectorCodec.class)
+        .setLocalModelUpdateFunctionClass(NMFETModelUpdateFunction.class)
         .addParameterClass(Rank.class)
         .addParameterClass(PrintMatrices.class)
         .build());

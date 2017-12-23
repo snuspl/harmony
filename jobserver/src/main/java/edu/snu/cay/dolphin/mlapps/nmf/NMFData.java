@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.dolphin.mlapps.nmf;
 
-import org.apache.reef.io.network.util.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 
@@ -24,17 +24,10 @@ import java.util.List;
  */
 final class NMFData {
 
-  private final int rowIndex;
   private final List<Pair<Integer, Float>> columns;
 
-  NMFData(final int rowIndex,
-          final List<Pair<Integer, Float>> columns) {
-    this.rowIndex = rowIndex;
+  NMFData(final List<Pair<Integer, Float>> columns) {
     this.columns = columns;
-  }
-
-  int getRowIndex() {
-    return rowIndex;
   }
 
   List<Pair<Integer, Float>> getColumns() {

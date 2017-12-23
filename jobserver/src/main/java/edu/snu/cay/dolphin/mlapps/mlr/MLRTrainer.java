@@ -27,7 +27,7 @@ import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.MemoryUtils;
 import edu.snu.cay.utils.ThreadUtils;
 import edu.snu.cay.utils.Tuple3;
-import org.apache.reef.io.network.util.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 
@@ -44,7 +44,7 @@ import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.*;
  * Uses {@code numClasses} model vectors to determine which class each data instance belongs to.
  * The model vector that outputs the highest dot product value is declared as that data instance's prediction.
  */
-final class MLRTrainer implements Trainer<MLRData> {
+final class MLRTrainer implements Trainer<Long, MLRData> {
   private static final Logger LOG = Logger.getLogger(MLRTrainer.class.getName());
   private static final float ZERO_THRESHOLD = 1e-7f;
 
@@ -177,13 +177,13 @@ final class MLRTrainer implements Trainer<MLRData> {
   }
 
   @Override
-  public void runMiniBatch(final Collection<MLRData> miniBatchTrainingData) {
+  public void runMiniBatch(final Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData) {
     // pull data when mini-batch is started
     pullModels();
 
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
-    final BlockingQueue<MLRData> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
+    final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
 
     // collects the gradients computed by multiple threads
@@ -195,7 +195,7 @@ final class MLRTrainer implements Trainer<MLRData> {
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final Future<Vector[]> future = executor.submit(() -> {
-          final List<MLRData> drainedInstances = new ArrayList<>(drainSize);
+          final List<Map.Entry<Long, MLRData>> drainedInstances = new ArrayList<>(drainSize);
           final Vector[] threadGradient = new Vector[numClasses];
           for (int classIdx = 0; classIdx < numClasses; classIdx++) {
             threadGradient[classIdx] = vectorFactory.createDenseZeros(numFeatures);
@@ -209,7 +209,7 @@ final class MLRTrainer implements Trainer<MLRData> {
               break;
             }
             
-            drainedInstances.forEach(instance -> updateGradient(instance, threadGradient));
+            drainedInstances.forEach(instance -> updateGradient(instance.getValue(), threadGradient));
             drainedInstances.clear();
             count += numDrained;
           }
@@ -244,15 +244,15 @@ final class MLRTrainer implements Trainer<MLRData> {
   }
 
   @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection<MLRData> inputData,
+  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, MLRData>> inputData,
                                                  final Collection<MLRData> testData,
                                                  final Table modelTable) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
     final MLRModel mlrModel = pullModelsToEvaluate(classPartitionIndices, modelTable);
 
     LOG.log(Level.INFO, "Start computing loss value");
-    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputData, mlrModel.getParams());
-    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(testData, mlrModel.getParams());
+    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputData, null, mlrModel);
+    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(null, testData, mlrModel);
 
     final Map<CharSequence, Double> map = new HashMap<>();
     map.put("loss", (double) trainingLossRegLossAvgAccuracy.getFirst());
@@ -384,21 +384,38 @@ final class MLRTrainer implements Trainer<MLRData> {
    * Compute the loss value using the current models and given data instances.
    * May take long, so do not call frequently.
    */
-  private Tuple3<Float, Float, Float> computeLoss(final Collection<MLRData> data, final Vector[] params) {
+  private Tuple3<Float, Float, Float> computeLoss(final Collection<Map.Entry<Long, MLRData>> kvData,
+                                                  final Collection<MLRData> data,
+                                                  final MLRModel mlrModel) {
+    final Vector[] params = mlrModel.getParams();
 
     double loss = 0;
     int correctPredictions = 0;
 
-    for (final MLRData entry : data) {
-      final Vector feature = entry.getFeature();
-      final int label = entry.getLabel(); final Vector predictions = predict(feature, params);
-      final int prediction = max(predictions).getFirst();
+    if (kvData == null) {
+      for (final MLRData entry : data) {
+        final Vector feature = entry.getFeature();
+        final int label = entry.getLabel(); final Vector predictions = predict(feature, params);
+        final int prediction = max(predictions).getLeft();
 
-      if (label == prediction) {
-        ++correctPredictions;
+        if (label == prediction) {
+          ++correctPredictions;
+        }
+
+        loss += -Math.log(predictions.get(label));
       }
+    } else {
+      for (final Map.Entry<Long, MLRData> entry : kvData) {
+        final Vector feature = entry.getValue().getFeature();
+        final int label = entry.getValue().getLabel(); final Vector predictions = predict(feature, params);
+        final int prediction = max(predictions).getLeft();
 
-      loss += -Math.log(predictions.get(label));
+        if (label == prediction) {
+          ++correctPredictions;
+        }
+
+        loss += -Math.log(predictions.get(label));
+      }
     }
 
     double regLoss = 0;
@@ -445,7 +462,7 @@ final class MLRTrainer implements Trainer<MLRData> {
    * Returns {@code log(sum_i(exp(vector.get(i)))}, while avoiding overflow.
    */
   private static double logSumExp(final Vector vector) {
-    final double max = max(vector).getSecond();
+    final double max = max(vector).getRight();
     double sumExp = 0f;
     for (int index = 0; index < vector.length(); ++index) {
       sumExp += Math.exp(vector.get(index) - max);
@@ -466,6 +483,6 @@ final class MLRTrainer implements Trainer<MLRData> {
         maxIndex = index;
       }
     }
-    return new Pair<>(maxIndex, maxValue);
+    return Pair.of(maxIndex, maxValue);
   }
 }

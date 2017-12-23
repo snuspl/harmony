@@ -22,10 +22,14 @@ import edu.snu.cay.dolphin.mlapps.lda.LDAParameters.*;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.core.worker.TrainingDataProvider;
+import edu.snu.cay.services.et.evaluator.api.TableAccessor;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,7 +38,7 @@ import java.util.logging.Logger;
  * all workers update their initial topic assignments. For each mini-batch, sequentially sampling documents,
  * it immediately pushes the changed topic assignment whenever each word is sampled to a new topic.
  */
-final class LDATrainer implements Trainer<Document> {
+final class LDATrainer implements Trainer<Long, Document> {
 
   private static final Logger LOG = Logger.getLogger(LDATrainer.class.getName());
 
@@ -45,9 +49,11 @@ final class LDATrainer implements Trainer<Document> {
 
   private final List<Integer> vocabList;
 
-  private final TrainingDataProvider<Document> trainingDataProvider;
+  private final TrainingDataProvider<Long, Document> trainingDataProvider;
 
   private final ModelAccessor<Integer, int[], int[]> modelAccessor;
+
+  private final edu.snu.cay.services.et.evaluator.api.Table<Long, LDALocalModel, ?> localModelTable;
 
   /**
    * Allows to access and update the latest model.
@@ -57,14 +63,18 @@ final class LDATrainer implements Trainer<Document> {
   @Inject
   private LDATrainer(final SparseLDASampler sampler,
                      final LDAStatCalculator statCalculator,
-                     final TrainingDataProvider<Document> trainingDataProvider,
+                     final TableAccessor tableAccessor,
+                     @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
+                     final TrainingDataProvider<Long, Document> trainingDataProvider,
                      final ModelAccessor<Integer, int[], int[]> modelAccessor,
                      final ModelHolder<LDAModel> modelHolder,
                      @Parameter(NumVocabs.class) final int numVocabs,
                      @Parameter(NumTopics.class) final int numTopics,
-                     @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches) {
+                     @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches)
+      throws TableNotExistException {
     this.sampler = sampler;
     this.statCalculator = statCalculator;
+    this.localModelTable = tableAccessor.getTable(localModelTableId);
     this.trainingDataProvider = trainingDataProvider;
     this.modelAccessor = modelAccessor;
     this.numVocabs = numVocabs;
@@ -86,19 +96,30 @@ final class LDATrainer implements Trainer<Document> {
   public void initGlobalSettings() {
     // In LDA, topic counts should be initialized by pushing values before running.
     final TopicChanges topicChanges = new TopicChanges();
-    for (final Document document : trainingDataProvider.getEpochData()) {
+    final Collection<Map.Entry<Long, Document>> epochData = trainingDataProvider.getEpochData();
+    final List<Pair<Long, LDALocalModel>> localModels = new ArrayList<>(epochData.size());
+    for (final Map.Entry<Long, Document> documentPair : epochData) {
+      final long documentId = documentPair.getKey();
+      final Document document = documentPair.getValue();
+      final LDALocalModel localModel = new LDALocalModel(document.size(), numTopics);
+      localModels.add(Pair.of(documentId, localModel));
       for (int i = 0; i < document.size(); i++) {
         final int word = document.getWord(i);
-        topicChanges.increment(word, document.getAssignment(i), 1);
+        topicChanges.increment(word, localModel.getAssignment(i), 1);
         // numVocabs-th row represents the total word-topic assignment count vector
-        topicChanges.increment(numVocabs, document.getAssignment(i), 1);
+        topicChanges.increment(numVocabs, localModel.getAssignment(i), 1);
       }
+    }
+    try {
+      localModelTable.multiPut(localModels).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
     }
     pushAndResetGradients(topicChanges);
   }
 
   @Override
-  public void runMiniBatch(final Collection<Document> miniBatchTrainingData) {
+  public void runMiniBatch(final Collection<Map.Entry<Long, Document>> miniBatchTrainingData) {
     final List<Integer> words = getKeys(miniBatchTrainingData);
 
     pullModels(words);
@@ -117,7 +138,7 @@ final class LDATrainer implements Trainer<Document> {
   }
 
   @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection<Document> inputData,
+  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, Document>> inputData,
                                                  final Collection<Document> testData,
                                                  final edu.snu.cay.services.et.evaluator.api.Table modelTable) {
 
@@ -230,10 +251,10 @@ final class LDATrainer implements Trainer<Document> {
   public void cleanup() {
   }
 
-  private List<Integer> getKeys(final Collection<Document> documents) {
+  private List<Integer> getKeys(final Collection<Map.Entry<Long, Document>> documentPairs) {
     final Set<Integer> keys = new TreeSet<>();
-    for (final Document document : documents) {
-      keys.addAll(document.getWords());
+    for (final Map.Entry<Long, Document> documentPair : documentPairs) {
+      keys.addAll(documentPair.getValue().getWords());
     }
 
     final List<Integer> result = new ArrayList<>(keys.size() + 1);

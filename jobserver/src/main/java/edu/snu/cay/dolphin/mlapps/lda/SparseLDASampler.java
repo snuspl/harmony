@@ -19,6 +19,9 @@ import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.mlapps.lda.LDAParameters.*;
+import edu.snu.cay.services.et.evaluator.api.Table;
+import edu.snu.cay.services.et.evaluator.api.TableAccessor;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ThreadUtils;
 import org.apache.reef.tang.annotations.Parameter;
@@ -54,6 +57,8 @@ final class SparseLDASampler {
    */
   private final int numTrainerThreads;
 
+  private final Table<Long, LDALocalModel, ?> localModelTable;
+
   /**
    * Allows to access and update the latest model.
    */
@@ -66,11 +71,14 @@ final class SparseLDASampler {
                            @Parameter(NumVocabs.class) final int numVocabs,
                            @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
                            @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
-                           final ModelHolder<LDAModel> modelHolder) {
+                           @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
+                           final TableAccessor tableAccessor,
+                           final ModelHolder<LDAModel> modelHolder) throws TableNotExistException {
     this.alpha = alpha;
     this.beta = beta;
     this.numTopics = numTopics;
     this.numVocabs = numVocabs;
+    this.localModelTable = tableAccessor.getTable(localModelTableId);
     this.modelHolder = modelHolder;
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
@@ -81,20 +89,20 @@ final class SparseLDASampler {
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
   }
 
-  List<TopicChanges> sample(final Collection<Document> documents) {
+  List<TopicChanges> sample(final Collection<Map.Entry<Long, Document>> documentPairs) {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
-    final BlockingQueue<Document> instances = new ArrayBlockingQueue<>(documents.size());
-    instances.addAll(documents);
+    final BlockingQueue<Map.Entry<Long, Document>> instances = new ArrayBlockingQueue<>(documentPairs.size());
+    instances.addAll(documentPairs);
 
     final List<Future<TopicChanges>> futures = new ArrayList<>(numTrainerThreads);
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
       // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = Math.max(documents.size() / numTrainerThreads / numTrainerThreads, 1);
+      final int drainSize = Math.max(documentPairs.size() / numTrainerThreads / numTrainerThreads, 1);
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final Future<TopicChanges> future = executor.submit(() -> {
-          final List<Document> drainedInstances = new ArrayList<>(drainSize);
+          final List<Map.Entry<Long, Document>> drainedInstances = new ArrayList<>(drainSize);
           final LDAModel model = modelHolder.getModel()
               .orElseThrow(() -> new RuntimeException(MSG_GET_MODEL_FAILED));
 
@@ -127,10 +135,20 @@ final class SparseLDASampler {
 
   /**
    * Processes one training data instance and update the intermediate model.
-   * @param document training data instance
+   * @param documentPair training data instance
    * @param model the latest model
    */
-  private void updateModel(final Document document, final LDAModel model) {
+  private void updateModel(final Map.Entry<Long, Document> documentPair, final LDAModel model) {
+    final Document document = documentPair.getValue();
+
+    final LDALocalModel localModel;
+    try {
+      final long docId = documentPair.getKey();
+      localModel = localModelTable.get(docId).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+
     final int[] topicSummaryVector = model.getTopicSummaryVector();
     final Map<Integer, int[]> wordTopicVectors = model.getWordTopicVectors();
 
@@ -148,7 +166,7 @@ final class SparseLDASampler {
     // Initialize auxiliary variables
     // Recalculate for each document to adapt changes from other workers.
     for (int i = 0; i < numTopics; i++) {
-      final int topicCount = document.getTopicCount(i);
+      final int topicCount = localModel.getTopicCount(i);
       final double denom = topicSummaryVector[i] + beta * numVocabs;
       qCoefficients[i] = (alpha + topicCount) / denom;
       // All s terms are not zero
@@ -164,8 +182,8 @@ final class SparseLDASampler {
 
     for (int wordIndex = 0; wordIndex < document.size(); wordIndex++) {
       final int word = document.getWord(wordIndex);
-      final int oldTopic = document.getAssignment(wordIndex);
-      final int oldTopicCount = document.getTopicCount(oldTopic);
+      final int oldTopic = localModel.getAssignment(wordIndex);
+      final int oldTopicCount = localModel.getTopicCount(oldTopic);
 
       // Remove the current word from the document and update terms.
       final double denom = (topicSummaryVector[oldTopic] - 1) + beta * numVocabs;
@@ -185,7 +203,7 @@ final class SparseLDASampler {
 
       qCoefficients[oldTopic] = (alpha + oldTopicCount - 1) / denom;
 
-      document.removeWordAtIndex(wordIndex);
+      localModel.removeWordAtIndex(wordIndex);
 
       final int[] wordTopicCount = wordTopicVectors.get(word);
 
@@ -216,7 +234,7 @@ final class SparseLDASampler {
         newTopic = sampleFromTerms(randomVar - (sumS + sumR), qTerms, nonZeroQTermIndices);
       }
 
-      final int newTopicCount = document.getTopicCount(newTopic);
+      final int newTopicCount = localModel.getTopicCount(newTopic);
 
       // Update the terms and add the removed word with the new topic.
       final double newDenom = (topicSummaryVector[newTopic] + 1) + beta * numVocabs;
@@ -235,7 +253,7 @@ final class SparseLDASampler {
 
       qCoefficients[newTopic] = (alpha + newTopicCount + 1) / newDenom;
 
-      document.addWordAtIndex(wordIndex, newTopic);
+      localModel.addWordAtIndex(wordIndex, newTopic);
 
       // Accumulate the changes to TopicChanges
       if (newTopic != oldTopic) {

@@ -17,69 +17,21 @@ package edu.snu.cay.dolphin.mlapps.lda;
 
 import com.google.common.primitives.Ints;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
 
 /**
  * Representation of a document in a corpus. This has words and corresponding topic assignment
  * in the document as well as a document-topic assignment table of the document.
  */
 final class Document {
-
   private final List<Integer> words;
-  private final int[] assignments;
-  private final Map<Integer, Integer> topicCounts;
-  private final int numTopics;
 
   /**
    * Creates a document with given words. The initial topics for the words are assigned randomly.
    * @param words Words that the document contains
-   * @param numTopics Number of topics determined by user parameter
-   *                  ({@link LDAParameters.NumTopics})
    */
-  Document(final int[] words, final int numTopics) {
+  Document(final int[] words) {
     this.words = Ints.asList(words);
-    this.assignments = new int[words.length];
-
-    this.topicCounts = new HashMap<>(words.length); // the number of assigned topics is bound to the document's words
-    this.numTopics = numTopics;
-
-    initialize();
-  }
-
-  /**
-   * Creates a document with words and intermediate topic assignments that have been learned.
-   * @param words Words that the document contains
-   * @param assignments Topic Index that a word is assigned to
-   * @param topicCounts Number of words that are assigned to a topic
-   * @param numTopics Number of topics determined by user parameter
-   *                  ({@link LDAParameters.NumTopics})
-   */
-  Document(final int[] words, final int[] assignments, final Map<Integer, Integer> topicCounts, final int numTopics) {
-    this.words = Ints.asList(words);
-    this.assignments = assignments;
-    this.topicCounts = topicCounts;
-    this.numTopics = numTopics;
-  }
-
-  /**
-   * Assigns each word in the doc to a random topic.
-   */
-  private void initialize() {
-    final Random rand = new Random();
-    for (int i = 0; i < assignments.length; i++) {
-      final int topic = rand.nextInt(numTopics);
-      assignments[i] = topic;
-      topicCounts.compute(topic, (key, oldValue) -> {
-        if (oldValue == null) {
-          return 1;
-        } else {
-          return oldValue + 1;
-        }
-      });
-    }
   }
 
   int size() {
@@ -92,54 +44,5 @@ final class Document {
 
   List<Integer> getWords() {
     return words;
-  }
-
-  /**
-   * @param index Index of the word
-   * @return Topic Index that the word is assigned to
-   */
-  int getAssignment(final int index) {
-    return assignments[index];
-  }
-
-  void removeWordAtIndex(final int index) {
-    final int oldTopic = assignments[index];
-    topicCounts.compute(oldTopic, (key, oldValue) -> {
-      if (oldValue == null || oldValue == 0) {
-        return 0; // it happens due to inconsistency by migration of worker-side model
-      } else {
-        return oldValue - 1;
-      }
-    });
-  }
-
-  void addWordAtIndex(final int index, final int newTopic) {
-    assignments[index] = newTopic;
-    topicCounts.compute(newTopic, (key, oldValue) -> {
-      if (oldValue == null) {
-        return 1;
-      } else {
-        return oldValue + 1;
-      }
-    });
-  }
-
-  void setTopicCount(final int topicIdx, final int value) {
-    topicCounts.put(topicIdx, value);
-  }
-
-  /**
-   * @param topicIndex Index of a topic
-   * @return Number of words that are assigned to the topic
-   */
-  int getTopicCount(final int topicIndex) {
-    return topicCounts.getOrDefault(topicIndex, 0);
-  }
-
-  /**
-   * @return the count of topics assigned to each word in this document.
-   */
-  Map<Integer, Integer> getTopicCounts() {
-    return topicCounts;
   }
 }

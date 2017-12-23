@@ -26,6 +26,8 @@ import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
 import edu.snu.cay.services.et.configuration.parameters.ValueCodec;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
+import edu.snu.cay.services.et.evaluator.impl.NoneKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.io.network.impl.StreamingCodec;
@@ -58,10 +60,12 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
     final String dolphinJobId = appId + "-" + jobCount;
     final String modelTableId = ModelTableId.DEFAULT_VALUE + jobCount;
+    final String localModelTableId = LocalModelTableId.DEFAULT_VALUE + jobCount;
     final String inputTableId = InputTableId.DEFAULT_VALUE + jobCount;
 
     jobInjector.bindVolatileParameter(Parameters.JobId.class, dolphinJobId);
     jobInjector.bindVolatileParameter(ModelTableId.class, modelTableId);
+    jobInjector.bindVolatileParameter(LocalModelTableId.class, localModelTableId);
     jobInjector.bindVolatileParameter(InputTableId.class, inputTableId);
 
     final String serializedParamConf = jobInjector.getNamedInstance(ETDolphinLauncher.SerializedParamConf.class);
@@ -88,12 +92,26 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         workerInjector, numWorkerBlocks, userParamConf);
     final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
 
+    final TableConfiguration localModelTableConf;
+    final boolean hasLocalModelTable = workerInjector.getNamedInstance(HasLocalModelTable.class);
+    if (hasLocalModelTable) {
+      final Injector localModelTableInjector = Tang.Factory.getTang().newInjector(
+          ConfigurationUtils.SERIALIZER.fromString(
+              workerInjector.getNamedInstance(
+                  ETDolphinLauncher.SerializedLocalModelTableConf.class)));
+      localModelTableConf = buildLocalModelTableConf(localModelTableId,
+          localModelTableInjector, numWorkerBlocks, userParamConf);
+    } else {
+      localModelTableConf = null;
+    }
+
     return DolphinJobEntity.newBuilder()
         .setJobInjector(jobInjector)
         .setJobId(dolphinJobId)
         .setServerTableConf(serverTableConf)
         .setWorkerTableConf(workerTableConf)
         .setInputPath(inputPath)
+        .setWorkerLocalModelTableConf(localModelTableConf)
         .build();
   }
 
@@ -104,6 +122,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final StreamingCodec keyCodec = workerInjector.getNamedInstance(KeyCodec.class);
     final StreamingCodec valueCodec = workerInjector.getNamedInstance(ValueCodec.class);
     final DataParser dataParser = workerInjector.getInstance(DataParser.class);
+    final boolean hasInputDataKey = workerInjector.getNamedInstance(HasInputDataKey.class);
 
     return TableConfiguration.newBuilder()
         .setId(tableId)
@@ -113,8 +132,32 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setUpdateFunctionClass(VoidUpdateFunction.class)
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
-        .setIsOrderedTable(true)
+        .setIsOrderedTable(false)
         .setDataParserClass(dataParser.getClass())
+        .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
+        .setUserParamConf(userParamConf)
+        .build();
+  }
+
+  private static TableConfiguration buildLocalModelTableConf(final String tableId,
+                                                             final Injector localModelTableInjector,
+                                                             final int numTotalBlocks,
+                                                             final Configuration userParamConf)
+      throws InjectionException {
+    final StreamingCodec keyCodec = localModelTableInjector.getNamedInstance(KeyCodec.class);
+    final StreamingCodec valueCodec = localModelTableInjector.getNamedInstance(ValueCodec.class);
+    final Codec updateValueCodec = localModelTableInjector.getNamedInstance(UpdateValueCodec.class);
+    final UpdateFunction updateFunction = localModelTableInjector.getInstance(UpdateFunction.class);
+
+    return TableConfiguration.newBuilder()
+        .setId(tableId)
+        .setKeyCodecClass(keyCodec.getClass())
+        .setValueCodecClass(valueCodec.getClass())
+        .setUpdateValueCodecClass(updateValueCodec.getClass())
+        .setUpdateFunctionClass(updateFunction.getClass())
+        .setNumTotalBlocks(numTotalBlocks)
+        .setIsMutableTable(true)
+        .setIsOrderedTable(false)
         .setUserParamConf(userParamConf)
         .build();
   }
