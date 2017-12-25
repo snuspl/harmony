@@ -31,8 +31,7 @@ import java.util.List;
  * Helper class about {@link Configuration}.
  */
 public final class ConfigurationUtils {
-
-  private static final ConfigurationSerializer SERIALIZER = new AvroConfigurationSerializer();
+  public static final ConfigurationSerializer SERIALIZER = new AvroConfigurationSerializer();
   private static final Configuration EMPTY_CONF = Tang.Factory.getTang().newConfigurationBuilder().build();
 
   // utility class should not be instantiated

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Seoul National University
+ * Copyright (C) 2017 Seoul National University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +15,28 @@
  */
 package edu.snu.cay.dolphin.mlapps.nmf;
 
-import org.apache.commons.lang3.tuple.Pair;
+import edu.snu.cay.common.math.linalg.Vector;
 
-import java.util.List;
+import java.util.Map;
 
 /**
- * Data object for non-negative matrix factorization.
+ * Encapsulates the worker-local model in NMF app.
  */
-final class NMFData {
+final class NMFLocalModel {
+  /**
+   * Row-wise representation of left matrix.
+   * The map's key is a row index of matrix and value is a vector representing the row.
+   */
+  private final Map<Integer, Vector> lMatrix;
 
-  private final List<Pair<Integer, Float>> columns;
-
-  NMFData(final List<Pair<Integer, Float>> columns) {
-    this.columns = columns;
+  NMFLocalModel(final Map<Integer, Vector> lMatrix) {
+    this.lMatrix = lMatrix;
   }
 
-  List<Pair<Integer, Float>> getColumns() {
-    return columns;
+  /**
+   * @return the L matrix
+   */
+  Map<Integer, Vector> getLMatrix() {
+    return lMatrix;
   }
 }

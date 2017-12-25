@@ -17,7 +17,6 @@ package edu.snu.cay.dolphin.mlapps.gbt;
 
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.param.Parameters;
-import edu.snu.cay.dolphin.core.worker.ETModelAccessor;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.mlapps.gbt.tree.*;
@@ -58,11 +57,6 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Threshold for checking whether two Float values are the same.
    */
   private static final float SIMILAR_VALUE_THRESHOLD = 1e-9f;
-  
-  /**
-   * Max iteration of run() method.
-   */
-  private final int maxNumEpochs;
 
   /**
    * The number of keys that are assigned to each tree for partitioning models across servers.
@@ -144,7 +138,6 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
                      @Parameter(GBTParameters.Gamma.class) final float gamma,
                      @Parameter(GBTParameters.TreeMaxDepth.class) final int treeMaxDepth,
                      @Parameter(GBTParameters.LeafMinSize.class) final int leafMinSize,
-                     @Parameter(DolphinParameters.MaxNumEpochs.class) final int maxNumEpochs,
                      @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                      @Parameter(GBTParameters.NumKeys.class) final int numKeys,
                      final GBTMetadataParser metadataParser) {
@@ -155,7 +148,6 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
     this.gamma = gamma;
     this.treeMaxDepth = treeMaxDepth;
     this.leafMinSize = leafMinSize;
-    this.maxNumEpochs = maxNumEpochs;
     this.numKeys = numKeys;
     this.treeSize = (1 << treeMaxDepth) - 1;
     this.random = new Random();
@@ -768,7 +760,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
       keys.add(label * numKeys + i);
     }
 
-    return  ((ETModelAccessor) modelAccessor).pull(keys, modelTable);
+    return  modelAccessor.pull(keys, modelTable);
   }
 
   /**

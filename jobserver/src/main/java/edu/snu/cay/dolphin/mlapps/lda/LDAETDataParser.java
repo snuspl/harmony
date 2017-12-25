@@ -16,7 +16,6 @@
 package edu.snu.cay.dolphin.mlapps.lda;
 
 import edu.snu.cay.services.et.evaluator.api.DataParser;
-import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.Collection;
@@ -24,11 +23,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 final class LDAETDataParser implements DataParser<Document> {
-  private final int numTopics;
 
   @Inject
-  private LDAETDataParser(@Parameter(LDAParameters.NumTopics.class) final int numTopics) {
-    this.numTopics = numTopics;
+  private LDAETDataParser() {
+
   }
 
   @Override
@@ -48,7 +46,7 @@ final class LDAETDataParser implements DataParser<Document> {
         words[i] = Integer.parseInt(split[i]);
       }
 
-      result.add(new Document(words, numTopics));
+      result.add(new Document(words));
     }
 
     return result;

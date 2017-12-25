@@ -251,9 +251,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     final MLRModel mlrModel = pullModelsToEvaluate(classPartitionIndices, modelTable);
 
     LOG.log(Level.INFO, "Start computing loss value");
-    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputData,
-        null, mlrModel.getParams());
-    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(null, testData, mlrModel.getParams());
+    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputData, null, mlrModel);
+    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(null, testData, mlrModel);
 
     final Map<CharSequence, Double> map = new HashMap<>();
     map.put("loss", (double) trainingLossRegLossAvgAccuracy.getFirst());
@@ -387,7 +386,9 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    * Only one type of MLR data arguments is not null.
    */
   private Tuple3<Float, Float, Float> computeLoss(final Collection<Map.Entry<Long, MLRData>> kvData,
-                                                  final Collection<MLRData> data, final Vector[] params) {
+                                                  final Collection<MLRData> data,
+                                                  final MLRModel mlrModel) {
+    final Vector[] params = mlrModel.getParams();
 
     double loss = 0;
     int correctPredictions = 0;

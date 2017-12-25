@@ -17,28 +17,23 @@ package edu.snu.cay.dolphin.mlapps.lda;
 
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
-import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.io.*;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A codec for (de-)serializing data used in LDA application.
  */
 final class LDADataCodec implements Codec<Document>, StreamingCodec<Document> {
-  private final int numTopics;
 
   @Inject
-  private LDADataCodec(@Parameter(LDAParameters.NumTopics.class) final int numTopics) {
-    this.numTopics = numTopics;
+  private LDADataCodec() {
   }
 
   @Override
   public byte[] encode(final Document document) {
-    final int numBytes = (document.getWords().size() * 2 + numTopics + 1) * Integer.BYTES;
+    final int numBytes = (document.getWords().size() + 1) * Integer.BYTES;
 
     try (ByteArrayOutputStream baos = new ByteArrayOutputStream(numBytes);
          DataOutputStream daos = new DataOutputStream(baos)) {
@@ -66,19 +61,6 @@ final class LDADataCodec implements Codec<Document>, StreamingCodec<Document> {
       for (final int word : words) {
         daos.writeInt(word);
       }
-      for (int wordIdx = 0; wordIdx < words.size(); wordIdx++) {
-        daos.writeInt(document.getAssignment(wordIdx));
-      }
-      final Map<Integer, Integer> topicCounts = document.getTopicCounts();
-      daos.writeInt(topicCounts.size());
-      topicCounts.forEach((topicIdx, topicCount) -> {
-        try {
-          daos.writeInt(topicIdx);
-          daos.writeInt(topicCount);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      });
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
@@ -89,24 +71,12 @@ final class LDADataCodec implements Codec<Document>, StreamingCodec<Document> {
     try {
       final int numWords = dais.readInt();
       final int[] words = new int[numWords];
-      final int[] assignments = new int[numWords];
-      final Map<Integer, Integer> topicCounts = new ConcurrentHashMap<>(numWords);
 
       for (int wordIdx = 0; wordIdx < numWords; wordIdx++) {
         words[wordIdx] = dais.readInt();
       }
-      for (int wordIdx = 0; wordIdx < numWords; wordIdx++) {
-        assignments[wordIdx] = dais.readInt();
-      }
 
-      final int numEntries = dais.readInt();
-      for (int i = 0; i < numEntries; i++) {
-        final int topicIdx = dais.readInt();
-        final int topicCount = dais.readInt();
-        topicCounts.put(topicIdx, topicCount);
-      }
-
-      return new Document(words, assignments, topicCounts, numTopics);
+      return new Document(words);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
