@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.pregel.graph.impl;
 
-import com.google.common.collect.Lists;
 import edu.snu.cay.pregel.PregelParameters;
 import edu.snu.cay.pregel.combiner.MessageCombiner;
 import edu.snu.cay.services.et.evaluator.api.Table;
@@ -23,13 +22,12 @@ import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.reef.tang.annotations.Parameter;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import javax.inject.Inject;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -40,6 +38,7 @@ import java.util.logging.Logger;
  * @param <Long> identifier of the vertex
  * @param <M> message type of the vertex
  */
+@NotThreadSafe
 public final class MessageManager<Long, M> {
   private static final Logger LOG = Logger.getLogger(MessageManager.class.getName());
 
@@ -58,8 +57,6 @@ public final class MessageManager<Long, M> {
    * At the finish of a single superstep, worker task calls {@link #flushAllMessages()} and gets all futures in it.
    * Then clear it.
    */
-  private final List<Future<?>> msgFutureList = Collections.synchronizedList(Lists.newArrayList());
-
   @Inject
   private MessageManager(final TableAccessor tableAccessor,
                          @Parameter(PregelParameters.MessageTableId.class) final String messageTableId,
@@ -88,6 +85,7 @@ public final class MessageManager<Long, M> {
   /**
    * Add a message towards a vertex.
    * All the messages are flushed by {@link #flushAllMessages()} altogether.
+   * This method can be used by multi-threads.
    *
    * @param vertexId a vertex id
    * @param message message
@@ -101,17 +99,13 @@ public final class MessageManager<Long, M> {
    * Flushes out all messages added by {@link #addMessage}.
    * It returns after receiving ack messages.
    *
-   * @return the number of flushed messages
+   * @return true if there exist ongoing messages
    */
-  public int flushAllMessages() throws ExecutionException, InterruptedException {
-    vertexIdToAccumulatedMsgs.forEach((id, message) -> msgFutureList.add(getNextMessageTable().update(id, message)));
+  public boolean flushAllMessages() throws ExecutionException, InterruptedException {
+    final boolean messageExist = !vertexIdToAccumulatedMsgs.isEmpty();
+    getNextMessageTable().multiUpdate(vertexIdToAccumulatedMsgs).get();
     vertexIdToAccumulatedMsgs.clear();
 
-    final int numMsgs = msgFutureList.size();
-    for (final Future<?> msgFuture : msgFutureList) {
-      msgFuture.get();
-    }
-    msgFutureList.clear();
-    return numMsgs;
+    return messageExist;
   }
 }
