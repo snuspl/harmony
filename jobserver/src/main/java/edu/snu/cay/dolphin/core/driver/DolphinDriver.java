@@ -199,7 +199,6 @@ public final class DolphinDriver {
         .setIsOrderedTable(false)
         .setDataParserClass(dataParser.getClass())
         .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
-<<<<<<< HEAD
         .setUserParamConf(userParamConf)
         .build();
   }
