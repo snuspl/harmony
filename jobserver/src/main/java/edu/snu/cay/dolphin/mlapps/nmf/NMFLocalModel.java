@@ -20,11 +20,12 @@ import edu.snu.cay.common.math.linalg.Vector;
 import java.util.Map;
 
 /**
- * Encapsulates the worker-local model data in NMF app.
+ * Encapsulates the worker-local model in NMF app.
  */
 final class NMFLocalModel {
   /**
    * Row-wise representation of left matrix.
+   * The map's key is a row index of matrix and value is a vector representing the row.
    */
   private final Map<Integer, Vector> lMatrix;
 

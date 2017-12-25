@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Seoul National University
+ * Copyright (C) 2017 Seoul National University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,17 +20,31 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Representation of a document in a corpus. This has words and corresponding topic assignment
- * in the document as well as a document-topic assignment table of the document.
+ * Representation of worker-side local model for a document.
+ * This has topic assignments for words in the document
+ * as well as a document-topic assignment table of the document maintained by servers.
  */
 final class LDALocalModel {
 
+  /**
+   * The list index is the word id and the value is the topic id.
+   */
   private final int[] wordTopicAssignments;
+
+  /**
+   * The number of words assigned to each topic.
+   * The map's key is the topic id and the value is the count of corresponding words.
+   */
   private final Map<Integer, Integer> topicCounts;
+
+  /**
+   * The number of total topics.
+   */
   private final int numTopics;
 
   /**
-   * Creates a local model with given words. The initial topics for the words are assigned randomly.
+   * Creates a local model with the given number of words and topics.
+   * The initial topics for the words are assigned randomly.
    * @param numWords the number of words that the document contains
    * @param numTopics Number of topics determined by user parameter
    *                  ({@link LDAParameters.NumTopics})
@@ -45,7 +59,7 @@ final class LDALocalModel {
   }
 
   /**
-   * Creates a document with words and intermediate topic assignments that have been learned.
+   * Creates a local model with intermediate topic assignments that have been learned.
    * @param wordTopicAssignments Topic Index that a word is assigned to
    * @param topicCounts Number of words that are assigned to a topic
    * @param numTopics Number of topics determined by user parameter
@@ -58,7 +72,7 @@ final class LDALocalModel {
   }
 
   /**
-   * Assigns each word in the doc to a random topic.
+   * Assigns a random topic to each word in the doc.
    */
   private void initialize() {
     final Random rand = new Random();

@@ -134,10 +134,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     final BlockingQueue<Map.Entry<Integer, NMFData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
 
-    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getKeys(instances);
-    LOG.log(Level.INFO, "numInstances: {0}, numRowKeys: {1}, numColumnKeys: {2}," +
-        " rowKeys: {3}, columnKeys: {4}", new Object[]{instances.size(), rowKeysToColumnKeys.getLeft().size(),
-        rowKeysToColumnKeys.getRight().size(), rowKeysToColumnKeys.getLeft(), rowKeysToColumnKeys.getRight()});
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(instances);
 
     // pull data when mini-batch is started
     final NMFModel model = pullModels(rowKeysToColumnKeys.getRight());
@@ -206,7 +203,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
                                                  final Collection<NMFData> testData,
                                                  final Table modelTable) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
-    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getKeys(inputData);
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(inputData);
     final NMFModel model = pullModelToEvaluate(rowKeysToColumnKeys.getRight(), modelTable);
     final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
 
@@ -250,7 +247,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
     final StringBuilder lsb = new StringBuilder();
 
-    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getKeys(dataPairs);
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(dataPairs);
     final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
     for (final int rowKey : rowKeysToColumnKeys.getLeft()) {
       lsb.append(String.format("L(%d, *):", rowKey));
@@ -292,7 +289,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   /**
    * Processes one training data instance and update the intermediate model.
    * @param datumPair a pair of training data instance and its key
-   * @param lVec L_{i, *} : i-th row of L
+   * @param lVec L_{i, *} : i-th row of L matrix
    * @param model up-to-date NMFModel which is pulled from server
    * @param threadRGradient gradient matrix to update {@param model}
    */
@@ -387,10 +384,14 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   }
 
   /**
+   * Gets keys from given input dataset.
+   * It has two groups of keys: row keys and column keys.
+   * Row keys are for input data and local models.
+   * Column keys are for server-side global models.
    * @param dataValues Dataset assigned to this worker
-   * @return Keys to send pull requests, which are determined by existing columns in NMFData.
+   * @return a pair of row keys and column keys
    */
-  private Pair<List<Integer>, List<Integer>> getKeys(final Collection<Map.Entry<Integer, NMFData>> dataValues) {
+  private Pair<List<Integer>, List<Integer>> getRowColumnKeys(final Collection<Map.Entry<Integer, NMFData>> dataValues) {
     final ArrayList<Integer> rowKeys = new ArrayList<>(dataValues.size());
     final ArrayList<Integer> columnKeys = new ArrayList<>();
 

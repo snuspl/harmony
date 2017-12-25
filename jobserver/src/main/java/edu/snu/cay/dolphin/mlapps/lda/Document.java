@@ -20,14 +20,14 @@ import com.google.common.primitives.Ints;
 import java.util.List;
 
 /**
- * Representation of a document in a corpus. This has words and corresponding topic assignment
- * in the document as well as a document-topic assignment table of the document.
+ * Representation of a document in a corpus.
+ * This has words in the document.
  */
 final class Document {
   private final List<Integer> words;
 
   /**
-   * Creates a document with given words. The initial topics for the words are assigned randomly.
+   * Creates a document with given words.
    * @param words Words that the document contains
    */
   Document(final int[] words) {

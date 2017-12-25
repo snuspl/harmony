@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A codec for (de-)serializing data used in LDA application.
+ * A codec for (de-)serializing local model used in LDA application.
  */
 final class LDALocalModelCodec implements Codec<LDALocalModel>, StreamingCodec<LDALocalModel> {
   private final int numTopics;

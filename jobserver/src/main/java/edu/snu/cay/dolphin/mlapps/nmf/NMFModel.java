@@ -26,6 +26,7 @@ import java.util.Map;
 final class NMFModel implements Copyable<NMFModel> {
   /**
    * Column-wise representation of right matrix.
+   * The map's key is a column index of matrix and value is a vector representing the column.
    */
   private final Map<Integer, Vector> rMatrix;
 
