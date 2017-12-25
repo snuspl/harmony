@@ -39,8 +39,20 @@ public final class DolphinParameters {
     }
   }
 
+  @NamedParameter(doc = "Local model table identifier", default_value = LocalModelTableId.DEFAULT_VALUE)
+  public final class LocalModelTableId implements Name<String> {
+    public static final String DEFAULT_VALUE = "local_model_table";
+
+    private LocalModelTableId() {
+    }
+  }
+
   @NamedParameter(doc = "Whether this app's input data has key or not", default_value = "false")
   public final class HasInputDataKey implements Name<Boolean> {
+  }
+
+  @NamedParameter(doc = "Whether this app has local model table or not", default_value = "false")
+  public final class HasLocalModelTable implements Name<Boolean> {
   }
 
   @NamedParameter(doc = "Starting epoch index for each worker")

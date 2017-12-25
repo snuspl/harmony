@@ -15,12 +15,17 @@
  */
 package edu.snu.cay.dolphin.mlapps.lda;
 
+import edu.snu.cay.dolphin.DolphinParameters;
+import edu.snu.cay.services.et.evaluator.api.Table;
+import edu.snu.cay.services.et.evaluator.api.TableAccessor;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.commons.math3.special.Gamma;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Compute log likelihoods of the model.
@@ -44,11 +49,15 @@ final class LDAStatCalculator {
    */
   private final double logGammaBeta;
 
+  private final Table<Long, LDALocalModel, ?> localModelTable;
+
   @Inject
   private LDAStatCalculator(@Parameter(LDAParameters.Alpha.class) final double alpha,
                             @Parameter(LDAParameters.Beta.class) final double beta,
                             @Parameter(LDAParameters.NumTopics.class) final int numTopics,
-                            @Parameter(LDAParameters.NumVocabs.class) final int numVocabs) {
+                            @Parameter(LDAParameters.NumVocabs.class) final int numVocabs,
+                            @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
+                            final TableAccessor tableAccessor) throws TableNotExistException {
     this.alpha = alpha;
     this.beta = beta;
     this.numTopics = numTopics;
@@ -56,6 +65,7 @@ final class LDAStatCalculator {
 
     this.logGammaAlpha = Gamma.logGamma(alpha);
     this.logGammaBeta = Gamma.logGamma(beta);
+    this.localModelTable = tableAccessor.getTable(localModelTableId);
   }
 
   /**
@@ -65,21 +75,28 @@ final class LDAStatCalculator {
    *   <li>D: Total number of documents</li>
    *   <li>n(j, d): <i>j</i>th topic's number of assignments to <i>d</i>th document</li>
    * </ul>
-   * @param workload a collection of documents assigned to this trainer
-   * @return a portion of log likelihood computed from the given workload
+   * @param documentPairs a collection of documents assigned to this trainer
+   * @return a portion of log likelihood computed from the given documentPairs
    */
-  double computeDocLLH(final Collection<Map.Entry<Long, Document>> workload) {
-    double result = workload.size() * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha));
-    for (final Map.Entry<Long, Document> entry : workload) {
-      final Document doc = entry.getValue();
+  double computeDocLLH(final Collection<Map.Entry<Long, Document>> documentPairs) {
+    double result = documentPairs.size() * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha));
+    for (final Map.Entry<Long, Document> documentPair : documentPairs) {
+      final Document document = documentPair.getValue();
+      final LDALocalModel localModel;
+      try {
+        localModel = localModelTable.get(documentPair.getKey()).get();
+      } catch (InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+
       for (int j = 0; j < numTopics; j++) {
-        final int topicCount = doc.getTopicCount(j);
+        final int topicCount = localModel.getTopicCount(j);
         if (topicCount < 0) {
-          doc.setTopicCount(j, 0);
+          localModel.setTopicCount(j, 0);
         }
         result += topicCount <= 0 ? logGammaAlpha : Gamma.logGamma(topicCount + alpha);
       }
-      result -= Gamma.logGamma(doc.size() + numTopics * alpha);
+      result -= Gamma.logGamma(document.size() + numTopics * alpha);
     }
     return result;
   }

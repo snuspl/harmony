@@ -25,6 +25,8 @@ import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.core.worker.TrainingDataProvider;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.evaluator.api.Table;
+import edu.snu.cay.services.et.evaluator.api.TableAccessor;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ThreadUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -53,7 +55,6 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   private final float lambda;
 
   private final boolean printMatrices;
-  private final NMFModelGenerator modelGenerator;
 
   /**
    * The step size drops by this rate.
@@ -77,6 +78,8 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
   private final TrainingDataProvider<Integer, NMFData> trainingDataProvider;
 
+  private final Table<Integer, Vector, Vector> localModelTable;
+
   @Inject
   private NMFTrainer(final ModelAccessor<Integer, Vector, Vector> modelAccessor,
                      final VectorFactory vectorFactory,
@@ -89,8 +92,9 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
                      @Parameter(NMFParameters.PrintMatrices.class) final boolean printMatrices,
                      @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
                      @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
-                     final NMFModelGenerator modelGenerator,
-                     final TrainingDataProvider<Integer, NMFData> trainingDataProvider) {
+                     @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
+                     final TableAccessor tableAccessor,
+                     final TrainingDataProvider<Integer, NMFData> trainingDataProvider) throws TableNotExistException {
     this.modelAccessor = modelAccessor;
     this.vectorFactory = vectorFactory;
     this.rank = rank;
@@ -105,8 +109,8 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
       throw new IllegalArgumentException("decay_period must be a positive value");
     }
     this.printMatrices = printMatrices;
-    this.modelGenerator = modelGenerator;
     this.trainingDataProvider = trainingDataProvider;
+    this.localModelTable = tableAccessor.getTable(localModelTableId);
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
     this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
@@ -129,10 +133,14 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
     final BlockingQueue<Map.Entry<Integer, NMFData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
-    
+
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(instances);
+
     // pull data when mini-batch is started
-    final List<Integer> keys = getKeys(instances);
-    final NMFModel model = pullModels(keys);
+    final NMFModel model = pullModels(rowKeysToColumnKeys.getRight());
+
+    // initialize local LMatrix
+    final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
 
     // collect gradients computed in each thread
     final List<Future<Map<Integer, Vector>>> futures = new ArrayList<>(numTrainerThreads);
@@ -153,7 +161,10 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
               break;
             }
 
-            drainedInstances.forEach(instance -> updateGradient(instance.getValue(), model, threadRGradient));
+            final Map<Integer, Vector> lMatrix = localModel.getLMatrix();
+
+            drainedInstances.forEach(instance -> updateGradient(instance,
+                lMatrix.get(instance.getKey()), model, threadRGradient));
             drainedInstances.clear();
             count += numDrained;
           }
@@ -192,11 +203,13 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
                                                  final Collection<NMFData> testData,
                                                  final Table modelTable) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
-    final NMFModel model = pullModelToEvaluate(getKeys(inputData), modelTable);
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(inputData);
+    final NMFModel model = pullModelToEvaluate(rowKeysToColumnKeys.getRight(), modelTable);
+    final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
 
     LOG.log(Level.INFO, "Start computing loss value");
     final Map<CharSequence, Double> map = new HashMap<>();
-    map.put("loss", (double) computeLoss(inputData, model));
+    map.put("loss", (double) computeLoss(inputData, localModel, model));
 
     return map;
   }
@@ -210,6 +223,19 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     return new NMFModel(rMatrix);
   }
 
+  private NMFLocalModel getLocalModel(final List<Integer> keys) {
+    try {
+      final Map<Integer, Vector> localModelMatrix = localModelTable.multiGetOrInit(keys).get();
+      if (localModelMatrix.size() != keys.size()) {
+        throw new RuntimeException();
+      }
+
+      return new NMFLocalModel(localModelMatrix);
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
   public void cleanup() {
     // print generated matrices
@@ -217,13 +243,15 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
       return;
     }
     // print L matrix
-    final Collection<Map.Entry<Integer, NMFData>> workload = trainingDataProvider.getEpochData();
+    final Collection<Map.Entry<Integer, NMFData>> dataPairs = trainingDataProvider.getEpochData();
 
     final StringBuilder lsb = new StringBuilder();
-    for (final Map.Entry<Integer, NMFData> datum : workload) {
-      final NMFData nmfData = datum.getValue();
-      lsb.append(String.format("L(%d, *):", datum.getKey()));
-      for (final VectorEntry valueEntry : nmfData.getVector()) {
+
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(dataPairs);
+    final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
+    for (final int rowKey : rowKeysToColumnKeys.getLeft()) {
+      lsb.append(String.format("L(%d, *):", rowKey));
+      for (final VectorEntry valueEntry : localModel.getLMatrix().get(rowKey)) {
         lsb.append(' ');
         lsb.append(valueEntry.value());
       }
@@ -232,7 +260,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     LOG.log(Level.INFO, lsb.toString());
 
     // print transposed R matrix
-    final NMFModel model = pullModels(getKeys(workload));
+    final NMFModel model = pullModels(rowKeysToColumnKeys.getRight());
     final StringBuilder rsb = new StringBuilder();
     for (final Map.Entry<Integer, Vector> entry : model.getRMatrix().entrySet()) {
       rsb.append(String.format("R(*, %d):", entry.getKey()));
@@ -260,14 +288,13 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
   /**
    * Processes one training data instance and update the intermediate model.
-   * @param datum training data instance
+   * @param datumPair a pair of training data instance and its key
+   * @param lVec L_{i, *} : i-th row of L matrix
    * @param model up-to-date NMFModel which is pulled from server
    * @param threadRGradient gradient matrix to update {@param model}
-
    */
-  private void updateGradient(final NMFData datum, final NMFModel model,
+  private void updateGradient(final Map.Entry<Integer, NMFData> datumPair, final Vector lVec, final NMFModel model,
                               final Map<Integer, Vector> threadRGradient) {
-    final Vector lVec = datum.getVector(); // L_{i, *} : i-th row of L
     final Vector lGradSum;
     if (lambda != 0.0f) {
       // l2 regularization term. 2 * lambda * L_{i, *}
@@ -276,7 +303,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
       lGradSum = vectorFactory.createDenseZeros(rank);
     }
 
-    for (final Pair<Integer, Float> column : datum.getColumns()) { // a pair of column index and value
+    for (final Pair<Integer, Float> column : datumPair.getValue().getColumns()) { // a pair of column index and value
       final int colIdx = column.getLeft();
       final Vector rVec = model.getRMatrix().get(colIdx); // R_{*, j} : j-th column of R
       final float error = lVec.dot(rVec) - column.getRight(); // e = L_{i, *} * R_{*, j} - D_{i, j}
@@ -298,7 +325,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     }
 
     // update L matrix
-    modelGenerator.getValidVector(lVec.axpy(-stepSize, lGradSum));
+    localModelTable.updateNoReply(datumPair.getKey(), lGradSum);
   }
 
   /**
@@ -334,17 +361,19 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   /**
    * Compute the loss value using the current models and given data instances.
    * May take long, so do not call frequently.
-   * @param instances The training data instances to evaluate training loss.
+   * @param dataPairs The training data instances to evaluate training loss.
    * @return the loss value, computed by the sum of the errors.
    */
-  private float computeLoss(final Collection<Map.Entry<Integer, NMFData>> instances, final NMFModel model) {
+  private float computeLoss(final Collection<Map.Entry<Integer, NMFData>> dataPairs,
+                            final NMFLocalModel nmfLocalModel,
+                            final NMFModel model) {
     final Map<Integer, Vector> rMatrix = model.getRMatrix();
+    final Map<Integer, Vector> lMatrix = nmfLocalModel.getLMatrix();
 
     float loss = 0.0f;
-    for (final Map.Entry<Integer, NMFData> datum : instances) {
-      final NMFData nmfData = datum.getValue();
-      final Vector lVec = nmfData.getVector(); // L_{i, *} : i-th row of L
-      for (final Pair<Integer, Float> column : nmfData.getColumns()) { // a pair of column index and value
+    for (final Map.Entry<Integer, NMFData> dataPair : dataPairs) {
+      final Vector lVec = lMatrix.get(dataPair.getKey()); // L_{i, *} : i-th row of L
+      for (final Pair<Integer, Float> column : dataPair.getValue().getColumns()) { // a pair of column index and value
         final int colIdx = column.getLeft();
         final Vector rVec = rMatrix.get(colIdx); // R_{*, j} : j-th column of R
         final float error = lVec.dot(rVec) - column.getRight(); // e = L_{i, *} * R_{*, j} - D_{i, j}
@@ -355,25 +384,34 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   }
 
   /**
+   * Gets keys from given input dataset.
+   * It has two groups of keys: row keys and column keys.
+   * Row keys are for input data and local models.
+   * Column keys are for server-side global models.
    * @param dataValues Dataset assigned to this worker
-   * @return Keys to send pull requests, which are determined by existing columns in NMFData.
+   * @return a pair of row keys and column keys
    */
-  private List<Integer> getKeys(final Collection<Map.Entry<Integer, NMFData>> dataValues) {
-    final ArrayList<Integer> keys = new ArrayList<>();
-    final Set<Integer> keySet = Sets.newTreeSet();
+  private Pair<List<Integer>, List<Integer>> getRowColumnKeys(
+      final Collection<Map.Entry<Integer, NMFData>> dataValues) {
+    final ArrayList<Integer> rowKeys = new ArrayList<>(dataValues.size());
+    final ArrayList<Integer> columnKeys = new ArrayList<>();
+
+    final Set<Integer> columnKeySet = Sets.newTreeSet();
     // aggregate column indices
     for (final Map.Entry<Integer, NMFData> datum : dataValues) {
-      final NMFData nmfData = datum.getValue();
-      keySet.addAll(
-          nmfData.getColumns()
+      rowKeys.add(datum.getKey());
+
+      columnKeySet.addAll(
+          datum.getValue().getColumns()
               .stream()
               .distinct()
               .map(Pair::getLeft)
               .collect(Collectors.toList()));
     }
-    keys.ensureCapacity(keySet.size());
-    keys.addAll(keySet);
-    return keys;
+    columnKeys.ensureCapacity(columnKeySet.size());
+    columnKeys.addAll(columnKeySet);
+
+    return Pair.of(rowKeys, columnKeys);
   }
 
   /**

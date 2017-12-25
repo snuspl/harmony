@@ -30,6 +30,7 @@ import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -44,16 +45,20 @@ public final class DolphinJobEntity implements JobEntity {
   private final TableConfiguration workerTableConf;
   private final String inputPath;
 
+  private final Optional<TableConfiguration> localModelTableConfOptional;
+
   private DolphinJobEntity(final Injector jobInjector,
                            final String jobId,
                            final TableConfiguration serverTableConf,
                            final TableConfiguration workerTableConf,
-                           final String inputPath) {
+                           final String inputPath,
+                           final Optional<TableConfiguration> localModelTableConfOptional) {
     this.jobInjector = jobInjector;
     this.jobId = jobId;
     this.serverTableConf = serverTableConf;
     this.workerTableConf = workerTableConf;
     this.inputPath = inputPath;
+    this.localModelTableConfOptional = localModelTableConfOptional;
   }
 
   @Override
@@ -96,6 +101,9 @@ public final class DolphinJobEntity implements JobEntity {
           etMaster.createTable(serverTableConf, servers);
       final Future<AllocatedTable> inputTableFuture =
           etMaster.createTable(workerTableConf, workers);
+      if (localModelTableConfOptional.isPresent()) {
+        etMaster.createTable(localModelTableConfOptional.get(), workers).get();
+      }
 
       final AllocatedTable modelTable = modelTableFuture.get();
       final AllocatedTable inputTable = inputTableFuture.get();
@@ -122,6 +130,7 @@ public final class DolphinJobEntity implements JobEntity {
     private TableConfiguration serverTableConf;
     private TableConfiguration workerTableConf;
     private String inputPath;
+    private TableConfiguration workerLocalModelTableConf = null; // optional
 
     private Builder() {
     }
@@ -151,9 +160,15 @@ public final class DolphinJobEntity implements JobEntity {
       return this;
     }
 
+    public Builder setWorkerLocalModelTableConf(final TableConfiguration workerLocalModelTableConf) {
+      this.workerLocalModelTableConf = workerLocalModelTableConf;
+      return this;
+    }
+
     @Override
     public DolphinJobEntity build() {
-      return new DolphinJobEntity(jobInjector, jobId, serverTableConf, workerTableConf, inputPath);
+      return new DolphinJobEntity(jobInjector, jobId, serverTableConf, workerTableConf, inputPath,
+          Optional.ofNullable(workerLocalModelTableConf));
     }
   }
 }
