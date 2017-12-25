@@ -99,13 +99,13 @@ public final class MessageManager<Long, M> {
    * Flushes out all messages added by {@link #addMessage}.
    * It returns after receiving ack messages.
    *
-   * @return the number of flushed messages
+   * @return true if there exist ongoing messages
    */
-  public int flushAllMessages() throws ExecutionException, InterruptedException {
-    final int numMsgs = vertexIdToAccumulatedMsgs.size();
+  public boolean flushAllMessages() throws ExecutionException, InterruptedException {
+    final boolean messageExist = !vertexIdToAccumulatedMsgs.isEmpty();
     getNextMessageTable().multiUpdate(vertexIdToAccumulatedMsgs).get();
     vertexIdToAccumulatedMsgs.clear();
 
-    return numMsgs;
+    return messageExist;
   }
 }

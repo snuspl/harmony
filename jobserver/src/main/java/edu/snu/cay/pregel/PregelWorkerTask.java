@@ -113,12 +113,12 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
       }
 
       // before finishing superstep, confirm that all outgoing messages are completely sent out
-      final int numSentMsgs = messageManager.flushAllMessages();
+      final boolean messageExist = messageManager.flushAllMessages();
 
       LOG.log(Level.INFO, "Superstep {0} is finished", superStepCount);
 
       // master will decide whether to continue or not
-      final boolean continueSuperstep = workerMsgManager.waitForTryNextSuperstepMsg(numActiveVertices, numSentMsgs);
+      final boolean continueSuperstep = workerMsgManager.waitForTryNextSuperstepMsg(numActiveVertices, messageExist);
 
       if (!continueSuperstep) {
         break;
