@@ -395,7 +395,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     if (kvData == null) {
       for (final MLRData entry : data) {
         final Vector feature = entry.getFeature();
-        final int label = entry.getLabel(); final Vector predictions = predict(feature, params);
+        final int label = entry.getLabel();
+        final Vector predictions = predict(feature, params);
         final int prediction = max(predictions).getLeft();
 
         if (label == prediction) {
@@ -407,7 +408,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     } else {
       for (final Map.Entry<Long, MLRData> entry : kvData) {
         final Vector feature = entry.getValue().getFeature();
-        final int label = entry.getValue().getLabel(); final Vector predictions = predict(feature, params);
+        final int label = entry.getValue().getLabel();
+        final Vector predictions = predict(feature, params);
         final int prediction = max(predictions).getLeft();
 
         if (label == prediction) {
@@ -462,7 +464,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    * Returns {@code log(sum_i(exp(vector.get(i)))}, while avoiding overflow.
    */
   private static double logSumExp(final Vector vector) {
-    final double max = max(vector).getLeft();
+    final double max = max(vector).getRight();
     double sumExp = 0f;
     for (int index = 0; index < vector.length(); ++index) {
       sumExp += Math.exp(vector.get(index) - max);
