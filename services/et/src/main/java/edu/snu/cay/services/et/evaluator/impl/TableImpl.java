@@ -16,6 +16,7 @@
 package edu.snu.cay.services.et.evaluator.impl;
 
 import edu.snu.cay.services.et.avro.OpType;
+import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.KeyCodec;
 import edu.snu.cay.services.et.configuration.parameters.TableIdentifier;
 import edu.snu.cay.services.et.evaluator.api.*;
@@ -49,6 +50,11 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   private final String tableId;
 
   /**
+   * Local executor identifier.
+   */
+  private final String executorId;
+
+  /**
    * A key codec.
    */
   private final StreamingCodec<K> keyCodec;
@@ -75,12 +81,14 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
 
   @Inject
   private TableImpl(@Parameter(TableIdentifier.class) final String tableId,
+                    @Parameter(ExecutorIdentifier.class) final String executorId,
                     @Parameter(KeyCodec.class) final StreamingCodec<K> keyCodec,
                     final TableComponents tableComponents,
                     final Tablet<K, V, U> tablet,
                     final RemoteAccessOpSender remoteAccessOpSender,
                     final BlockPartitioner<K> blockPartitioner) {
     this.tableId = tableId;
+    this.executorId = executorId;
     this.keyCodec = keyCodec;
     this.tableComponents = tableComponents;
     this.tablet = tablet;
@@ -407,28 +415,22 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
     final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
-    final Optional<String> remoteIdOptional;
 
     final Pair<Optional<String>, Lock> remoteIdWithLock =
         tableComponents.getOwnershipCache().resolveExecutorWithLock(blockId);
+
+    final Optional<String> remoteIdOptional = remoteIdWithLock.getKey();
+    // since UPDATE is write operation, we cannot bypass operation queue even it's for local blocks
+    final String targetExecutorId = remoteIdOptional.orElse(executorId);
     try {
-      remoteIdOptional = remoteIdWithLock.getKey();
 
-      // execute operation in local, holding ownershipLock
-      if (!remoteIdOptional.isPresent()) {
-        final V result = tablet.update(blockId, key, updateValue);
-        return new SingleKeyDataOpResult<>(result, true);
-      } else {
-        final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
-        // send operation to remote
-        remoteAccessOpSender.sendSingleKeyOpToRemote(
-            OpType.UPDATE, tableId, blockId, key, null,
-            updateValue, remoteIdOptional.get(), replyRequired, tableComponents, dataOpResult);
+      final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
+      // send operation to remote or local queue
+      remoteAccessOpSender.sendSingleKeyOpToRemote(
+          OpType.UPDATE, tableId, blockId, key, null,
+          updateValue, targetExecutorId, replyRequired, tableComponents, dataOpResult);
 
-        return dataOpResult;
-      }
-    } catch (final BlockNotExistsException e) {
-      throw new RuntimeException(e);
+      return dataOpResult;
     } finally {
       final Lock ownershipLock = remoteIdWithLock.getValue();
       ownershipLock.unlock();
@@ -464,35 +466,20 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
     blockToSubMaps.forEach((blockId, subMap) -> {
       final Pair<Optional<String>, Lock> remoteIdWithLock =
           tableComponents.getOwnershipCache().resolveExecutorWithLock(blockId);
-      final Optional<String> remoteIdOptional;
-      remoteIdOptional = remoteIdWithLock.getKey();
+      final Optional<String> remoteIdOptional = remoteIdWithLock.getKey();
+      // since UPDATE is write operation, we cannot bypass operation queue even it's for local blocks
+      final String targetExecutorId = remoteIdOptional.orElse(executorId);
       try {
-        // execute operation in local
-        if (!remoteIdOptional.isPresent()) {
-          final Map<K, V> localResultMap = new HashMap<>();
+        final List<K> keyList = new ArrayList<>(subMap.size());
+        final List<U> updateValueList = new ArrayList<>(subMap.size());
+        subMap.forEach((key, value) -> {
+          keyList.add(key);
+          updateValueList.add(value);
+        });
 
-          for (final Map.Entry<K, U> kuEntry : subMap.entrySet()) {
-            final V output = tablet.update(blockId, kuEntry.getKey(), kuEntry.getValue());
-            if (output != null) {
-              localResultMap.put(kuEntry.getKey(), output);
-            }
-          }
-          aggregateDataOpResult.onCompleted(localResultMap, true);
-        } else {
-
-          final List<K> keyList = new ArrayList<>(subMap.size());
-          final List<U> updateValueList = new ArrayList<>(subMap.size());
-          subMap.forEach((key, value) -> {
-            keyList.add(key);
-            updateValueList.add(value);
-          });
-
-          // send operation to remote
-          remoteAccessOpSender.sendMultiKeyOpToRemote(OpType.UPDATE, tableId, blockId, keyList, Collections.emptyList(),
-              updateValueList, remoteIdOptional.get(), replyRequired, tableComponents, aggregateDataOpResult);
-        }
-      } catch (BlockNotExistsException e) {
-        throw new RuntimeException(e);
+        // send operation to remote or local queue
+        remoteAccessOpSender.sendMultiKeyOpToRemote(OpType.UPDATE, tableId, blockId, keyList, Collections.emptyList(),
+            updateValueList, targetExecutorId, replyRequired, tableComponents, aggregateDataOpResult);
       } finally {
         final Lock ownershipLock = remoteIdWithLock.getValue();
         ownershipLock.unlock();
