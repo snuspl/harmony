@@ -420,10 +420,10 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
         tableComponents.getOwnershipCache().resolveExecutorWithLock(blockId);
 
     final Optional<String> remoteIdOptional = remoteIdWithLock.getKey();
+    // TODO #11: Optimize local access routine of update operation
     // since UPDATE is write operation, we cannot bypass operation queue even it's for local blocks
     final String targetExecutorId = remoteIdOptional.orElse(executorId);
     try {
-
       final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
       // send operation to remote or local queue
       remoteAccessOpSender.sendSingleKeyOpToRemote(
@@ -467,6 +467,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       final Pair<Optional<String>, Lock> remoteIdWithLock =
           tableComponents.getOwnershipCache().resolveExecutorWithLock(blockId);
       final Optional<String> remoteIdOptional = remoteIdWithLock.getKey();
+      // TODO #11: Optimize local access routine of update operation
       // since UPDATE is write operation, we cannot bypass operation queue even it's for local blocks
       final String targetExecutorId = remoteIdOptional.orElse(executorId);
       try {
