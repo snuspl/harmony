@@ -391,7 +391,8 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
    * @param dataValues Dataset assigned to this worker
    * @return a pair of row keys and column keys
    */
-  private Pair<List<Integer>, List<Integer>> getRowColumnKeys(final Collection<Map.Entry<Integer, NMFData>> dataValues) {
+  private Pair<List<Integer>, List<Integer>> getRowColumnKeys(
+      final Collection<Map.Entry<Integer, NMFData>> dataValues) {
     final ArrayList<Integer> rowKeys = new ArrayList<>(dataValues.size());
     final ArrayList<Integer> columnKeys = new ArrayList<>();
 
