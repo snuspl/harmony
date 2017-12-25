@@ -383,6 +383,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   /**
    * Compute the loss value using the current models and given data instances.
    * May take long, so do not call frequently.
+   * Only one type of MLR data arguments is not null.
    */
   private Tuple3<Float, Float, Float> computeLoss(final Collection<Map.Entry<Long, MLRData>> kvData,
                                                   final Collection<MLRData> data,
@@ -395,7 +396,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     if (kvData == null) {
       for (final MLRData entry : data) {
         final Vector feature = entry.getFeature();
-        final int label = entry.getLabel(); final Vector predictions = predict(feature, params);
+        final int label = entry.getLabel();
+        final Vector predictions = predict(feature, params);
         final int prediction = max(predictions).getLeft();
 
         if (label == prediction) {
@@ -407,7 +409,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     } else {
       for (final Map.Entry<Long, MLRData> entry : kvData) {
         final Vector feature = entry.getValue().getFeature();
-        final int label = entry.getValue().getLabel(); final Vector predictions = predict(feature, params);
+        final int label = entry.getValue().getLabel();
+        final Vector predictions = predict(feature, params);
         final int prediction = max(predictions).getLeft();
 
         if (label == prediction) {

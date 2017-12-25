@@ -88,6 +88,7 @@ final class LDAStatCalculator {
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }
+
       for (int j = 0; j < numTopics; j++) {
         final int topicCount = localModel.getTopicCount(j);
         if (topicCount < 0) {

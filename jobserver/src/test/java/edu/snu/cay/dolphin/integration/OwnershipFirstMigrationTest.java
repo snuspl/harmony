@@ -88,7 +88,7 @@ public final class OwnershipFirstMigrationTest {
   private List<String> getDefaultArguments(final int numWorkers, final int numServers) {
     final int numMiniBatches = 10;
     final int numWorkerBlocks = numWorkers * numMiniBatches;
-    final int numDataPerWorker = numMiniBatches; // a single data item for a batch
+    final int numDataPerWorker = numMiniBatches * 128;
 
     return Arrays.asList(
         "-max_num_epochs", Integer.toString(5),

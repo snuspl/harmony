@@ -37,6 +37,7 @@ import java.util.List;
  * In this format, one-based indexing is used.
  */
 final class NMFETDataParser implements DataParser<Pair<Integer, NMFData>> {
+
   @Inject
   private NMFETDataParser() {
 

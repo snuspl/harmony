@@ -101,8 +101,10 @@ final class LDATrainer implements Trainer<Long, Document> {
     for (final Map.Entry<Long, Document> documentPair : epochData) {
       final long documentId = documentPair.getKey();
       final Document document = documentPair.getValue();
+
       final LDALocalModel localModel = new LDALocalModel(document.size(), numTopics);
       localModels.add(Pair.of(documentId, localModel));
+
       for (int i = 0; i < document.size(); i++) {
         final int word = document.getWord(i);
         topicChanges.increment(word, localModel.getAssignment(i), 1);
@@ -254,7 +256,8 @@ final class LDATrainer implements Trainer<Long, Document> {
   private List<Integer> getKeys(final Collection<Map.Entry<Long, Document>> documentPairs) {
     final Set<Integer> keys = new TreeSet<>();
     for (final Map.Entry<Long, Document> documentPair : documentPairs) {
-      keys.addAll(documentPair.getValue().getWords());
+      final Document document = documentPair.getValue();
+      keys.addAll(document.getWords());
     }
 
     final List<Integer> result = new ArrayList<>(keys.size() + 1);

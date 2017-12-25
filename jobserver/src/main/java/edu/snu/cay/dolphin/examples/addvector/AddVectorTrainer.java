@@ -103,15 +103,13 @@ final class AddVectorTrainer implements Trainer {
 
   @Override
   public void runMiniBatch(final Collection miniBatchTrainingData) {
-    final int numDataToProcess = miniBatchTrainingData.size();
-
     // 1. pull model to compute with
     final List<Vector> valueList = modelAccessor.pull(keyList);
     LOG.log(Level.FINE, "Current values associated with keys {0} is {1}", new Object[]{keyList, valueList});
 
     // 2. sleep to simulate computation
     try {
-      Thread.sleep(computeTime * numDataToProcess);
+      Thread.sleep(computeTime);
     } catch (final InterruptedException e) {
       LOG.log(Level.WARNING, "Interrupted while sleeping to simulate computation", e);
     }

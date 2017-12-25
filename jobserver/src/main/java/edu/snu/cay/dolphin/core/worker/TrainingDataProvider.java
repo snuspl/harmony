@@ -20,8 +20,8 @@ import java.util.Map;
 
 /**
  * Provides the training data to process during epoch, for mini-batches.
- * @param <K> type of key
- * @param <V> type of training data
+ * @param <K> type of training data key
+ * @param <V> type of training data value
  */
 public interface TrainingDataProvider<K, V> {
 

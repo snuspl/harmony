@@ -678,8 +678,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Then, calculate residual values for each data by using real y-values and predicted values.
    */
   private List<Float> calculateResidual(final List<Map.Entry<Long, GBTData>> instances,
-                                        final int label,
-                                        final List<GBTree> forest) {
+                                        final int label, final List<GBTree> forest) {
     final List<Float> residual = new ArrayList<>(instances.size());
     for (int instanceIdx = 0; instanceIdx < instances.size(); instanceIdx++) {
       residual.add(0.0f);
@@ -778,13 +777,15 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
       for (final GBTree thisTree : forest) {
         int dataIdx = 0;
         for (final Map.Entry<Long, GBTData> instance : instances) {
-          predictedValue[dataIdx++] += stepSize * predictByTree(instance.getValue(), thisTree);
+          final GBTData gbtData = instance.getValue();
+          predictedValue[dataIdx++] += stepSize * predictByTree(gbtData, thisTree);
         }
       }
       int dataIdx = 0;
       for (final Map.Entry<Long, GBTData> instance : instances) {
+        final GBTData gbtData = instance.getValue();
         LOG.log(Level.INFO, "Predicted value : {0}", new Object[]{predictedValue[dataIdx++]});
-        LOG.log(Level.INFO, "real value : {0}", instance.getValue());
+        LOG.log(Level.INFO, "real value : {0}", gbtData.getValue());
       }
     } else {
       int misclassifiedNum = 0;
@@ -799,12 +800,14 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
         for (final GBTree thisTree : forest) {
           int dataIdx = 0;
           for (final Map.Entry<Long, GBTData> instance : instances) {
-            predictedValue[dataIdx++][label] += stepSize * predictByTree(instance.getValue(), thisTree);
+            final GBTData gbtData = instance.getValue();
+            predictedValue[dataIdx++][label] += stepSize * predictByTree(gbtData, thisTree);
           }
         }
       }
       int dataIdx = 0;
       for (final Map.Entry<Long, GBTData> instance : instances) {
+        final GBTData gbtData = instance.getValue();
         int predictedResult = 0;
         Float maxValue = predictedValue[dataIdx][0];
         for (int label = 1; label < valueTypeNum; label++) {
@@ -813,11 +816,11 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
             predictedResult = label;
           }
         }
-        if (!similarValues(predictedResult, instance.getValue().getValue())) {
+        if (!similarValues(predictedResult, gbtData.getValue())) {
           misclassifiedNum++;
         }
         LOG.log(Level.INFO, "Predicted class : {0}", new Object[]{predictedResult});
-        LOG.log(Level.INFO, "real class : {0}", (int)instance.getValue().getValue());
+        LOG.log(Level.INFO, "real class : {0}", (int) gbtData.getValue());
         dataIdx++;
       }
       LOG.log(Level.INFO, "number of misclassified data : {0}, error rate : {1}",

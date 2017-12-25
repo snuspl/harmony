@@ -213,8 +213,9 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
     final Vector values = vectorFactory.createDenseZeros(instances.size());
     int instanceIdx = 0;
     for (final Map.Entry<Long, LassoData> instance : instances) {
-      features.add(instance.getValue().getFeature());
-      values.set(instanceIdx++, instance.getValue().getValue());
+      final LassoData lassoData = instance.getValue();
+      features.add(lassoData.getFeature());
+      values.set(instanceIdx++, lassoData.getValue());
     }
     return Pair.of(matrixFactory.horzcatVecSparse(features).transpose(), values);
   }
@@ -276,22 +277,24 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
 
   /**
    * Compute the loss value for the data.
+   * Only one input parameter is not null.
    */
   private double computeLoss(final Collection<Map.Entry<Long, LassoData>> kvData,
                              final Collection<LassoData> data) {
     double squaredErrorSum = 0;
 
     if (kvData == null) {
-      for (final LassoData entry : data) {
-        final Vector feature = entry.getFeature();
-        final double value = entry.getValue();
+      for (final LassoData lassoData : data) {
+        final Vector feature = lassoData.getFeature();
+        final double value = lassoData.getValue();
         final double prediction = predict(feature);
         squaredErrorSum += (value - prediction) * (value - prediction);
       }
     } else {
       for (final Map.Entry<Long, LassoData> entry : kvData) {
-        final Vector feature = entry.getValue().getFeature();
-        final double value = entry.getValue().getValue();
+        final LassoData lassoData = entry.getValue();
+        final Vector feature = lassoData.getFeature();
+        final double value = lassoData.getValue();
         final double prediction = predict(feature);
         squaredErrorSum += (value - prediction) * (value - prediction);
       }

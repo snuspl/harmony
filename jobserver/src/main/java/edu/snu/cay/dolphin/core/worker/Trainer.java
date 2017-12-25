@@ -38,8 +38,8 @@ import java.util.Map;
  * can also be received as constructor parameters, given that the parameter itself is tagged with
  * {@link org.apache.reef.tang.annotations.Parameter} and an actual value is given for the parameter via command line.
  *
- * @param <K> type of key
- * @param <V> type of the training data
+ * @param <K> type of the training data key
+ * @param <V> type of the training data value
  */
 @TaskSide
 public interface Trainer<K, V> {

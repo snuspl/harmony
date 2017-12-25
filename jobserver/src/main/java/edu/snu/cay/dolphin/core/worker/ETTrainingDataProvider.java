@@ -62,7 +62,6 @@ public final class ETTrainingDataProvider<K, V> implements TrainingDataProvider<
   public Collection<Map.Entry<K, V>> getNextBatchData() {
     if (blockIterator.hasNext()) {
       final Map<K, V> batchData = blockIterator.next().getAll();
-
       final List<Map.Entry<K, V>> entryList = new ArrayList<>(batchData.entrySet());
 
       Collections.shuffle(entryList); // shuffle to avoid bias
