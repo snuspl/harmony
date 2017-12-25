@@ -26,6 +26,8 @@ import edu.snu.cay.services.et.configuration.parameters.UpdateValueCodec;
 import edu.snu.cay.services.et.configuration.parameters.ValueCodec;
 import edu.snu.cay.services.et.evaluator.api.DataParser;
 import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
+import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
+import edu.snu.cay.services.et.evaluator.impl.NoneKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
 import edu.snu.cay.utils.ConfigurationUtils;
 import org.apache.reef.io.network.impl.StreamingCodec;
@@ -104,6 +106,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final StreamingCodec keyCodec = workerInjector.getNamedInstance(KeyCodec.class);
     final StreamingCodec valueCodec = workerInjector.getNamedInstance(ValueCodec.class);
     final DataParser dataParser = workerInjector.getInstance(DataParser.class);
+    final boolean hasInputDataKey = workerInjector.getNamedInstance(HasInputDataKey.class);
 
     return TableConfiguration.newBuilder()
         .setId(tableId)
@@ -113,8 +116,9 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setUpdateFunctionClass(VoidUpdateFunction.class)
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
-        .setIsOrderedTable(true)
+        .setIsOrderedTable(false)
         .setDataParserClass(dataParser.getClass())
+        .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
         .setUserParamConf(userParamConf)
         .build();
   }

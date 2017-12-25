@@ -16,12 +16,14 @@
 package edu.snu.cay.dolphin.core.worker;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * Provides the training data to process during epoch, for mini-batches.
- * @param <V> type of training data
+ * @param <K> type of training data key
+ * @param <V> type of training data value
  */
-public interface TrainingDataProvider<V> {
+public interface TrainingDataProvider<K, V> {
 
   /**
    * Prepares the data to process in the next epoch, accessible with calls to {@link #getNextBatchData()}.
@@ -32,13 +34,13 @@ public interface TrainingDataProvider<V> {
    * Provides the training data instances to compute in the next mini-batch.
    * @return a collection of training data instances, which can be an empty list if all data has been processed.
    */
-  Collection<V> getNextBatchData();
+  Collection<Map.Entry<K, V>> getNextBatchData();
 
   /**
    * Provides the training data for this epoch.
    * @return a collection of training data instances for epoch
    */
-  Collection<V> getEpochData();
+  Collection<Map.Entry<K, V>> getEpochData();
   
   /**
    * Gets the number of mini-batches for current epoch.

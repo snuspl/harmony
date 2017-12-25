@@ -20,6 +20,7 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * Compute log likelihoods of the model.
@@ -67,9 +68,10 @@ final class LDAStatCalculator {
    * @param workload a collection of documents assigned to this trainer
    * @return a portion of log likelihood computed from the given workload
    */
-  double computeDocLLH(final Collection<Document> workload) {
+  double computeDocLLH(final Collection<Map.Entry<Long, Document>> workload) {
     double result = workload.size() * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha));
-    for (final Document doc : workload) {
+    for (final Map.Entry<Long, Document> entry : workload) {
+      final Document doc = entry.getValue();
       for (int j = 0; j < numTopics; j++) {
         final int topicCount = doc.getTopicCount(j);
         if (topicCount < 0) {

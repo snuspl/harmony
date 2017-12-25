@@ -104,6 +104,7 @@ public final class DolphinJobLauncher {
               .bindImplementation(ModelAccessor.class, ETModelAccessor.class)
               .bindNamedParameter(KeyCodec.class, dolphinConf.getInputKeyCodecClass())
               .bindNamedParameter(ValueCodec.class, dolphinConf.getInputValueCodecClass())
+              .bindNamedParameter(HasInputDataKey.class, Boolean.toString(dolphinConf.hasInputDataKey()))
               .build());
 
       // job configuration. driver will use this configuration to spawn a job

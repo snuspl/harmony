@@ -36,7 +36,7 @@ import java.util.logging.Logger;
 /**
  * Tasklet for running Dolphin trainers on ET.
  */
-public final class WorkerTasklet<V> implements Tasklet {
+public final class WorkerTasklet<K, V> implements Tasklet {
   private static final Logger LOG = Logger.getLogger(WorkerTasklet.class.getName());
   public static final String TASKLET_ID = "WorkerTasklet";
 
@@ -46,10 +46,10 @@ public final class WorkerTasklet<V> implements Tasklet {
 
   private final ProgressReporter progressReporter;
   private final WorkerGlobalBarrier workerGlobalBarrier;
-  private final TrainingDataProvider<V> trainingDataProvider;
+  private final TrainingDataProvider<K, V> trainingDataProvider;
   private final ModelAccessor modelAccessor;
   private final TestDataProvider<V> testDataProvider;
-  private final Trainer<V> trainer;
+  private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
   /**
@@ -64,10 +64,10 @@ public final class WorkerTasklet<V> implements Tasklet {
                         @Parameter(DolphinParameters.MaxNumEpochs.class) final int maxNumEpochs,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
-                        final TrainingDataProvider<V> trainingDataProvider,
+                        final TrainingDataProvider<K, V> trainingDataProvider,
                         final ModelAccessor modelAccessor,
                         final TestDataProvider<V> testDataProvider,
-                        final Trainer<V> trainer,
+                        final Trainer<K, V> trainer,
                         final MetricCollector metricCollector) {
     this.taskletId = taskletId;
     this.startingEpoch = startingEpoch;
@@ -105,7 +105,7 @@ public final class WorkerTasklet<V> implements Tasklet {
       int numProcessedDataInEpoch = 0;
       int miniBatchIdx = 0;
       while (true) {
-        final Collection<V> miniBatchData = trainingDataProvider.getNextBatchData();
+        final Collection<Map.Entry<K, V>> miniBatchData = trainingDataProvider.getNextBatchData();
         if (miniBatchData.isEmpty()) {
           break; // Finish the epoch when there are no more data to process
         }

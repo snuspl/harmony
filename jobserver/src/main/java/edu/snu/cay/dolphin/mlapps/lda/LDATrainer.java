@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  * all workers update their initial topic assignments. For each mini-batch, sequentially sampling documents,
  * it immediately pushes the changed topic assignment whenever each word is sampled to a new topic.
  */
-final class LDATrainer implements Trainer<Document> {
+final class LDATrainer implements Trainer<Long, Document> {
 
   private static final Logger LOG = Logger.getLogger(LDATrainer.class.getName());
 
@@ -45,7 +45,7 @@ final class LDATrainer implements Trainer<Document> {
 
   private final List<Integer> vocabList;
 
-  private final TrainingDataProvider<Document> trainingDataProvider;
+  private final TrainingDataProvider<Long, Document> trainingDataProvider;
 
   private final ModelAccessor<Integer, int[], int[]> modelAccessor;
 
@@ -57,7 +57,7 @@ final class LDATrainer implements Trainer<Document> {
   @Inject
   private LDATrainer(final SparseLDASampler sampler,
                      final LDAStatCalculator statCalculator,
-                     final TrainingDataProvider<Document> trainingDataProvider,
+                     final TrainingDataProvider<Long, Document> trainingDataProvider,
                      final ModelAccessor<Integer, int[], int[]> modelAccessor,
                      final ModelHolder<LDAModel> modelHolder,
                      @Parameter(NumVocabs.class) final int numVocabs,
@@ -86,7 +86,8 @@ final class LDATrainer implements Trainer<Document> {
   public void initGlobalSettings() {
     // In LDA, topic counts should be initialized by pushing values before running.
     final TopicChanges topicChanges = new TopicChanges();
-    for (final Document document : trainingDataProvider.getEpochData()) {
+    for (final Map.Entry<Long, Document> entry : trainingDataProvider.getEpochData()) {
+      final Document document = entry.getValue();
       for (int i = 0; i < document.size(); i++) {
         final int word = document.getWord(i);
         topicChanges.increment(word, document.getAssignment(i), 1);
@@ -98,7 +99,7 @@ final class LDATrainer implements Trainer<Document> {
   }
 
   @Override
-  public void runMiniBatch(final Collection<Document> miniBatchTrainingData) {
+  public void runMiniBatch(final Collection<Map.Entry<Long, Document>> miniBatchTrainingData) {
     final List<Integer> words = getKeys(miniBatchTrainingData);
 
     pullModels(words);
@@ -117,7 +118,7 @@ final class LDATrainer implements Trainer<Document> {
   }
 
   @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection<Document> inputData,
+  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, Document>> inputData,
                                                  final Collection<Document> testData,
                                                  final edu.snu.cay.services.et.evaluator.api.Table modelTable) {
 
@@ -230,9 +231,10 @@ final class LDATrainer implements Trainer<Document> {
   public void cleanup() {
   }
 
-  private List<Integer> getKeys(final Collection<Document> documents) {
+  private List<Integer> getKeys(final Collection<Map.Entry<Long, Document>> documentPairs) {
     final Set<Integer> keys = new TreeSet<>();
-    for (final Document document : documents) {
+    for (final Map.Entry<Long, Document> documentPair : documentPairs) {
+      final Document document = documentPair.getValue();
       keys.addAll(document.getWords());
     }
 
