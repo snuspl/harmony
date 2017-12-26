@@ -21,6 +21,7 @@ import edu.snu.cay.pregel.combiner.MinimumLongMessageCombiner;
 import edu.snu.cay.pregel.common.DefaultEdgeCodec;
 import edu.snu.cay.pregel.common.DefaultGraphParser;
 import edu.snu.cay.utils.StreamingSerializableCodec;
+import org.apache.reef.client.LauncherStatus;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.io.IOException;
@@ -38,7 +39,12 @@ public final class ShortestPathET {
 
   }
 
-  public static void main(final String[] args) throws IOException, InjectionException {
+  /**
+   * Runs app with given arguments.
+   * @param args command line arguments for running app
+   * @return a LauncherStatus
+   */
+  public static LauncherStatus runShortestPath(final String[] args) throws IOException, InjectionException {
     PregelLauncher.launch(ShortestPathET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
         .setComputationClass(ShortestPathComputation.class)
         .setDataParserClass(DefaultGraphParser.class)
@@ -48,5 +54,12 @@ public final class ShortestPathET {
         .setEdgeCodecClass(DefaultEdgeCodec.class)
         .addParameterClass(SourceId.class)
         .build());
+  }
+
+  public static void main(final String[] args) throws IOException, InjectionException {
+    final LauncherStatus status = runShortestPath(args);
+    if (!status.equals(LauncherStatus.COMPLETED)) {
+      throw new RuntimeException(String.format("Job failed. %s", status));
+    }
   }
 }
