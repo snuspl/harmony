@@ -67,7 +67,7 @@ public final class PregelMaster {
 
   private final String jobId;
 
-  private final Map<String, RunningTasklet> runningTaskletMap = new ConcurrentHashMap<>();
+  private final Set<RunningTasklet> runningTasklets = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
   @Inject
   private PregelMaster(@Parameter(PregelParameters.SerializedTaskletConf.class) final String serializedTaskConf,
@@ -95,7 +95,7 @@ public final class PregelMaster {
     taskletFutureList.forEach(taskletFuture -> {
       try {
         final RunningTasklet tasklet = taskletFuture.get();
-        runningTaskletMap.put(tasklet.getId(), tasklet);
+        runningTasklets.add(tasklet);
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }
@@ -137,8 +137,9 @@ public final class PregelMaster {
             .setType(controlMsgType)
             .build();
 
-        LOG.log(Level.INFO, "Broadcast control msg to workers: {0}", runningTaskletMap.keySet());
-        runningTaskletMap.values().forEach(tasklet -> {
+        LOG.log(Level.INFO, "Broadcast control msg to workers to " + (controlMsgType.equals(ControlMsgType.Stop) ?
+            "stop" : "start next superstep"));
+        runningTasklets.forEach(tasklet -> {
           try {
             tasklet.send(AvroUtils.toBytes(controlMsg, SuperstepControlMsg.class));
           } catch (NetworkException e) {
