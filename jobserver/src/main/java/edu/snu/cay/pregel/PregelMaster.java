@@ -137,8 +137,8 @@ public final class PregelMaster {
             .setType(controlMsgType)
             .build();
 
-        LOG.log(Level.INFO, "Broadcast control msg to workers to " + (controlMsgType.equals(ControlMsgType.Stop) ?
-            "stop" : "start next superstep"));
+        LOG.log(Level.INFO, "Broadcast control msg:[{0}] to {1} workers",
+            new Object[]{controlMsgType, runningTasklets.size()});
         runningTasklets.forEach(tasklet -> {
           try {
             tasklet.send(AvroUtils.toBytes(controlMsg, SuperstepControlMsg.class));
