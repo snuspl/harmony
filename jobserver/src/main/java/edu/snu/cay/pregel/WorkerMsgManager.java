@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.pregel;
 
-import edu.snu.cay.jobserver.JobServerMsg;
+import edu.snu.cay.jobserver.TaskletJobMsg;
 import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
@@ -103,13 +103,13 @@ final class WorkerMsgManager implements TaskletCustomMsgHandler {
         .setIsNoOngoingMsgs(isNoOngoingMsgs)
         .build();
 
-    final JobServerMsg jobServerMsg = JobServerMsg.newBuilder()
+    final TaskletJobMsg taskletJobMsg = TaskletJobMsg.newBuilder()
         .setJobId(jobId)
-        .setSrcId(taskletId)
+        .setTaskletId(taskletId)
         .setJobMsg(ByteBuffer.wrap(AvroUtils.toBytes(resultMsg, SuperstepResultMsg.class)))
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(jobServerMsg, JobServerMsg.class));
+    taskletCustomMsgSender.send(AvroUtils.toBytes(taskletJobMsg, TaskletJobMsg.class));
 
     // 3. wait for a response
     try {

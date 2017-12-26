@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 [
+/**
+ * A protocol for custom messages from tasklets to its job master.
+ */
 {
   "namespace": "edu.snu.cay.jobserver",
   "type": "record",
-  "name": "JobServerMsg",
+  "name": "TaskletJobMsg",
   "fields":
   [
     {"name": "jobId", "type": "string"},
-    {"name": "srcId", "type": "string"},
+    {"name": "taskletId", "type": "string"},
     {"name": "jobMsg", "type": "bytes"}
   ]
 }
