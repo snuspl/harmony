@@ -225,7 +225,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
   private NMFLocalModel getLocalModel(final List<Integer> keys) {
     try {
-      final Map<Integer, Vector> localModelMatrix = localModelTable.multiGetOrInit(keys).get();
+      final Map<Integer, Vector> localModelMatrix = localModelTable.multiGetOrInit(keys, false).get();
       if (localModelMatrix.size() != keys.size()) {
         throw new RuntimeException();
       }

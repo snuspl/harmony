@@ -84,7 +84,7 @@ final class LDAStatCalculator {
       final Document document = documentPair.getValue();
       final LDALocalModel localModel;
       try {
-        localModel = localModelTable.get(documentPair.getKey()).get();
+        localModel = localModelTable.get(documentPair.getKey(), false).get();
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }

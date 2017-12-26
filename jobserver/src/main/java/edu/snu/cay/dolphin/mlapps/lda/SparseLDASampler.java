@@ -144,7 +144,7 @@ final class SparseLDASampler {
     final LDALocalModel localModel;
     try {
       final long docId = documentPair.getKey();
-      localModel = localModelTable.get(docId).get();
+      localModel = localModelTable.get(docId, false).get();
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
