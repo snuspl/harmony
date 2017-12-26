@@ -245,7 +245,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   }
 
   @Override
-  public DataOpResult<V> get(final K key) {
+  public DataOpResult<V> get(final K key, final boolean copy) {
     final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
@@ -257,15 +257,17 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       remoteIdOptional = remoteIdWithLock.getKey();
 
       // execute operation in local, holding ownershipLock
-      if (!remoteIdOptional.isPresent()) {
+      if (!copy && !remoteIdOptional.isPresent()) {
         final V result = tablet.get(blockId, key);
         return new SingleKeyDataOpResult<>(result, true);
       } else {
+        final String targetExecutorId = remoteIdOptional.orElse(executorId);
+
         final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
         // send operation to remote
         remoteAccessOpSender.sendSingleKeyOpToRemote(
             OpType.GET, tableId, blockId, key, null, null,
-            remoteIdOptional.get(), true, tableComponents, dataOpResult);
+            targetExecutorId, true, tableComponents, dataOpResult);
 
         return dataOpResult;
       }
@@ -278,7 +280,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   }
 
   @Override
-  public Future<Map<K, V>> multiGet(final List<K> keys) {
+  public Future<Map<K, V>> multiGet(final List<K> keys, final boolean copy) {
     final Map<Integer, List<K>> blockToKeyListMap = new HashMap<>();
     for (final K key : keys) {
       final int blockId = blockPartitioner.getBlockId(key);
@@ -293,7 +295,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       remoteIdOptional = remoteIdWithLock.getKey();
       try {
         // execute operation in local
-        if (!remoteIdOptional.isPresent()) {
+        if (!copy && !remoteIdOptional.isPresent()) {
           final Map<K, V> localResultMap = new HashMap<>();
           for (final K key : keyList) {
             final V output = tablet.get(blockId, key);
@@ -303,10 +305,11 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
           }
           aggregateDataOpResult.onCompleted(localResultMap, true);
         } else {
+          final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
           // send operation to remote
           remoteAccessOpSender.sendMultiKeyOpToRemote(OpType.GET, tableId, blockId, keyList,
-              Collections.emptyList(), Collections.emptyList(), remoteIdOptional.get(),
+              Collections.emptyList(), Collections.emptyList(), targetExecutorId,
               true, tableComponents, aggregateDataOpResult);
         }
       } catch (BlockNotExistsException e) {
@@ -321,7 +324,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   }
 
   @Override
-  public Future<V> getOrInit(final K key) {
+  public Future<V> getOrInit(final K key, final boolean copy) {
     final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
@@ -333,15 +336,17 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       remoteIdOptional = remoteIdWithLock.getKey();
 
       // execute operation in local, holding ownershipLock
-      if (!remoteIdOptional.isPresent()) {
+      if (!copy && !remoteIdOptional.isPresent()) {
         final V result = tablet.getOrInit(blockId, key);
         return new SingleKeyDataOpResult<>(result, true);
       } else {
+        final String targetExecutorId = remoteIdOptional.orElse(executorId);
+
         final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
         // send operation to remote
         remoteAccessOpSender.sendSingleKeyOpToRemote(
             OpType.GET_OR_INIT, tableId, blockId, key, null, null,
-            remoteIdOptional.get(), true, tableComponents, dataOpResult);
+            targetExecutorId, true, tableComponents, dataOpResult);
 
         return dataOpResult;
       }
@@ -355,7 +360,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   }
 
   @Override
-  public Future<Map<K, V>> multiGetOrInit(final List<K> keys) {
+  public Future<Map<K, V>> multiGetOrInit(final List<K> keys, final boolean copy) {
     final Map<Integer, List<K>> blockToKeyListMap = new HashMap<>();
     for (final K key : keys) {
       final int blockId = blockPartitioner.getBlockId(key);
@@ -370,7 +375,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       remoteIdOptional = remoteIdWithLock.getKey();
       try {
         // execute operation in local
-        if (!remoteIdOptional.isPresent()) {
+        if (!copy && !remoteIdOptional.isPresent()) {
           final Map<K, V> localResultMap = new HashMap<>();
           for (final K key : keyList) {
             final V output = tablet.getOrInit(blockId, key);
@@ -380,10 +385,11 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
           }
           aggregateDataOpResult.onCompleted(localResultMap, true);
         } else {
+          final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
           // send operation to remote
           remoteAccessOpSender.sendMultiKeyOpToRemote(OpType.GET_OR_INIT, tableId, blockId, keyList,
-              Collections.emptyList(), Collections.emptyList(), remoteIdOptional.get(),
+              Collections.emptyList(), Collections.emptyList(), targetExecutorId,
               true, tableComponents, aggregateDataOpResult);
         }
       } catch (BlockNotExistsException e) {
