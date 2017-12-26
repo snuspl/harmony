@@ -49,8 +49,6 @@ public final class PregelMaster {
   private static final Logger LOG = Logger.getLogger(PregelMaster.class.getName());
   private static final String WORKER_TASKLET_ID = "Worker";
 
-  private final Set<String> workerIds;
-
   /**
    * These two values are updated by the results of every worker at the end of a single superstep.
    * Master checks whether 1) all vertices in workers are halt or not, 2) and any ongoing messages are exist or not.
@@ -78,7 +76,6 @@ public final class PregelMaster {
                        @Parameter(Parameters.JobId.class) final String jobId,
                        @Parameter(PregelParameters.NumWorkers.class) final int numWorkers) throws IOException {
     this.msgCountDownLatch = new CountDownLatch(numWorkers);
-    this.workerIds = Collections.synchronizedSet(new HashSet<String>(numWorkers));
     this.isAllVerticesHalt = true;
     this.isNoOngoingMsgs = true;
     this.numWorkers = numWorkers;
@@ -140,9 +137,10 @@ public final class PregelMaster {
             .setType(controlMsgType)
             .build();
 
-        workerIds.forEach(workerId -> {
+        LOG.log(Level.INFO, "Broadcast control msg to workers: {0}", runningTaskletMap.keySet());
+        runningTaskletMap.values().forEach(tasklet -> {
           try {
-            runningTaskletMap.get(workerId).send(AvroUtils.toBytes(controlMsg, SuperstepControlMsg.class));
+            tasklet.send(AvroUtils.toBytes(controlMsg, SuperstepControlMsg.class));
           } catch (NetworkException e) {
             throw new RuntimeException(e);
           }
@@ -163,11 +161,7 @@ public final class PregelMaster {
   /**
    * Handles {@link SuperstepResultMsg} from workers.
    */
-  public void onWorkerMsg(final String workerId, final SuperstepResultMsg resultMsg) {
-    if (!workerIds.contains(workerId)) {
-      workerIds.add(workerId);
-    }
-
+  public void onWorkerMsg(final SuperstepResultMsg resultMsg) {
     LOG.log(Level.INFO, "isAllVerticesHalt : {0}, isNoOngoingMsgs : {1}",
         new Object[]{resultMsg.getIsAllVerticesHalt(), resultMsg.getIsNoOngoingMsgs()});
     isAllVerticesHalt &= resultMsg.getIsAllVerticesHalt();
