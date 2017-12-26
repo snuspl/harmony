@@ -261,6 +261,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
         final V result = tablet.get(blockId, key);
         return new SingleKeyDataOpResult<>(result, true);
       } else {
+        // TODO #11: Optimize local access routine of get operation
         final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
         final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
@@ -305,6 +306,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
           }
           aggregateDataOpResult.onCompleted(localResultMap, true);
         } else {
+          // TODO #11: Optimize local access routine of get operation
           final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
           // send operation to remote
@@ -340,6 +342,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
         final V result = tablet.getOrInit(blockId, key);
         return new SingleKeyDataOpResult<>(result, true);
       } else {
+        // TODO #11: Optimize local access routine of get operation
         final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
         final DataOpResult<V> dataOpResult = new SingleKeyDataOpResult<>();
@@ -385,6 +388,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
           }
           aggregateDataOpResult.onCompleted(localResultMap, true);
         } else {
+          // TODO #11: Optimize local access routine of get operation
           final String targetExecutorId = remoteIdOptional.orElse(executorId);
 
           // send operation to remote
