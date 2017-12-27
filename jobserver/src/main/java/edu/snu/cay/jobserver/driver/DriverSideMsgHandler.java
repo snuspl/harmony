@@ -38,10 +38,10 @@ public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
   @Override
   public void onNext(final byte[] bytes) {
-    final TaskletJobMsg jobServerMsg = AvroUtils.fromBytes(bytes, TaskletJobMsg.class);
-    final String jobId = jobServerMsg.getJobId().toString();
-    final String srcId = jobServerMsg.getTaskletId().toString();
-    final byte[] jobMsg = jobServerMsg.getJobMsg().array();
+    final TaskletJobMsg taskletJobMsg = AvroUtils.fromBytes(bytes, TaskletJobMsg.class);
+    final String jobId = taskletJobMsg.getJobId().toString();
+    final String srcId = taskletJobMsg.getTaskletId().toString();
+    final byte[] jobMsg = taskletJobMsg.getJobMsg().array();
 
     jobServerDriverFuture.get().getJobMaster(jobId).onMsg(srcId, jobMsg);
   }

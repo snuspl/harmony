@@ -39,8 +39,8 @@ public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
   @Override
   public void onNext(final byte[] bytes) {
-    final TaskletJobMsg jobServerMsg = AvroUtils.fromBytes(bytes, TaskletJobMsg.class);
-    final byte[] jobMsg = jobServerMsg.getJobMsg().array();
+    final TaskletJobMsg taskletJobMsg = AvroUtils.fromBytes(bytes, TaskletJobMsg.class);
+    final byte[] jobMsg = taskletJobMsg.getJobMsg().array();
     final DolphinMsg dolphinMsg = AvroUtils.fromBytes(jobMsg, DolphinMsg.class);
     dolphinMasterFuture.get().getMsgHandler().onDolphinMsg(dolphinMsg);
   }
