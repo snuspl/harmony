@@ -45,7 +45,7 @@ public final class ShortestPathET {
    * @return a LauncherStatus
    */
   public static LauncherStatus runShortestPath(final String[] args) throws IOException, InjectionException {
-    PregelLauncher.launch(ShortestPathET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
+    return PregelLauncher.launch(ShortestPathET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
         .setComputationClass(ShortestPathComputation.class)
         .setDataParserClass(DefaultGraphParser.class)
         .setMessageCombinerClass(MinimumLongMessageCombiner.class)
