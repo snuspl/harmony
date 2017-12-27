@@ -21,6 +21,7 @@ import edu.snu.cay.pregel.combiner.DoubleSumMessageCombiner;
 import edu.snu.cay.pregel.common.NoneEdgeValueGraphParser;
 import edu.snu.cay.pregel.common.NoneValueEdgeCodec;
 import edu.snu.cay.utils.StreamingSerializableCodec;
+import org.apache.reef.client.LauncherStatus;
 import org.apache.reef.tang.exceptions.InjectionException;
 
 import java.io.IOException;
@@ -37,8 +38,13 @@ public final class PagerankET {
 
   }
 
-  public static void main(final String[] args) throws IOException, InjectionException {
-    PregelLauncher.launch(PagerankET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
+  /**
+   * Runs app with given arguments.
+   * @param args command line arguments for running app
+   * @return a LauncherStatus
+   */
+  public static LauncherStatus runPagerank(final String[] args) throws IOException, InjectionException {
+    return PregelLauncher.launch(PagerankET.class.getSimpleName(), args, PregelConfiguration.newBuilder()
         .setComputationClass(PagerankComputation.class)
         .setDataParserClass(NoneEdgeValueGraphParser.class)
         .setMessageCombinerClass(DoubleSumMessageCombiner.class)
@@ -46,5 +52,12 @@ public final class PagerankET {
         .setVertexValueCodecClass(StreamingSerializableCodec.class)
         .setEdgeCodecClass(NoneValueEdgeCodec.class)
         .build());
+  }
+
+  public static void main(final String[] args) throws IOException, InjectionException {
+    final LauncherStatus status = runPagerank(args);
+    if (!status.equals(LauncherStatus.COMPLETED)) {
+      throw new RuntimeException(String.format("Job failed. %s", status));
+    }
   }
 }
