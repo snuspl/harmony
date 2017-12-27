@@ -87,9 +87,9 @@ final class WorkerMsgManager implements TaskletCustomMsgHandler {
    * It sends a message to master and waits a response message.
    *
    * @param numActiveVertices the number of active vertices after superstep
-   * @param numSentMsgs the number of sent messages in this superstep
+   * @param messageExist messages exist that are sent in this superstep
    */
-  boolean waitForTryNextSuperstepMsg(final int numActiveVertices, final int numSentMsgs) {
+  boolean waitForTryNextSuperstepMsg(final int numActiveVertices, final boolean messageExist) {
 
     // 1. reset state
     this.goNextSuperstep = false;
@@ -97,7 +97,7 @@ final class WorkerMsgManager implements TaskletCustomMsgHandler {
 
     // 2. send a message
     final boolean isAllVerticesHalt = numActiveVertices == 0;
-    final boolean isNoOngoingMsgs = numSentMsgs == 0;
+    final boolean isNoOngoingMsgs = !messageExist;
     final SuperstepResultMsg resultMsg = SuperstepResultMsg.newBuilder()
         .setIsAllVerticesHalt(isAllVerticesHalt)
         .setIsNoOngoingMsgs(isNoOngoingMsgs)
