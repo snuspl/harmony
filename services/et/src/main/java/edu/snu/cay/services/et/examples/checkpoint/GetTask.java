@@ -56,7 +56,7 @@ final class GetTask implements Tasklet {
 
     int itemCount = 0;
     for (long key = 0; key < NUM_ITEMS; key++) {
-      final String value = table.get(key).get();
+      final String value = table.get(key, false).get();
 
       if (value != null) { // value can be null, if the checkpoint was done with sampling
         itemCount++;

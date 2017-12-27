@@ -72,7 +72,7 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   public V pull(final K key) {
     pullTracer.startTimer();
 
-    final Future<V> future = modelTable.getOrInit(key);
+    final Future<V> future = modelTable.getOrInit(key, true);
     V result;
     while (true) {
       try {
@@ -104,7 +104,7 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   @Override
   public List<V> pull(final List<K> keys, final Table<K, V, P> aModelTable) {
     try {
-      final Map<K, V> result = aModelTable.multiGetOrInit(keys).get();
+      final Map<K, V> result = aModelTable.multiGetOrInit(keys, true).get();
 
       final List<V> valueList = new ArrayList<>(keys.size());
       keys.forEach(key -> valueList.add(result.get(key)));

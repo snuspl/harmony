@@ -40,7 +40,7 @@ public final class PregelJobMaster implements JobMaster {
   @Override
   public void onMsg(final String srcId, final byte[] bytes) {
     final SuperstepResultMsg resultMsg = AvroUtils.fromBytes(bytes, SuperstepResultMsg.class);
-    pregelMaster.onWorkerMsg(srcId, resultMsg);
+    pregelMaster.onWorkerMsg(resultMsg);
   }
 
   @Override

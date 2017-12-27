@@ -78,7 +78,7 @@ public final class UpdaterTask implements Tasklet {
 
     for (int k = 0; k < numKeys; k++) {
       final int key = startKey + k;
-      final Integer getResult = modelTable.get(key).get();
+      final Integer getResult = modelTable.get(key, false).get();
       LOG.log(Level.INFO, "Get result for key {0}: {1}", new Object[]{key, getResult});
     }
   }

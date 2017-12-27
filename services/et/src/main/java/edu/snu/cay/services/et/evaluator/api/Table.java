@@ -91,48 +91,64 @@ public interface Table<K, V, U> {
   /**
    * Retrieves the value to which the specified key is associated,
    * or {@code null} if this table contains no value for the key.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * Retrieving the origin is good for performance, but users should be aware of that
+   * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result, which
    * allows users to retrieve the result from the object when the request is complete.
    * @param key key with which value is to be associated
+   * @param copy a boolean for whether to return the copy of data or the origin from the local tablet
    * @return {@link Future} that will provide the value to which the specified key is associated,
    *         or {@code null} if no value is associated with the given key
    */
-  Future<V> get(K key);
+  Future<V> get(K key, boolean copy);
 
   /**
    * Retrieves the values to which the specified keys are associated.
    * or {@code null} for the keys that this table contains no value.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * Retrieving the origin is good for performance, but users should be aware of that
+   * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result,
    * which allows users to retrieve the result from the object when the request is complete.
    * @param keys keys with which values are to be associated
+   * @param copy a boolean for whether to return the copy of data or the origin from the local tablet
    * @return {@link Future} that will provide the map containing values to which the specified keys are associated,
    *         or {@code null} if no value is associated with the given keys
    */
-  Future<Map<K, V>> multiGet(List<K> keys);
+  Future<Map<K, V>> multiGet(List<K> keys, boolean copy);
 
   /**
    * Retrieves the value to which the specified key is associated.
    * If this table contains no value for the key, it returns a value of {@link UpdateFunction#initValue(K)}
    * after associating this value with the key.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * Retrieving the origin is good for performance, but users should be aware of that
+   * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result, which
    * allows users to retrieve the result from the object when the request is complete.
    * @param key key with which value is to be associated
+   * @param copy a boolean for whether to return the copy of data or the origin from the local tablet
    * @return {@link Future} that will provide the value to which the specified key is associated,
    *         or a value obtained by {@link UpdateFunction#initValue(K)} if there is no mapping for the key
    */
-  Future<V> getOrInit(K key);
+  Future<V> getOrInit(K key, boolean copy);
 
   /**
    * Retrieves the values to which the specified keys are associated.
    * For the entries that this table has not added yet, {@link UpdateFunction#initValue(K)} are associated and inserted
    * to the table with the keys.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * Retrieving the origin is good for performance, but users should be aware of that
+   * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result,
    * which allows users to retrieve the result from the object when the request is complete.
    * @param keys keys with which values are to be associated
+   * @param copy a boolean for whether to return the copy of data or the origin from the local tablet
    * @return {@link Future} that will provide the map containing values to which the specified keys are associated,
    *         or values obtained by {@link UpdateFunction#initValue(K)} for the keys that have no mapping
    */
-  Future<Map<K, V>> multiGetOrInit(List<K> keys);
+  Future<Map<K, V>> multiGetOrInit(List<K> keys, boolean copy);
 
   /**
    * Update a value associated with the specified key using {@link UpdateFunction}.

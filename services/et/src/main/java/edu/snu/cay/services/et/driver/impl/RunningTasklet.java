@@ -98,11 +98,13 @@ public final class RunningTasklet {
 
     final RunningTasklet that = (RunningTasklet) o;
 
-    return taskletId.equals(that.taskletId);
+    return executorId.equals(that.executorId) && taskletId.equals(that.taskletId);
   }
 
   @Override
   public int hashCode() {
-    return taskletId.hashCode();
+    int result = executorId.hashCode();
+    result = 31 * result + taskletId.hashCode();
+    return result;
   }
 }

@@ -58,10 +58,10 @@ final class GetTasklet implements Tasklet {
     final Table<Long, String, ?> hashedTable = tableAccessor.getTable(HASHED_TABLE_ID);
     final Table<Long, String, ?> orderedTable = tableAccessor.getTable(ORDERED_TABLE_ID);
 
-    final String value00 = hashedTable.getOrInit(KEY0).get();
-    final String value01 = hashedTable.getOrInit(KEY1).get();
-    final String value10 = orderedTable.getOrInit(KEY0).get();
-    final String value11 = orderedTable.getOrInit(KEY1).get();
+    final String value00 = hashedTable.getOrInit(KEY0, false).get();
+    final String value01 = hashedTable.getOrInit(KEY1, false).get();
+    final String value10 = orderedTable.getOrInit(KEY0, false).get();
+    final String value11 = orderedTable.getOrInit(KEY1, false).get();
 
     LOG.log(Level.INFO, "value for key {0} in a hashedTable is {1}", new Object[]{KEY0, value00});
     LOG.log(Level.INFO, "value for key {0} in a hashedTable is {1}", new Object[]{KEY1, value01});
