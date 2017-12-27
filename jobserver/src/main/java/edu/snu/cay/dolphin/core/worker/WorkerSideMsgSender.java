@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.core.worker;
 
 import edu.snu.cay.dolphin.*;
-import edu.snu.cay.jobserver.JobServerMsg;
+import edu.snu.cay.jobserver.TaskletJobMsg;
 import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
@@ -127,12 +127,12 @@ public final class WorkerSideMsgSender {
   }
 
   private void sendDolphinMsg(final DolphinMsg dolphinMsg) {
-    final JobServerMsg jobServerMsg = JobServerMsg.newBuilder()
+    final TaskletJobMsg taskletJobMsg = TaskletJobMsg.newBuilder()
         .setJobId(jobId)
-        .setSrcId(taskletId)
+        .setTaskletId(taskletId)
         .setJobMsg(ByteBuffer.wrap(AvroUtils.toBytes(dolphinMsg, DolphinMsg.class)))
         .build();
 
-    taskletCustomMsgSender.send(AvroUtils.toBytes(jobServerMsg, JobServerMsg.class));
+    taskletCustomMsgSender.send(AvroUtils.toBytes(taskletJobMsg, TaskletJobMsg.class));
   }
 }

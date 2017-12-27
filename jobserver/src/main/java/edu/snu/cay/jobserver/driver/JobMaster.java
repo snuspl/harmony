@@ -29,7 +29,7 @@ public interface JobMaster {
    * Upon a msg from a tasklet with {@code srcId} that belong to this job.
    * It should be called when driver-side msg handler has been called.
    */
-  void onMsg(String srcId, byte[] bytes);
+  void onMsg(String srcTaskletId, byte[] bytes);
 
   /**
    * Start running a job with given executor groups and tables.

@@ -18,7 +18,7 @@ package edu.snu.cay.dolphin.core.driver;
 
 import edu.snu.cay.dolphin.DolphinMsg;
 import edu.snu.cay.dolphin.core.master.DolphinMaster;
-import edu.snu.cay.jobserver.JobServerMsg;
+import edu.snu.cay.jobserver.TaskletJobMsg;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.tang.InjectionFuture;
@@ -39,8 +39,8 @@ public final class DriverSideMsgHandler implements TaskletCustomMsgHandler {
 
   @Override
   public void onNext(final byte[] bytes) {
-    final JobServerMsg jobServerMsg = AvroUtils.fromBytes(bytes, JobServerMsg.class);
-    final byte[] jobMsg = jobServerMsg.getJobMsg().array();
+    final TaskletJobMsg taskletJobMsg = AvroUtils.fromBytes(bytes, TaskletJobMsg.class);
+    final byte[] jobMsg = taskletJobMsg.getJobMsg().array();
     final DolphinMsg dolphinMsg = AvroUtils.fromBytes(jobMsg, DolphinMsg.class);
     dolphinMasterFuture.get().getMsgHandler().onDolphinMsg(dolphinMsg);
   }
