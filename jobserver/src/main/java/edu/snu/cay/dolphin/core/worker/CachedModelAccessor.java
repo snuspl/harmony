@@ -64,7 +64,7 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
         final List<K> keyList = new ArrayList<>(keys.size());
         try {
           pullTracer.startTimer();
-          final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList).get();
+          final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList, true).get();
           pullTracer.recordTime(keys.size());
 
           kvMap.forEach(modelLoadingCache::put);
@@ -87,7 +87,7 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
           @Override
           public V load(final K key) throws Exception {
             pullTracer.startTimer();
-            final Future<V> pullFuture = modelTable.getOrInit(key);
+            final Future<V> pullFuture = modelTable.getOrInit(key, true);
             final V value = pullFuture.get();
             pullTracer.recordTime(1);
             return value;
@@ -99,7 +99,7 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
             keys.forEach(keyList::add);
 
             pullTracer.startTimer();
-            final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList).get();
+            final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList, true).get();
             pullTracer.recordTime(kvMap.size());
 
             return kvMap;
@@ -168,7 +168,7 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
   @Override
   public List<V> pull(final List<K> keys, final Table<K, V, P> aModelTable) {
     try {
-      final Map<K, V> result = aModelTable.multiGetOrInit(keys).get();
+      final Map<K, V> result = aModelTable.multiGetOrInit(keys, true).get();
 
       final List<V> valueList = new ArrayList<>(keys.size());
       keys.forEach(key -> valueList.add(result.get(key)));

@@ -340,7 +340,7 @@ final class TableAccessSingleThreadTask implements Tasklet {
         for (int i = 0; i < NUM_OPERATIONS; i++) {
           final long key = getKeyByTestType(i);
           final String expectedValue = getExpectedValue(key, isUpdated, isNullTest);
-          final String value = table.get(key).get();
+          final String value = table.get(key, false).get();
 
           // if data are removed, get method returns null
           if (isNullTest) {

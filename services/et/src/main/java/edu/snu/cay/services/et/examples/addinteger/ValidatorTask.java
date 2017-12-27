@@ -96,7 +96,7 @@ public final class ValidatorTask implements Tasklet {
 
     for (int i = 0; i < numKeys; i++) {
       final int key = startKey + i;
-      final int result = modelTable.get(key).get();
+      final int result = modelTable.get(key, false).get();
 
       if (expectedResult != result) {
         LOG.log(Level.WARNING, "For key {0}, expected value {1} but received {2}",
