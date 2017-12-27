@@ -91,7 +91,7 @@ public interface Table<K, V, U> {
   /**
    * Retrieves the value to which the specified key is associated,
    * or {@code null} if this table contains no value for the key.
-   * This method provides a option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
    * Retrieving the origin is good for performance, but users should be aware of that
    * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result, which
@@ -106,7 +106,7 @@ public interface Table<K, V, U> {
   /**
    * Retrieves the values to which the specified keys are associated.
    * or {@code null} for the keys that this table contains no value.
-   * This method provides a option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
    * Retrieving the origin is good for performance, but users should be aware of that
    * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result,
@@ -122,7 +122,7 @@ public interface Table<K, V, U> {
    * Retrieves the value to which the specified key is associated.
    * If this table contains no value for the key, it returns a value of {@link UpdateFunction#initValue(K)}
    * after associating this value with the key.
-   * This method provides a option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
    * Retrieving the origin is good for performance, but users should be aware of that
    * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result, which
@@ -138,7 +138,7 @@ public interface Table<K, V, U> {
    * Retrieves the values to which the specified keys are associated.
    * For the entries that this table has not added yet, {@link UpdateFunction#initValue(K)} are associated and inserted
    * to the table with the keys.
-   * This method provides a option whether to retrieve the copy of value or the origin, when accessing local tablet.
+   * This method provides an option whether to retrieve the copy of value or the origin, when accessing local tablet.
    * Retrieving the origin is good for performance, but users should be aware of that
    * the type of value should be immutable or returned values can mutate without consistency.
    * It returns a {@link Future} of result,
