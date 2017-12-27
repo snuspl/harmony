@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.pregel.integration;
 
-import edu.snu.cay.dolphin.examples.addvector.AddVectorET;
 import edu.snu.cay.pregel.graphapps.pagerank.PagerankET;
 import edu.snu.cay.pregel.graphapps.shortestpath.ShortestPathET;
 import edu.snu.cay.utils.test.IntegrationTest;
