@@ -61,12 +61,10 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final String dolphinJobId = appId + "-" + jobCount;
     final String modelTableId = ModelTableId.DEFAULT_VALUE + jobCount;
     final String localModelTableId = LocalModelTableId.DEFAULT_VALUE + jobCount;
-    final String inputTableId = InputTableId.DEFAULT_VALUE + jobCount;
 
     jobInjector.bindVolatileParameter(Parameters.JobId.class, dolphinJobId);
     jobInjector.bindVolatileParameter(ModelTableId.class, modelTableId);
     jobInjector.bindVolatileParameter(LocalModelTableId.class, localModelTableId);
-    jobInjector.bindVolatileParameter(InputTableId.class, inputTableId);
 
     final String serializedParamConf = jobInjector.getNamedInstance(ETDolphinLauncher.SerializedParamConf.class);
     final String serializedServerConf = jobInjector.getNamedInstance(ETDolphinLauncher.SerializedServerConf.class);
@@ -88,9 +86,12 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final Injector workerInjector = Tang.Factory.getTang().newInjector(workerConf);
     final int numWorkerBlocks = workerInjector.getNamedInstance(NumWorkerBlocks.class);
 
+    final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
+    final String inputTableId = inputPath;
+    jobInjector.bindVolatileParameter(InputTableId.class, inputPath);
+
     final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId,
         workerInjector, numWorkerBlocks, userParamConf);
-    final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
 
     final TableConfiguration localModelTableConf;
     final boolean hasLocalModelTable = workerInjector.getNamedInstance(HasLocalModelTable.class);
