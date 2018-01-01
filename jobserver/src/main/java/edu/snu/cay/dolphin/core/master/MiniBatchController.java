@@ -16,7 +16,6 @@
 package edu.snu.cay.dolphin.core.master;
 
 import edu.snu.cay.dolphin.DolphinParameters;
-import edu.snu.cay.jobserver.JobLogger;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -28,14 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 
 /**
  * A class for controlling and synchronizing mini-batch progress at workers.
+ * It synchronizes workers within {@link DolphinParameters.ClockSlack}.
  */
 public final class MiniBatchController {
-  private final JobLogger jobLogger;
-
   private final MasterSideMsgSender masterSideMsgSender;
 
   private final int totalMiniBatchesToRun;
@@ -54,9 +51,7 @@ public final class MiniBatchController {
   private MiniBatchController(@Parameter(DolphinParameters.MaxNumEpochs.class) final int numEpochs,
                               @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numMiniBatchesInEpoch,
                               @Parameter(DolphinParameters.ClockSlack.class) final int slack,
-                              final JobLogger jobLogger,
                               final MasterSideMsgSender masterSideMsgSender) {
-    this.jobLogger = jobLogger;
     this.slack = slack;
     this.masterSideMsgSender = masterSideMsgSender;
     this.totalMiniBatchesToRun = numEpochs * numMiniBatchesInEpoch;
@@ -71,9 +66,7 @@ public final class MiniBatchController {
       return;
     }
 
-    final int miniBatchIdx = miniBatchCounter.incrementAndGet();
-    jobLogger.log(Level.INFO, "Batch progress: {0} / {1}.",
-        new Object[]{miniBatchIdx, totalMiniBatchesToRun});
+    final int miniBatchCount = miniBatchCounter.incrementAndGet();
 
     // update workerIdToProgress
     final int progress = workerIdToProgress.compute(workerId,
@@ -103,11 +96,13 @@ public final class MiniBatchController {
     }
 
     // finish job
-    final boolean stop = miniBatchIdx + 1 > totalMiniBatchesToRun;
+    final boolean stop = miniBatchCount + 1 > totalMiniBatchesToRun;
     if (stop) { // stop workers if they have finished all mini-batches
       closedFlag.set(true);
-      masterSideMsgSender.sendMiniBatchControlMsg(workerId, true);
-      blockedWorkers.forEach(blockedWorkerId -> masterSideMsgSender.sendMiniBatchControlMsg(blockedWorkerId, true));
+
+      // release all workers to let them do the last mini-batches
+      masterSideMsgSender.sendMiniBatchControlMsg(workerId, false);
+      blockedWorkers.forEach(blockedWorkerId -> masterSideMsgSender.sendMiniBatchControlMsg(blockedWorkerId, false));
       blockedWorkers.clear();
 
     } else {

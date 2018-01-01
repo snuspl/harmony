@@ -87,15 +87,14 @@ public final class BatchProgressTracker implements ProgressProvider {
     jobLogger.log(Level.INFO, "Batch progress: {0} / {1}.",
         new Object[]{miniBatchIdx, totalMiniBatchesToRun});
 
-    if ((miniBatchIdx - 1) % numMiniBatchesInEpoch == 0) {
+    if ((miniBatchIdx) % numMiniBatchesInEpoch == 0) {
       final int epochIdx = miniBatchIdx / numMiniBatchesInEpoch;
       final String msgToClient = String.format("Epoch progress: [%d / %d], JobId: %s",
           epochIdx, numMaxEpochs, jobId);
+      jobLogger.log(Level.INFO, msgToClient);
       jobMessageObserver.sendMessageToClient(msgToClient.getBytes(StandardCharsets.UTF_8));
-    }
 
-    if (offlineModelEval) {
-      if (miniBatchIdx % numMiniBatchesInEpoch == 0) {
+      if (offlineModelEval) {
         jobLogger.log(Level.INFO, "Checkpoint model table. EpochIdx: {0}", miniBatchIdx / numMiniBatchesInEpoch);
         modelChkpManager.createCheckpoint();
       }
