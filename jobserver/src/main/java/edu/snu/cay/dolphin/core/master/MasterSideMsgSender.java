@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.core.master;
 
+import edu.snu.cay.dolphin.MiniBatchControlMsg;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.dolphin.DolphinMsg;
 import edu.snu.cay.dolphin.ModelEvalAnsMsg;
@@ -56,6 +57,24 @@ final class MasterSideMsgSender {
       taskRunnerFuture.get().getWorkerTasklet(workerId).send(serializedReleaseMsg);
     } catch (NetworkException e) {
       jobLogger.log(Level.INFO, String.format("Fail to send release msg to worker %s.", workerId), e);
+    }
+  }
+
+  /**
+   * Send a mini-batch control msg to {@code workerId}.
+   * @param workerId an identifier of worker
+   */
+  void sendMiniBatchControlMsg(final String workerId, final boolean stop) {
+    final DolphinMsg msg = DolphinMsg.newBuilder()
+        .setType(dolphinMsgType.MiniBatchControlMsg)
+        .setMiniBatchControlMsg(MiniBatchControlMsg.newBuilder()
+            .setStop(stop).build())
+        .build();
+
+    try {
+      taskRunnerFuture.get().getWorkerTasklet(workerId).send(AvroUtils.toBytes(msg, DolphinMsg.class));
+    } catch (NetworkException e) {
+      jobLogger.log(Level.INFO, String.format("Fail to send mini-batch control msg to worker %s.", workerId), e);
     }
   }
 

@@ -115,6 +115,14 @@ public final class WorkerSideMsgSender {
     sendDolphinMsg(dolphinMsg);
   }
 
+  public void sendMiniBatchSyncMsg() {
+    final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
+        .setType(dolphinMsgType.MiniBatchSyncMsg)
+        .build();
+
+    sendDolphinMsg(dolphinMsg);
+  }
+
   /**
    * Send a msg to master for asking model evaluation.
    */

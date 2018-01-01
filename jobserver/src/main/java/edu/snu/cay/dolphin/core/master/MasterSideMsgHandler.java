@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
  */
 public final class MasterSideMsgHandler {
   private final InjectionFuture<WorkerStateManager> workerStateManagerFuture;
+  private final InjectionFuture<MiniBatchController> miniBatchControllerFuture;
   private final InjectionFuture<ProgressTracker> progressTrackerFuture;
   private final InjectionFuture<BatchProgressTracker> batchProgressTrackerFuture;
   private final InjectionFuture<ModelChkpManager> modelChkpManagerFuture;
@@ -42,10 +43,12 @@ public final class MasterSideMsgHandler {
 
   @Inject
   private MasterSideMsgHandler(final InjectionFuture<WorkerStateManager> workerStateManagerFuture,
+                               final InjectionFuture<MiniBatchController> miniBatchControllerFuture,
                                final InjectionFuture<ProgressTracker> progressTrackerFuture,
                                final InjectionFuture<BatchProgressTracker> batchProgressTrackerFuture,
                                final InjectionFuture<ModelChkpManager> modelChkpManagerFuture) {
     this.workerStateManagerFuture = workerStateManagerFuture;
+    this.miniBatchControllerFuture = miniBatchControllerFuture;
     this.progressTrackerFuture = progressTrackerFuture;
     this.batchProgressTrackerFuture = batchProgressTrackerFuture;
     this.modelChkpManagerFuture = modelChkpManagerFuture;
@@ -71,6 +74,9 @@ public final class MasterSideMsgHandler {
       break;
     case SyncMsg:
       syncMsgExecutor.submit(() -> workerStateManagerFuture.get().onSyncMsg(dolphinMsg.getSyncMsg()));
+      break;
+    case MiniBatchSyncMsg:
+      miniBatchControllerFuture.get().onSync();
       break;
     case ModelEvalAskMsg:
       modelEvalMsgExecutor.submit(() -> modelChkpManagerFuture.get().onWorkerMsg());

@@ -31,6 +31,7 @@ public final class WorkerSideMsgHandler implements TaskletCustomMsgHandler {
   private static final int NUM_MODEL_EV_MSG_THREADS = 8;
 
   private final WorkerGlobalBarrier workerGlobalBarrier;
+  private final MiniBatchBarrier miniBatchBarrier;
   private final ModelEvaluator modelEvaluator;
 
   private final ExecutorService releaseMsgExecutor = CatchableExecutors.newFixedThreadPool(NUM_RELEASE_MSG_THREADS);
@@ -38,8 +39,10 @@ public final class WorkerSideMsgHandler implements TaskletCustomMsgHandler {
 
   @Inject
   private WorkerSideMsgHandler(final WorkerGlobalBarrier workerGlobalBarrier,
+                               final MiniBatchBarrier miniBatchBarrier,
                                final ModelEvaluator modelEvaluator) {
     this.workerGlobalBarrier = workerGlobalBarrier;
+    this.miniBatchBarrier = miniBatchBarrier;
     this.modelEvaluator = modelEvaluator;
   }
 
@@ -50,7 +53,9 @@ public final class WorkerSideMsgHandler implements TaskletCustomMsgHandler {
     case ReleaseMsg:
       releaseMsgExecutor.submit(workerGlobalBarrier::onReleaseMsg);
       break;
-
+    case MiniBatchControlMsg:
+      miniBatchBarrier.onRelease(dolphinMsg.getMiniBatchControlMsg().getStop());
+      break;
     case ModelEvalAnsMsg:
       modelEvalMsgExecutor.submit(() -> modelEvaluator.onMasterMsg(dolphinMsg.getModelEvalAnsMsg()));
       break;
