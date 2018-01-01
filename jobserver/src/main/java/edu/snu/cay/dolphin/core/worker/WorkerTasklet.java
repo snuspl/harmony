@@ -23,6 +23,7 @@ import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.metric.MetricCollector;
+import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -102,7 +103,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
       final PerOpTimeInEpoch perOpTimeInEpoch = new PerOpTimeInEpoch();
       trainingDataProvider.prepareDataForEpoch();
 
-      boolean completed = false;
       int numProcessedDataInEpoch = 0;
       int miniBatchIdx = 0;
       while (true) {
@@ -112,9 +112,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         }
 
         LOG.log(Level.INFO, "Starting batch {0} in epoch {1}", new Object[] {miniBatchIdx, epochIdx});
-        completed = miniBatchBarrier.await();
-        if (completed) {
-          break;
+        if (miniBatchBarrier.await()) {
+          cleanup();
+          return;
         }
 
         modelAccessor.getAndResetMetrics();
@@ -136,16 +136,17 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         }
       }
 
-      if (completed) {
-        break;
-      }
-
       final double epochElapsedTimeSec = (System.currentTimeMillis() - epochStartTime) / 1000.0D;
       trainer.onEpochFinished(epochIdx);
       sendEpochMetrics(epochIdx, miniBatchIdx, numProcessedDataInEpoch, epochElapsedTimeSec, perOpTimeInEpoch);
       epochIdx++;
     }
+  }
 
+  /**
+   * Cleanup worker state before finish.
+   */
+  private void cleanup() throws NetworkException {
     // Synchronize all workers before cleanup for workers
     // to finish with the globally equivalent view of trained model
     workerGlobalBarrier.await();
