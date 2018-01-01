@@ -20,7 +20,6 @@
   "name": "ProgressMsg",
   "fields":
   [
-    {"name": "type", "type": {"type": "enum", "name": "ProgressMsgType", "symbols": ["Batch", "Epoch"]}},
     {"name": "executorId", "type": "string"},
     {"name": "progress", "type": "int"}
   ]

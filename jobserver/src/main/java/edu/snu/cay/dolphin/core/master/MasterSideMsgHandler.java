@@ -58,13 +58,7 @@ public final class MasterSideMsgHandler {
     switch (dolphinMsg.getType()) {
     case ProgressMsg:
       final ProgressMsg progressMsg = dolphinMsg.getProgressMsg();
-      switch (progressMsg.getType()) {
-      case Batch:
-        progressMsgExecutor.submit(() -> batchProgressTrackerFuture.get().onProgressMsg(progressMsg));
-        break;
-      default:
-        throw new RuntimeException("Unexpected msg type");
-      }
+      progressMsgExecutor.submit(() -> batchProgressTrackerFuture.get().onProgressMsg(progressMsg));
       break;
     case SyncMsg:
       syncMsgExecutor.submit(() -> workerStateManagerFuture.get().onSyncMsg(dolphinMsg.getSyncMsg()));
