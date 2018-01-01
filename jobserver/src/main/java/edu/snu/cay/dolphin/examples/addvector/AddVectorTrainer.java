@@ -21,7 +21,6 @@ import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.evaluator.api.Table;
-import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.reef.tang.annotations.Parameter;
 

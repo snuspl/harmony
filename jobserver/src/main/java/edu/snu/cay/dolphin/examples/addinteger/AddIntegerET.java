@@ -50,7 +50,6 @@ public final class AddIntegerET {
         .addParameterClass(ExampleParameters.ComputeTimeMs.class)
         .addParameterClass(ExampleParameters.NumTrainingData.class)
         .addParameterClass(ExampleParameters.NumTestData.class)
-        .addParameterClass(ExampleParameters.NumWorkers.class)
         .build(), conf);
   }
 
