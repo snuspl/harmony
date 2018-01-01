@@ -82,7 +82,7 @@ public final class ModelEvaluator {
         throw new RuntimeException(e);
       }
 
-      final Collection trainingData = inputTable.getLocalTablet().getDataMap().values();
+      final Collection<Map.Entry> trainingData = inputTable.getLocalTablet().getDataMap().entrySet();
 
       final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData, modelTable);
 
