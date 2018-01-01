@@ -97,7 +97,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     int epochIdx = startingEpoch;
     while (true) {
       LOG.log(Level.INFO, "Starting epoch {0}", epochIdx);
-      progressReporter.reportEpochStart(epochIdx);
 
       final long epochStartTime = System.currentTimeMillis();
       final PerOpTimeInEpoch perOpTimeInEpoch = new PerOpTimeInEpoch();

@@ -17,7 +17,6 @@ package edu.snu.cay.dolphin.optimizer.impl;
 
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.master.ETTaskRunner;
-import edu.snu.cay.dolphin.core.master.ProgressTracker;
 import edu.snu.cay.dolphin.core.master.WorkerStateManager;
 import edu.snu.cay.dolphin.metric.MetricManager;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetrics;
@@ -65,8 +64,6 @@ public final class ETOptimizationOrchestrator implements OptimizationOrchestrato
 
   private final ETTaskRunner taskRunner;
 
-  private final ProgressTracker progressTracker;
-
   private final AtomicInteger optimizationCounter = new AtomicInteger(0);
 
   private final String modelTableId;
@@ -95,7 +92,6 @@ public final class ETOptimizationOrchestrator implements OptimizationOrchestrato
                                      final PlanCompiler planCompiler,
                                      final ETTaskRunner taskRunner,
                                      final WorkerStateManager workerStateManager,
-                                     final ProgressTracker progressTracker,
                                      final JobMessageObserver jobMessageObserver,
                                      @Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
                                      @Parameter(DolphinParameters.InputTableId.class) final String inputTableId,
@@ -114,7 +110,6 @@ public final class ETOptimizationOrchestrator implements OptimizationOrchestrato
     this.etMaster = etMaster;
     this.taskRunner = taskRunner;
     this.workerStateManager = workerStateManager;
-    this.progressTracker = progressTracker;
     this.modelTableId = modelTableId;
     this.inputTableId = inputTableId;
     this.optimizationIntervalMs = optimizationIntervalMs;
@@ -182,7 +177,6 @@ public final class ETOptimizationOrchestrator implements OptimizationOrchestrato
           taskRunner.updateExecutorEntry(changesInWorkers.getLeft(), changesInWorkers.getRight(),
               changesInServers.getLeft(), changesInServers.getRight());
           workerStateManager.onOptimizationFinished(changesInWorkers.getLeft(), changesInWorkers.getRight());
-          changesInWorkers.getRight().forEach(progressTracker::onWorkerDelete);
 
           try {
             LOG.log(Level.INFO, "Sleep {0} ms for next optimization", optimizationIntervalMs);

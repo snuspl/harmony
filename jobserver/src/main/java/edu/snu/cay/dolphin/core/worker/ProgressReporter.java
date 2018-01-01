@@ -16,7 +16,6 @@
 package edu.snu.cay.dolphin.core.worker;
 
 import edu.snu.cay.dolphin.core.master.BatchProgressTracker;
-import edu.snu.cay.dolphin.core.master.ProgressTracker;
 import org.apache.reef.annotations.audience.EvaluatorSide;
 import org.apache.reef.exception.evaluator.NetworkException;
 
@@ -32,14 +31,6 @@ public final class ProgressReporter {
   @Inject
   private ProgressReporter(final WorkerSideMsgSender msgSender) {
     this.msgSender = msgSender;
-  }
-
-  /**
-   * Report that epoch has started to {@link ProgressTracker}.
-   * @param epochIdx a current processing epoch index
-   */
-  void reportEpochStart(final int epochIdx) throws NetworkException {
-    msgSender.sendEpochProgressMsg(epochIdx);
   }
 
   /**

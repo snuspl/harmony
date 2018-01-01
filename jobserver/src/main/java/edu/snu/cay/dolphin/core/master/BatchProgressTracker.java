@@ -18,25 +18,33 @@ package edu.snu.cay.dolphin.core.master;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.dolphin.ProgressMsg;
+import edu.snu.cay.jobserver.Parameters;
+import org.apache.reef.driver.ProgressProvider;
+import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 /**
- * A component to track minibatch-progress by workers.
- * Different from {@link ProgressTracker}, it receives a progress message for every batch by workers.
- * And every {@link DolphinParameters.NumTotalMiniBatches} batches,
+ * A component to track mini-batch progress by workers.
+ * It receives a progress message for every batch by workers.
+ * Upon every {@link DolphinParameters.NumTotalMiniBatches} batches,
  * it checkpoints a model table for offline model evaluation.
  */
-public final class BatchProgressTracker {
+public final class BatchProgressTracker implements ProgressProvider {
   private final JobLogger jobLogger;
 
   private final ModelChkpManager modelChkpManager;
+  private final JobMessageObserver jobMessageObserver;
 
+  private final String jobId;
+
+  private final int numMaxEpochs;
   private final int totalMiniBatchesToRun;
   private final int numMiniBatchesInEpoch;
 
@@ -48,6 +56,8 @@ public final class BatchProgressTracker {
 
   @Inject
   private BatchProgressTracker(final JobLogger jobLogger,
+                               final JobMessageObserver jobMessageObserver,
+                               @Parameter(Parameters.JobId.class) final String jobId,
                                @Parameter(DolphinParameters.MaxNumEpochs.class) final int numEpochs,
                                @Parameter(DolphinParameters.NumTotalMiniBatches.class)
                                  final int numMiniBatchesInEpoch,
@@ -55,10 +65,20 @@ public final class BatchProgressTracker {
                                  final boolean offlineModelEval,
                                final ModelChkpManager modelChkpManager) {
     this.jobLogger = jobLogger;
+    this.jobMessageObserver = jobMessageObserver;
     this.modelChkpManager = modelChkpManager;
+    this.jobId = jobId;
+    this.numMaxEpochs = numEpochs;
     this.totalMiniBatchesToRun = numEpochs * numMiniBatchesInEpoch;
     this.numMiniBatchesInEpoch = numMiniBatchesInEpoch;
     this.offlineModelEval = offlineModelEval;
+  }
+
+  /**
+   * @return a global minimum epoch progress
+   */
+  public int getGlobalMinEpochIdx() {
+    return miniBatchCounter.get() / numMiniBatchesInEpoch;
   }
 
   synchronized void onProgressMsg(final ProgressMsg msg) {
@@ -66,6 +86,13 @@ public final class BatchProgressTracker {
     final int miniBatchIdx = miniBatchCounter.incrementAndGet();
     jobLogger.log(Level.INFO, "Batch progress: {0} / {1}.",
         new Object[]{miniBatchIdx, totalMiniBatchesToRun});
+
+    if ((miniBatchIdx - 1) % numMiniBatchesInEpoch == 0) {
+      final int epochIdx = miniBatchIdx / numMiniBatchesInEpoch;
+      final String msgToClient = String.format("Epoch progress: [%d / %d], JobId: %s",
+          epochIdx, numMaxEpochs, jobId);
+      jobMessageObserver.sendMessageToClient(msgToClient.getBytes(StandardCharsets.UTF_8));
+    }
 
     if (offlineModelEval) {
       if (miniBatchIdx % numMiniBatchesInEpoch == 0) {
@@ -76,5 +103,10 @@ public final class BatchProgressTracker {
 
     workerIdToBatchProgress.compute(workerId, (id, batchCount) -> batchCount == null ? 1 : batchCount + 1);
     jobLogger.log(Level.INFO, "Committed Batches per workers: {0}", workerIdToBatchProgress);
+  }
+
+  @Override
+  public float getProgress() {
+    return miniBatchCounter.get() / totalMiniBatchesToRun;
   }
 }
