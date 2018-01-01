@@ -76,7 +76,7 @@ public final class MasterSideMsgHandler {
       syncMsgExecutor.submit(() -> workerStateManagerFuture.get().onSyncMsg(dolphinMsg.getSyncMsg()));
       break;
     case MiniBatchSyncMsg:
-      miniBatchControllerFuture.get().onSync();
+      miniBatchControllerFuture.get().onSync(dolphinMsg.getMiniBatchSyncMsg().getWorkerId().toString());
       break;
     case ModelEvalAskMsg:
       modelEvalMsgExecutor.submit(() -> modelChkpManagerFuture.get().onWorkerMsg());

@@ -265,7 +265,7 @@ public final class ETDolphinLauncher {
 
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
         NumTrainerThreads.class,
-        HyperThreadEnabled.class, ModelCacheEnabled.class,
+        HyperThreadEnabled.class, ModelCacheEnabled.class, ClockSlack.class,
         MaxNumEpochs.class, NumTotalMiniBatches.class, TestDataPath.class);
 
     // commonly used parameters for ML apps

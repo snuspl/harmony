@@ -131,6 +131,12 @@ public final class DolphinParameters {
     }
   }
 
+  @NamedParameter(doc = "A slack of clock gap between workers. Each worker's clock increments upon every mini-batch.",
+                  short_name = "clock_slack",
+                  default_value = "0")
+  public final class ClockSlack implements Name<Integer> {
+  }
+
   @NamedParameter(doc = "The queue size to handle remote access messages at server",
                   short_name = "server_handler_queue_size",
                   default_value = "500000")

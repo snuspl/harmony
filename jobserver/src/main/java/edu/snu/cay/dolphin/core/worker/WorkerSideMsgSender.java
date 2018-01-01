@@ -118,6 +118,8 @@ public final class WorkerSideMsgSender {
   public void sendMiniBatchSyncMsg() {
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
         .setType(dolphinMsgType.MiniBatchSyncMsg)
+        .setMiniBatchSyncMsg(MiniBatchSyncMsg.newBuilder()
+        .setWorkerId(executorId).build())
         .build();
 
     sendDolphinMsg(dolphinMsg);

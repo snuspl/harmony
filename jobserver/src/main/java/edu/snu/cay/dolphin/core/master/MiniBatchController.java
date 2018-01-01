@@ -17,10 +17,16 @@ package edu.snu.cay.dolphin.core.master;
 
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.jobserver.JobLogger;
-import org.apache.reef.tang.InjectionFuture;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -30,47 +36,88 @@ import java.util.logging.Level;
 public final class MiniBatchController {
   private final JobLogger jobLogger;
 
-  private final int numWorkers;
-
-  private final AtomicInteger numBlockedWorkers = new AtomicInteger(0);
-
   private final MasterSideMsgSender masterSideMsgSender;
-
-  private final InjectionFuture<ETTaskRunner> etTaskRunnerFuture;
 
   private final int totalMiniBatchesToRun;
   private final AtomicInteger miniBatchCounter = new AtomicInteger(0);
 
+  private final int slack;
+  private final AtomicBoolean closedFlag = new AtomicBoolean(false);
+
+  private final Map<String, Integer> workerIdToProgress = new ConcurrentHashMap<>();
+  private final SortedMap<Integer, Set<String>> progressToWorkerIds = new ConcurrentSkipListMap<>();
+
+  private AtomicInteger minProgress = new AtomicInteger(0);
+  private Set<String> blockedWorkers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
   @Inject
-  private MiniBatchController(@Parameter(DolphinParameters.NumWorkers.class) final int numWorkers,
-                              @Parameter(DolphinParameters.MaxNumEpochs.class) final int numEpochs,
-                              @Parameter(DolphinParameters.NumTotalMiniBatches.class)
-                              final int numMiniBatchesInEpoch,
+  private MiniBatchController(@Parameter(DolphinParameters.MaxNumEpochs.class) final int numEpochs,
+                              @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numMiniBatchesInEpoch,
+                              @Parameter(DolphinParameters.ClockSlack.class) final int slack,
                               final JobLogger jobLogger,
-                              final MasterSideMsgSender masterSideMsgSender,
-                              final InjectionFuture<ETTaskRunner> etTaskRunnerFuture) {
+                              final MasterSideMsgSender masterSideMsgSender) {
     this.jobLogger = jobLogger;
-    this.numWorkers = numWorkers;
+    this.slack = slack;
     this.masterSideMsgSender = masterSideMsgSender;
-    this.etTaskRunnerFuture = etTaskRunnerFuture;
     this.totalMiniBatchesToRun = numEpochs * numMiniBatchesInEpoch;
   }
 
   /**
    * On sync msgs from workers at every starts of mini-batches.
    */
-  synchronized void onSync() {
+  synchronized void onSync(final String workerId) {
+    if (closedFlag.get()) {
+      masterSideMsgSender.sendMiniBatchControlMsg(workerId, true);
+      return;
+    }
+
     final int miniBatchIdx = miniBatchCounter.incrementAndGet();
     jobLogger.log(Level.INFO, "Batch progress: {0} / {1}.",
         new Object[]{miniBatchIdx, totalMiniBatchesToRun});
 
-    if (numBlockedWorkers.incrementAndGet() == numWorkers) {
-      final boolean stop = miniBatchIdx - numWorkers + 1 > totalMiniBatchesToRun;
+    // update workerIdToProgress
+    final int progress = workerIdToProgress.compute(workerId,
+        (s, prevProgress) -> prevProgress == null ? 1 : prevProgress + 1);
 
-      etTaskRunnerFuture.get().getAllWorkerExecutors().forEach(workerId ->
-          masterSideMsgSender.sendMiniBatchControlMsg(workerId, stop)
-      );
-      numBlockedWorkers.set(0);
+    // update progressToWorkerIds
+    if (progress != 1) {
+      progressToWorkerIds.compute(progress - 1, (k, v) -> {
+        v.remove(workerId);
+        return v.isEmpty() ? null : v;
+      });
+    }
+    progressToWorkerIds.compute(progress, (k, v) -> {
+      final Set<String> workers = v == null ? Collections.newSetFromMap(new ConcurrentHashMap<>()) : v;
+      workers.add(workerId);
+      return workers;
+    });
+
+    // update min progress
+    final int newMinProgress = progressToWorkerIds.firstKey();
+    if (newMinProgress > minProgress.get()) {
+      minProgress.set(newMinProgress);
+
+      // release the fastest blocked workers
+      blockedWorkers.forEach(blockedWorkerId -> masterSideMsgSender.sendMiniBatchControlMsg(blockedWorkerId, false));
+      blockedWorkers.clear();
+    }
+
+    // finish job
+    final boolean stop = miniBatchIdx + 1 > totalMiniBatchesToRun;
+    if (stop) { // stop workers if they have finished all mini-batches
+      closedFlag.set(true);
+      masterSideMsgSender.sendMiniBatchControlMsg(workerId, true);
+      blockedWorkers.forEach(blockedWorkerId -> masterSideMsgSender.sendMiniBatchControlMsg(blockedWorkerId, true));
+      blockedWorkers.clear();
+
+    } else {
+      if (progress > minProgress.get() + slack) {
+        // block
+        blockedWorkers.add(workerId);
+      } else {
+        // release
+        masterSideMsgSender.sendMiniBatchControlMsg(workerId, false);
+      }
     }
   }
 }

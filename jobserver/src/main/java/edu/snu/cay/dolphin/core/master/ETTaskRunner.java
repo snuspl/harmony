@@ -114,13 +114,6 @@ public final class ETTaskRunner {
   }
 
   /**
-   * @return all executors where worker tasklets running on
-   */
-  public Collection<String> getAllWorkerExecutors() {
-    return Collections.unmodifiableSet(workerExecutorIdToTasklet.keySet());
-  }
-
-  /**
    * Updates the entry of worker tasks, which is called by the Optimization orchestrator.
    * @param addedWorkers a set of added worker tasks
    * @param deletedWorkers a set of deleted worker tasks
