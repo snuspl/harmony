@@ -63,7 +63,7 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({WorkerSideMsgSender.class, ETTaskRunner.class, RunningTasklet.class,
-    BatchProgressTracker.class, ModelChkpManager.class, ModelEvaluator.class})
+    MiniBatchController.class, BatchProgressTracker.class, ModelChkpManager.class, ModelEvaluator.class})
 public class WorkerStateManagerTest {
   private static final Logger LOG = Logger.getLogger(WorkerStateManagerTest.class.getName());
   private static final String JOB_ID = WorkerStateManagerTest.class.getName();
@@ -97,6 +97,7 @@ public class WorkerStateManagerTest {
     injector.bindVolatileParameter(DriverIdentifier.class, DRIVER_ID);
 
     // mock classes that this test does not use
+    injector.bindVolatileInstance(MiniBatchController.class, mock(MiniBatchController.class));
     injector.bindVolatileInstance(BatchProgressTracker.class, mock(BatchProgressTracker.class));
     injector.bindVolatileInstance(ModelChkpManager.class, mock(ModelChkpManager.class));
     injector.bindVolatileInstance(JobMessageObserver.class, mock(JobMessageObserver.class));
