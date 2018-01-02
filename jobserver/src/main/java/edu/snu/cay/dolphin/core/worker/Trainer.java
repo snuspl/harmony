@@ -54,7 +54,15 @@ public interface Trainer<K, V> {
    * Main method of this trainer, which is called every mini-batch.
    * @param miniBatchTrainingData the training data to process in the batch
    */
-  void runMiniBatch(Collection<Map.Entry<K, V>> miniBatchTrainingData);
+
+
+  void setMiniBatchData(Collection<Map.Entry<K, V>> miniBatchTrainingData);
+
+  void pullModel();
+
+  void localCompute();
+
+  void pushUpdate();
 
   /**
    * EventHandler that is called when an epoch is finished.

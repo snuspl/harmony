@@ -127,20 +127,35 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
   public void initGlobalSettings() {
   }
 
+  private volatile Collection<Map.Entry<Integer, NMFData>> miniBatchTrainingData;
+
+  private volatile NMFModel modelForMiniBatch;
+  private volatile NMFLocalModel localModelForMiniBatch;
+
+  private volatile Map<Integer, Vector> aggregatedGradients;
+
   @Override
-  public void runMiniBatch(final Collection<Map.Entry<Integer, NMFData>> miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection<Map.Entry<Integer, NMFData>> newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
+    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(miniBatchTrainingData);
+
+    // pull data when mini-batch is started
+    modelForMiniBatch = pullModels(rowKeysToColumnKeys.getRight());
+
+    // initialize local LMatrix
+    localModelForMiniBatch = getLocalModel(rowKeysToColumnKeys.getLeft());
+  }
+
+  @Override
+  public void localCompute() {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Integer, NMFData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
-
-    final Pair<List<Integer>, List<Integer>> rowKeysToColumnKeys = getRowColumnKeys(instances);
-
-    // pull data when mini-batch is started
-    final NMFModel model = pullModels(rowKeysToColumnKeys.getRight());
-
-    // initialize local LMatrix
-    final NMFLocalModel localModel = getLocalModel(rowKeysToColumnKeys.getLeft());
 
     // collect gradients computed in each thread
     final List<Future<Map<Integer, Vector>>> futures = new ArrayList<>(numTrainerThreads);
@@ -161,10 +176,10 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
               break;
             }
 
-            final Map<Integer, Vector> lMatrix = localModel.getLMatrix();
+            final Map<Integer, Vector> lMatrix = localModelForMiniBatch.getLMatrix();
 
             drainedInstances.forEach(instance -> updateGradient(instance,
-                lMatrix.get(instance.getKey()), model, threadRGradient));
+                lMatrix.get(instance.getKey()), modelForMiniBatch, threadRGradient));
             drainedInstances.clear();
             count += numDrained;
           }
@@ -182,10 +197,12 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     }
 
     final List<Map<Integer, Vector>> totalRGradients = ThreadUtils.retrieveResults(futures);
-    final Map<Integer, Vector> gradients = aggregateGradient(totalRGradients);
+    aggregatedGradients = aggregateGradient(totalRGradients);
+  }
 
-    // push gradients
-    pushAndResetGradients(gradients);
+  @Override
+  public void pushUpdate() {
+    pushAndResetGradients(aggregatedGradients);
   }
 
   @Override

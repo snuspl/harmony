@@ -168,18 +168,13 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
   public void initGlobalSettings() {
   }
 
-  @Override
-  public void cleanup() {
-    executor.shutdown();
-  }
-
   /**
-   * Build tree for this training data based on the trees that are already built before this run iteration.
+   * Build tree for this training data based on the trees that are built within previous iterations.
    */
   @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, GBTData>> miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection<Map.Entry<Long, GBTData>> miniBatchTrainingData) {
     final List<Map.Entry<Long, GBTData>> instances = new ArrayList<>(miniBatchTrainingData);
-    
+
     // Divide into two cases : Regression / Classification
     if (valueType == FeatureType.CONTINUOUS) {
       preprocessAndBuildTree(CONTINUOUS_FEATURE, instances);
@@ -190,6 +185,26 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
     } else {
       throw new IllegalArgumentException("valueType must be either numerical type or categorical type.");
     }
+  }
+
+  @Override
+  public void pullModel() {
+
+  }
+
+  @Override
+  public void localCompute() {
+
+  }
+
+  @Override
+  public void pushUpdate() {
+
+  }
+
+  @Override
+  public void cleanup() {
+    executor.shutdown();
   }
 
   /**

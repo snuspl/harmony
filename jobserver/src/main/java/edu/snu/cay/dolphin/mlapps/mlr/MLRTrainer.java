@@ -176,11 +176,22 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   public void initGlobalSettings() {
   }
 
-  @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData) {
-    // pull data when mini-batch is started
-    pullModels();
+  private volatile Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData;
 
+  private volatile Vector[] aggregatedMiniBatchGradients;
+
+  @Override
+  public void setMiniBatchData(final Collection<Map.Entry<Long, MLRData>> newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
+    pullModels();
+  }
+
+  @Override
+  public void localCompute() {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
@@ -208,7 +219,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
             if (numDrained == 0) {
               break;
             }
-            
+
             drainedInstances.forEach(instance -> updateGradient(instance.getValue(), threadGradient));
             drainedInstances.clear();
             count += numDrained;
@@ -227,10 +238,12 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     }
 
     final List<Vector[]> threadGradients = ThreadUtils.retrieveResults(futures);
-    final Vector[] gradients = aggregateGradient(threadGradients);
+    aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
+  }
 
-    // push gradients
-    pushAndResetGradients(gradients);
+  @Override
+  public void pushUpdate() {
+    pushAndResetGradients(aggregatedMiniBatchGradients);
   }
 
   @Override
