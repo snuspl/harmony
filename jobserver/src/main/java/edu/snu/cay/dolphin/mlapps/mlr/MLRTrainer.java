@@ -389,11 +389,13 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
                                                   final Collection<MLRData> data,
                                                   final MLRModel mlrModel) {
     final Vector[] params = mlrModel.getParams();
+    final int dataSize;
 
     double loss = 0;
     int correctPredictions = 0;
 
     if (kvData == null) {
+      dataSize = data.size();
       for (final MLRData entry : data) {
         final Vector feature = entry.getFeature();
         final int label = entry.getLabel();
@@ -407,6 +409,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
         loss += -Math.log(predictions.get(label));
       }
     } else {
+      dataSize = kvData.size();
       for (final Map.Entry<Long, MLRData> entry : kvData) {
         final Vector feature = entry.getValue().getFeature();
         final int label = entry.getValue().getLabel();
@@ -435,7 +438,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     }
     regLoss /= numClasses;
 
-    return new Tuple3<>((float) loss, (float) regLoss, (float) correctPredictions / data.size());
+    return new Tuple3<>((float) loss, (float) regLoss, (float) correctPredictions / dataSize);
   }
 
   /**

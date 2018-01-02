@@ -15,13 +15,18 @@
  */
 package edu.snu.cay.dolphin.core.master;
 
+import edu.snu.cay.dolphin.core.worker.WorkerTasklet;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.dolphin.DolphinMsg;
 import edu.snu.cay.dolphin.ModelEvalAnsMsg;
 import edu.snu.cay.dolphin.dolphinMsgType;
+import edu.snu.cay.jobserver.Parameters;
+import edu.snu.cay.services.et.driver.api.ETMaster;
+import edu.snu.cay.services.et.exceptions.ExecutorNotExistException;
 import edu.snu.cay.utils.AvroUtils;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.InjectionFuture;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 
@@ -32,14 +37,20 @@ import java.util.logging.Level;
  */
 final class MasterSideMsgSender {
   private final JobLogger jobLogger;
+  private final String jobId;
 
+  private final InjectionFuture<ETMaster> etMasterFuture;
   private final InjectionFuture<ETTaskRunner> taskRunnerFuture;
   private final byte[] serializedReleaseMsg;
 
   @Inject
   private MasterSideMsgSender(final JobLogger jobLogger,
+                              @Parameter(Parameters.JobId.class) final String jobId,
+                              final InjectionFuture<ETMaster> etMasterFuture,
                               final InjectionFuture<ETTaskRunner> taskRunnerFuture) {
     this.jobLogger = jobLogger;
+    this.jobId = jobId;
+    this.etMasterFuture = etMasterFuture;
     this.taskRunnerFuture = taskRunnerFuture;
 
     this.serializedReleaseMsg = AvroUtils.toBytes(DolphinMsg.newBuilder()
@@ -72,8 +83,9 @@ final class MasterSideMsgSender {
         .build();
 
     try {
-      taskRunnerFuture.get().getWorkerTasklet(workerId).send(AvroUtils.toBytes(msg, DolphinMsg.class));
-    } catch (NetworkException e) {
+      etMasterFuture.get().getExecutor(workerId).getRunningTasklet(jobId + "-" + WorkerTasklet.TASKLET_ID)
+          .send(AvroUtils.toBytes(msg, DolphinMsg.class));
+    } catch (NetworkException | ExecutorNotExistException e) {
       jobLogger.log(Level.INFO, String.format("Fail to send ModelEvalAns msg to worker %s.", workerId), e);
     }
   }
