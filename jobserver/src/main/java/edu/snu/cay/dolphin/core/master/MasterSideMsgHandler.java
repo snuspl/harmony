@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutorService;
  */
 public final class MasterSideMsgHandler {
   private final InjectionFuture<WorkerStateManager> workerStateManagerFuture;
-  private final InjectionFuture<ProgressTracker> progressTrackerFuture;
+  private final InjectionFuture<MiniBatchController> miniBatchControllerFuture;
   private final InjectionFuture<BatchProgressTracker> batchProgressTrackerFuture;
   private final InjectionFuture<ModelChkpManager> modelChkpManagerFuture;
 
@@ -42,11 +42,11 @@ public final class MasterSideMsgHandler {
 
   @Inject
   private MasterSideMsgHandler(final InjectionFuture<WorkerStateManager> workerStateManagerFuture,
-                               final InjectionFuture<ProgressTracker> progressTrackerFuture,
+                               final InjectionFuture<MiniBatchController> miniBatchControllerFuture,
                                final InjectionFuture<BatchProgressTracker> batchProgressTrackerFuture,
                                final InjectionFuture<ModelChkpManager> modelChkpManagerFuture) {
     this.workerStateManagerFuture = workerStateManagerFuture;
-    this.progressTrackerFuture = progressTrackerFuture;
+    this.miniBatchControllerFuture = miniBatchControllerFuture;
     this.batchProgressTrackerFuture = batchProgressTrackerFuture;
     this.modelChkpManagerFuture = modelChkpManagerFuture;
   }
@@ -58,19 +58,13 @@ public final class MasterSideMsgHandler {
     switch (dolphinMsg.getType()) {
     case ProgressMsg:
       final ProgressMsg progressMsg = dolphinMsg.getProgressMsg();
-      switch (progressMsg.getType()) {
-      case Batch:
-        progressMsgExecutor.submit(() -> batchProgressTrackerFuture.get().onProgressMsg(progressMsg));
-        break;
-      case Epoch:
-        progressMsgExecutor.submit(() -> progressTrackerFuture.get().onProgressMsg(progressMsg));
-        break;
-      default:
-        throw new RuntimeException("Unexpected msg type");
-      }
+      progressMsgExecutor.submit(() -> batchProgressTrackerFuture.get().onProgressMsg(progressMsg));
       break;
     case SyncMsg:
       syncMsgExecutor.submit(() -> workerStateManagerFuture.get().onSyncMsg(dolphinMsg.getSyncMsg()));
+      break;
+    case MiniBatchSyncMsg:
+      miniBatchControllerFuture.get().onSync(dolphinMsg.getMiniBatchSyncMsg().getWorkerId().toString());
       break;
     case ModelEvalAskMsg:
       modelEvalMsgExecutor.submit(() -> modelChkpManagerFuture.get().onWorkerMsg());

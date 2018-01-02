@@ -51,7 +51,6 @@ public final class AddVectorET {
         .addParameterClass(ExampleParameters.ComputeTimeMs.class)
         .addParameterClass(ExampleParameters.NumTrainingData.class)
         .addParameterClass(ExampleParameters.NumTestData.class)
-        .addParameterClass(ExampleParameters.NumWorkers.class)
         .addParameterClass(VectorSize.class)
         .build());
   }

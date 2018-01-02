@@ -105,6 +105,10 @@ public final class ETTaskRunner {
     return waitAndGetTaskResult();
   }
 
+  /**
+   * @param executorId executor identifier
+   * @return a {@link RunningTasklet} running on the executor with {@code executorId}
+   */
   public RunningTasklet getWorkerTasklet(final String executorId) {
     return workerExecutorIdToTasklet.get(executorId);
   }

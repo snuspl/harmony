@@ -20,8 +20,6 @@ import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.evaluator.api.Table;
-import edu.snu.cay.services.et.evaluator.api.TableAccessor;
-import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.reef.tang.annotations.Parameter;
 
@@ -73,24 +71,20 @@ final class AddIntegerTrainer implements Trainer {
 
   @Inject
   private AddIntegerTrainer(final ModelAccessor<Integer, Integer, Integer> modelAccessor,
-                            final TableAccessor tableAccessor,
-                            @Parameter(DolphinParameters.InputTableId.class) final String inputTableId,
                             @Parameter(DolphinParameters.MaxNumEpochs.class) final int maxNumEpochs,
+                            @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numMiniBatchesInEpoch,
                             @Parameter(ExampleParameters.DeltaValue.class) final int delta,
                             @Parameter(ExampleParameters.NumKeys.class) final int numberOfKeys,
-                            @Parameter(ExampleParameters.NumWorkers.class) final int numberOfWorkers,
                             @Parameter(ExampleParameters.ComputeTimeMs.class) final long computeTime,
-                            @Parameter(ExampleParameters.NumTrainingData.class) final int numTrainingData)
-      throws TableNotExistException {
+                            @Parameter(ExampleParameters.NumTrainingData.class) final int numTrainingData) {
     this.modelAccessor = modelAccessor;
     this.delta = delta;
     this.numberOfKeys = numberOfKeys;
     this.computeTime = computeTime;
-    final int numMiniBatches = tableAccessor.getTable(inputTableId).getLocalTablet().getNumBlocks();
 
-    this.expectedResult = delta * numberOfWorkers * maxNumEpochs * numMiniBatches;
-    LOG.log(Level.INFO, "delta:{0}, numWorkers:{1}, maxNumEpochs:{2}, numTrainingData:{3}, numMiniBatches:{4}",
-        new Object[]{delta, numberOfWorkers, maxNumEpochs, numTrainingData, numMiniBatches});
+    this.expectedResult = delta * maxNumEpochs * numMiniBatchesInEpoch;
+    LOG.log(Level.INFO, "delta:{0}, maxNumEpochs:{2}, numMiniBatchesInEpoch:{3}",
+        new Object[]{delta, maxNumEpochs, numTrainingData, numMiniBatchesInEpoch});
   }
 
   @Override

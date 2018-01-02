@@ -23,6 +23,7 @@ import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.metric.MetricCollector;
+import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -42,10 +43,10 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
   private final String taskletId;
   private final int startingEpoch;
-  private final int maxNumEpochs;
 
   private final ProgressReporter progressReporter;
   private final WorkerGlobalBarrier workerGlobalBarrier;
+  private final MiniBatchBarrier miniBatchBarrier;
   private final TrainingDataProvider<K, V> trainingDataProvider;
   private final ModelAccessor modelAccessor;
   private final TestDataProvider<V> testDataProvider;
@@ -61,9 +62,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
-                        @Parameter(DolphinParameters.MaxNumEpochs.class) final int maxNumEpochs,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
+                        final MiniBatchBarrier miniBatchBarrier,
                         final TrainingDataProvider<K, V> trainingDataProvider,
                         final ModelAccessor modelAccessor,
                         final TestDataProvider<V> testDataProvider,
@@ -71,9 +72,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
                         final MetricCollector metricCollector) {
     this.taskletId = taskletId;
     this.startingEpoch = startingEpoch;
-    this.maxNumEpochs = maxNumEpochs;
     this.progressReporter = progressReporter;
     this.workerGlobalBarrier = workerGlobalBarrier;
+    this.miniBatchBarrier = miniBatchBarrier;
     this.trainingDataProvider = trainingDataProvider;
     this.modelAccessor = modelAccessor;
     this.testDataProvider = testDataProvider;
@@ -94,9 +95,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     // to avoid meaningless computation by the workers who started earlier
     workerGlobalBarrier.await();
 
-    for (int epochIdx = startingEpoch; epochIdx < maxNumEpochs; ++epochIdx) {
+    int epochIdx = startingEpoch;
+    while (true) {
       LOG.log(Level.INFO, "Starting epoch {0}", epochIdx);
-      progressReporter.reportEpochStart(epochIdx);
 
       final long epochStartTime = System.currentTimeMillis();
       final PerOpTimeInEpoch perOpTimeInEpoch = new PerOpTimeInEpoch();
@@ -111,6 +112,10 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         }
 
         LOG.log(Level.INFO, "Starting batch {0} in epoch {1}", new Object[] {miniBatchIdx, epochIdx});
+        if (miniBatchBarrier.await()) {
+          cleanup();
+          return;
+        }
 
         modelAccessor.getAndResetMetrics();
         final long miniBatchStartTime = System.currentTimeMillis();
@@ -134,8 +139,14 @@ public final class WorkerTasklet<K, V> implements Tasklet {
       final double epochElapsedTimeSec = (System.currentTimeMillis() - epochStartTime) / 1000.0D;
       trainer.onEpochFinished(epochIdx);
       sendEpochMetrics(epochIdx, miniBatchIdx, numProcessedDataInEpoch, epochElapsedTimeSec, perOpTimeInEpoch);
+      epochIdx++;
     }
+  }
 
+  /**
+   * Cleanup worker state before finish.
+   */
+  private void cleanup() throws NetworkException {
     // Synchronize all workers before cleanup for workers
     // to finish with the globally equivalent view of trained model
     workerGlobalBarrier.await();

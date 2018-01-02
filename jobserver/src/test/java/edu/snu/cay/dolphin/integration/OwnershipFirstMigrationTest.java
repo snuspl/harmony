@@ -46,7 +46,6 @@ public final class OwnershipFirstMigrationTest {
     final List<String> defaultArgList = getDefaultArguments(numWorkers, numServers);
 
     final List<String> argListForDeletingOneServer = Arrays.asList(
-        "-number_workers", Integer.toString(numWorkers),
         "-num_dolphin_workers", Integer.toString(numWorkers),
         "-num_servers", Integer.toString(numServers),
         "-max_num_eval_local", Integer.toString(numTotalEvals),
@@ -70,7 +69,6 @@ public final class OwnershipFirstMigrationTest {
     final List<String> defaultArgList = getDefaultArguments(numWorkers, numServers);
 
     final List<String> argListForAddingOneServer = Arrays.asList(
-        "-number_workers", Integer.toString(numWorkers),
         "-num_dolphin_workers", Integer.toString(numWorkers),
         "-num_servers", Integer.toString(numServers),
         "-max_num_eval_local", Integer.toString(numTotalEvals),

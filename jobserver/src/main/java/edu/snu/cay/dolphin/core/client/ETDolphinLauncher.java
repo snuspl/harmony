@@ -15,11 +15,11 @@
  */
 package edu.snu.cay.dolphin.core.client;
 import edu.snu.cay.common.client.JobMessageLogger;
+import edu.snu.cay.dolphin.core.master.BatchProgressTracker;
 import edu.snu.cay.dolphin.core.worker.*;
 import edu.snu.cay.common.param.Parameters.*;
 import edu.snu.cay.dolphin.core.driver.DolphinDriver;
 import edu.snu.cay.dolphin.core.driver.DriverSideMsgHandler;
-import edu.snu.cay.dolphin.core.master.ProgressTracker;
 import edu.snu.cay.dolphin.metric.ETDolphinMetricReceiver;
 import edu.snu.cay.dolphin.metric.parameters.ServerMetricFlushPeriodMs;
 import edu.snu.cay.dolphin.optimizer.api.Optimizer;
@@ -265,7 +265,7 @@ public final class ETDolphinLauncher {
 
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
         NumTrainerThreads.class,
-        HyperThreadEnabled.class, ModelCacheEnabled.class,
+        HyperThreadEnabled.class, ModelCacheEnabled.class, ClockSlack.class,
         MaxNumEpochs.class, NumTotalMiniBatches.class, TestDataPath.class);
 
     // commonly used parameters for ML apps
@@ -354,7 +354,7 @@ public final class ETDolphinLauncher {
         .set(DriverConfiguration.ON_EVALUATOR_FAILED, DolphinDriver.FailedEvaluatorHandler.class)
         .set(DriverConfiguration.ON_CONTEXT_FAILED, DolphinDriver.FailedContextHandler.class)
         .set(DriverConfiguration.ON_TASK_FAILED, DolphinDriver.FailedTaskHandler.class)
-        .set(DriverConfiguration.PROGRESS_PROVIDER, ProgressTracker.class)
+        .set(DriverConfiguration.PROGRESS_PROVIDER, BatchProgressTracker.class)
         .build();
 
     final Configuration etMasterConfiguration = ETDriverConfiguration.CONF

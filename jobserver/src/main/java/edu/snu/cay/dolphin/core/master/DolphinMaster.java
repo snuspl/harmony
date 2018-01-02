@@ -58,7 +58,7 @@ public final class DolphinMaster {
   private final ModelChkpManager modelChkpManager;
   private final MetricManager metricManager;
   private final ETTaskRunner taskRunner;
-  private final ProgressTracker progressTracker;
+  private final BatchProgressTracker progressTracker;
   private final MasterSideMsgHandler msgHandler;
 
   private final long serverMetricFlushPeriodMs;
@@ -76,7 +76,7 @@ public final class DolphinMaster {
                         final MetricManager metricManager,
                         final ModelChkpManager modelChkpManager,
                         final ETTaskRunner taskRunner,
-                        final ProgressTracker progressTracker,
+                        final BatchProgressTracker progressTracker,
                         final ConfigurationSerializer confSerializer,
                         final MasterSideMsgHandler masterSideMsgHandler,
                         @Parameter(Parameters.JobId.class) final String jobId,

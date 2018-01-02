@@ -58,32 +58,12 @@ public final class WorkerSideMsgSender {
   }
 
   /**
-   * Send {@link ProgressMsg} to master-side for every epoch.
-   * @param epochIdx a current processing epoch index
-   */
-  void sendEpochProgressMsg(final int epochIdx) throws NetworkException {
-    final ProgressMsg progressMsg = ProgressMsg.newBuilder()
-        .setExecutorId(executorId)
-        .setType(ProgressMsgType.Epoch)
-        .setProgress(epochIdx)
-        .build();
-
-    final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
-        .setType(dolphinMsgType.ProgressMsg)
-        .setProgressMsg(progressMsg)
-        .build();
-
-    sendDolphinMsg(dolphinMsg);
-  }
-
-  /**
    * Send {@link ProgressMsg} to master-side for every mini-batch.
    * @param batchIdx a current processing mini-batch index
    */
   void sendBatchProgressMsg(final int batchIdx) throws NetworkException {
     final ProgressMsg progressMsg = ProgressMsg.newBuilder()
         .setExecutorId(executorId)
-        .setType(ProgressMsgType.Batch)
         .setProgress(batchIdx)
         .build();
 
@@ -110,6 +90,16 @@ public final class WorkerSideMsgSender {
     final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
         .setType(dolphinMsgType.SyncMsg)
         .setSyncMsg(syncMsg)
+        .build();
+
+    sendDolphinMsg(dolphinMsg);
+  }
+
+  public void sendMiniBatchSyncMsg() {
+    final DolphinMsg dolphinMsg = DolphinMsg.newBuilder()
+        .setType(dolphinMsgType.MiniBatchSyncMsg)
+        .setMiniBatchSyncMsg(MiniBatchSyncMsg.newBuilder()
+        .setWorkerId(executorId).build())
         .build();
 
     sendDolphinMsg(dolphinMsg);
