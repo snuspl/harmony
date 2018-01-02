@@ -24,6 +24,7 @@ import edu.snu.cay.dolphin.dolphinMsgType;
 import edu.snu.cay.dolphin.core.worker.WorkerGlobalBarrier;
 import edu.snu.cay.dolphin.core.worker.WorkerSideMsgSender;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
+import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.services.et.driver.impl.RunningTasklet;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
 import edu.snu.cay.utils.ThreadUtils;
@@ -102,6 +103,7 @@ public class WorkerStateManagerTest {
     injector.bindVolatileInstance(ModelChkpManager.class, mock(ModelChkpManager.class));
     injector.bindVolatileInstance(JobMessageObserver.class, mock(JobMessageObserver.class));
     injector.bindVolatileInstance(EvaluatorRequestor.class, mock(EvaluatorRequestor.class));
+    injector.bindVolatileInstance(ETMaster.class, mock(ETMaster.class));
     final ETTaskRunner mockedTaskRunner = mock(ETTaskRunner.class);
     injector.bindVolatileInstance(ETTaskRunner.class, mockedTaskRunner);
 
