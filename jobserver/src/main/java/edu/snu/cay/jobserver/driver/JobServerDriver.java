@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.jobserver.driver;
 
+import edu.snu.cay.common.reef.DriverStatusManager;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ConfigurationUtils;
@@ -51,7 +52,7 @@ public final class JobServerDriver {
   private static final Logger LOG = Logger.getLogger(JobServerDriver.class.getName());
 
   private final JobMessageObserver jobMessageObserver;
-  private final JobServerStatusManager jobServerStatusManager;
+  private final DriverStatusManager driverStatusManager;
   private final JobScheduler jobScheduler;
 
   private final ResourcePool resourcePool;
@@ -72,13 +73,13 @@ public final class JobServerDriver {
   private JobServerDriver(final ETMaster etMaster,
                           final JobMessageObserver jobMessageObserver,
                           final Injector jobBaseInjector,
-                          final JobServerStatusManager jobServerStatusManager,
+                          final DriverStatusManager driverStatusManager,
                           final JobScheduler jobScheduler,
                           final ResourcePool resourcePool)
       throws IOException, InjectionException {
     this.jobMessageObserver = jobMessageObserver;
     this.jobBaseInjector = jobBaseInjector;
-    this.jobServerStatusManager = jobServerStatusManager;
+    this.driverStatusManager = driverStatusManager;
     this.jobScheduler = jobScheduler;
     this.resourcePool = resourcePool;
     this.stateMachine = initStateMachine();
@@ -161,7 +162,7 @@ public final class JobServerDriver {
 
     stateMachine.setState(State.CLOSED);
 
-    jobServerStatusManager.finishJobServer();
+    driverStatusManager.finishDriver();
     resourcePool.close();
   }
 

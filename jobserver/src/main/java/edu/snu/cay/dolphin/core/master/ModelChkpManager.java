@@ -29,8 +29,7 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.inject.Inject;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -62,6 +61,7 @@ final class ModelChkpManager {
 
   private List<AllocatedExecutor> runningServers;
   private List<AllocatedExecutor> runningWorkers;
+  private List<AllocatedExecutor> remoteWorkers;
 
   private final ExecutorService executor = CatchableExecutors.newSingleThreadExecutor();
 
@@ -91,6 +91,8 @@ final class ModelChkpManager {
                     final List<AllocatedExecutor> workerExecutors) {
     this.runningServers = serverExecutors;
     this.runningWorkers = workerExecutors;
+    this.remoteWorkers = new ArrayList<>(runningWorkers);
+    remoteWorkers.removeAll(runningServers);
   }
 
   /**
@@ -119,18 +121,13 @@ final class ModelChkpManager {
    * It waits until the restoration finishes.
    */
   private boolean restoreOldestCheckpoint() {
-    // if it's the first restore wait until all chkps to be done
-    if (restoreCounter.getAndIncrement() == 0) {
-      waitChkpsToBeDone();
-    }
-
     if (checkpointIdFutures.isEmpty()) {
       jobLogger.log(Level.INFO, "No more checkpoints.");
       return false;
     }
 
-    jobMessageObserverFuture.get().sendMessageToClient(
-        String.format("Model eval progress: [%d / %d]", restoreCounter.get(), chkpCounter.get()).getBytes());
+    jobMessageObserverFuture.get().sendMessageToClient(String.format("Model eval progress: [%d / %d]",
+            restoreCounter.incrementAndGet(), chkpCounter.get()).getBytes());
 
     // Need to drop the previous model table first
     try {
@@ -159,7 +156,7 @@ final class ModelChkpManager {
       final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
       final Future<AllocatedTable> modelTableFuture = etMasterFuture.get().createTable(modelChkpId, runningServers);
       final AllocatedTable restoredModelTable = modelTableFuture.get();
-      restoredModelTable.subscribe(runningWorkers).get();
+      restoredModelTable.subscribe(remoteWorkers).get();
       final AllocatedTable restoredInputTable = inputTableFuture.get();
 
 
@@ -201,7 +198,7 @@ final class ModelChkpManager {
   /**
    * Waits all checkpoints requested by {@link #createCheckpoint()} to be done.
    */
-  private void waitChkpsToBeDone() {
+  void waitChkpsToBeDone() {
     checkpointIdFutures.forEach(futures -> {
       try {
         futures[0].get();

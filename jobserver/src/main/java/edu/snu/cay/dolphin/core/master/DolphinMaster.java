@@ -207,6 +207,8 @@ public final class DolphinMaster {
       }
     });
 
+    modelChkpManager.waitChkpsToBeDone();
+
     checkTaskResults(taskResults);
 
     workers.forEach(worker -> metricManager.stopMetricCollection(worker.getId()));
