@@ -17,6 +17,7 @@ package edu.snu.cay.services.et.evaluator.impl;
 
 import edu.snu.cay.services.et.avro.TaskletStatusType;
 import edu.snu.cay.services.et.configuration.parameters.NumTasklets;
+import edu.snu.cay.services.et.evaluator.TaskUnitScheduler;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
@@ -43,6 +44,7 @@ public final class TaskletRuntime {
 
   private final Injector taskletBaseInjector;
   private final MessageSender msgSender;
+  private final TaskUnitScheduler taskUnitScheduler;
 
   private boolean closeFlag = false;
 
@@ -53,9 +55,11 @@ public final class TaskletRuntime {
   @Inject
   private TaskletRuntime(final Injector taskletBaseInjector,
                          final MessageSender msgSender,
+                         final TaskUnitScheduler taskUnitScheduler,
                          @Parameter(NumTasklets.class) final int numTasklets) {
     this.taskletBaseInjector = taskletBaseInjector;
     this.msgSender = msgSender;
+    this.taskUnitScheduler = taskUnitScheduler;
     this.taskletThreadPool = Executors.newFixedThreadPool(numTasklets);
   }
 

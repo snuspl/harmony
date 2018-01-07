@@ -21,15 +21,15 @@ import edu.snu.cay.dolphin.metric.avro.DolphinWorkerMetrics;
 import edu.snu.cay.dolphin.metric.avro.EpochMetrics;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
+import edu.snu.cay.services.et.evaluator.TaskUnitScheduler;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +53,8 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
+  private final TaskUnitScheduler taskUnitScheduler;
+
   /**
    * A boolean flag that becomes true when {@link #close()} is called,
    * which consequently stops the task from training and terminates it.
@@ -62,6 +64,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
+                        final TaskUnitScheduler taskUnitScheduler,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
                         final MiniBatchBarrier miniBatchBarrier,
@@ -80,11 +83,16 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.testDataProvider = testDataProvider;
     this.trainer = trainer;
     this.metricCollector = metricCollector;
+    this.taskUnitScheduler = taskUnitScheduler;
   }
 
   @Override
   public void run() throws Exception {
     LOG.log(Level.INFO, "{0} starting from epoch {1}", new Object[]{taskletId, startingEpoch});
+
+    final TaskUnitInfo pullTaskUnitInfo = new TaskUnitInfo(taskletId, "PULL", TaskUnitInfo.ResourceType.NET);
+    final TaskUnitInfo compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
+    final TaskUnitInfo pushTaskUnitInfo = new TaskUnitInfo(taskletId, "PUSH", TaskUnitInfo.ResourceType.NET);
 
     final List<V> testData = testDataProvider.getTestData();
     LOG.log(Level.INFO, "Test data set size: {0}", testData.size());
@@ -122,11 +130,17 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         trainer.setMiniBatchData(miniBatchData);
 
+        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
         trainer.pullModel();
+        taskUnitScheduler.onTaskUnitFinished(pullTaskUnitInfo);
 
+        taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         trainer.localCompute();
+        taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
 
+        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
         trainer.pushUpdate();
+        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
 
         final double miniBatchElapsedTime = (System.currentTimeMillis() - miniBatchStartTime) / 1000.0D;
 

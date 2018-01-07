@@ -18,6 +18,6 @@ package edu.snu.cay.services.et.configuration.parameters;
 import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 
-@NamedParameter(doc = "Identifier of Executor.")
+@NamedParameter(doc = "Identifier of Tasklet.")
 public final class TaskletIdentifier implements Name<String> {
 }
