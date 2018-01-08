@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package edu.snu.cay.dolphin.core.client;
-import edu.snu.cay.common.client.JobMessageLogger;
+import edu.snu.cay.common.reef.JobMessageLogger;
 import edu.snu.cay.dolphin.core.master.BatchProgressTracker;
 import edu.snu.cay.dolphin.core.worker.*;
 import edu.snu.cay.common.param.Parameters.*;

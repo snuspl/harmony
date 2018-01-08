@@ -15,7 +15,7 @@
  */
 package edu.snu.cay.jobserver.client;
 
-import edu.snu.cay.common.client.JobMessageLogger;
+import edu.snu.cay.common.reef.JobMessageLogger;
 import edu.snu.cay.jobserver.driver.JobServerDriver;
 import org.apache.reef.annotations.audience.ClientSide;
 import org.apache.reef.client.*;

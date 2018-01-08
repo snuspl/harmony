@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Classes for the client-side.
+ * Classes for working with REEF.
  */
-package edu.snu.cay.common.client;
+package edu.snu.cay.common.reef;
