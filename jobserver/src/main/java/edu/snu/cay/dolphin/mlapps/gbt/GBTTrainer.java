@@ -173,6 +173,8 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    */
   @Override
   public void setMiniBatchData(final Collection<Map.Entry<Long, GBTData>> miniBatchTrainingData) {
+    // TODO #00: GBT has small iterations in a mini-batch
+
     final List<Map.Entry<Long, GBTData>> instances = new ArrayList<>(miniBatchTrainingData);
 
     // Divide into two cases : Regression / Classification
