@@ -102,7 +102,7 @@ public final class DolphinParameters {
   public final class NumWorkers implements Name<Integer> {
   }
 
-  @NamedParameter(doc = "The number of servers",
+  @NamedParameter(doc = "The number of servers. 0 means PS-collocation",
                   short_name = "num_servers",
                   default_value = "1")
   public final class NumServers implements Name<Integer> {

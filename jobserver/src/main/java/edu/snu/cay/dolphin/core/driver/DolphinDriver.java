@@ -20,6 +20,7 @@ import edu.snu.cay.dolphin.core.master.DolphinMaster;
 import edu.snu.cay.dolphin.core.client.ETDolphinLauncher;
 import edu.snu.cay.dolphin.optimizer.api.OptimizationOrchestrator;
 import edu.snu.cay.dolphin.DolphinParameters;
+import edu.snu.cay.common.reef.DriverStatusManager;
 import edu.snu.cay.services.et.configuration.ExecutorConfiguration;
 import edu.snu.cay.services.et.configuration.RemoteAccessConfiguration;
 import edu.snu.cay.services.et.configuration.ResourceConfiguration;
@@ -35,7 +36,6 @@ import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
 import edu.snu.cay.services.et.evaluator.impl.ExistKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.NoneKeyBulkDataLoader;
 import edu.snu.cay.services.et.evaluator.impl.VoidUpdateFunction;
-import edu.snu.cay.utils.StreamingSerializableCodec;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.driver.context.FailedContext;
 import org.apache.reef.driver.evaluator.FailedEvaluator;
@@ -78,6 +78,7 @@ public final class DolphinDriver {
 
   private final int numWorkers;
   private final int numServers;
+  private final boolean psCollocation;
 
   private final ResourceConfiguration workerResourceConf;
   private final ResourceConfiguration serverResourceConf;
@@ -90,12 +91,15 @@ public final class DolphinDriver {
   private final String inputPath;
   private final Optional<TableConfiguration> workerLocalModelTableConfOptional;
 
+  private final DriverStatusManager driverStatusManager;
+
   @Inject
   private DolphinDriver(final DolphinMaster dolphinMaster,
                         final ETMaster etMaster,
                         final JobMessageObserver jobMessageObserver,
                         final ConfigurationSerializer confSerializer,
                         final OptimizationOrchestrator optimizationOrchestrator,
+                        final DriverStatusManager driverStatusManager,
                         @Parameter(DolphinParameters.OfflineModelEvaluation.class) final boolean offlineModelEval,
                         @Parameter(DolphinParameters.NumServers.class) final int numServers,
                         @Parameter(DolphinParameters.ServerMemSize.class) final int serverMemSize,
@@ -120,11 +124,13 @@ public final class DolphinDriver {
     this.etMaster = etMaster;
     this.dolphinMaster = dolphinMaster;
     this.jobMessageObserver = jobMessageObserver;
+    this.driverStatusManager = driverStatusManager;
 
     this.offlineModelEval = offlineModelEval;
 
     this.numWorkers = numWorkers;
     this.numServers = numServers;
+    this.psCollocation = numServers == 0;
 
     // configuration commonly used in both workers and servers
     final Configuration userParamConf = confSerializer.fromString(serializedParamConf);
@@ -267,8 +273,9 @@ public final class DolphinDriver {
     @Override
     public void onNext(final StartTime startTime) {
       try {
-        final List<AllocatedExecutor> servers = etMaster.addExecutors(numServers, getServerExecutorConf()).get();
         final List<AllocatedExecutor> workers = etMaster.addExecutors(numWorkers, getWorkerExecutorConf()).get();
+        final List<AllocatedExecutor> servers = psCollocation ?
+            workers : etMaster.addExecutors(numServers, getServerExecutorConf()).get();
 
         new Thread(() -> {
           final Future<AllocatedTable> modelTableFuture = etMaster.createTable(serverTableConf, servers);
@@ -285,7 +292,9 @@ public final class DolphinDriver {
             final AllocatedTable modelTable = modelTableFuture.get();
             final AllocatedTable inputTable = inputTableFuture.get();
 
-            modelTable.subscribe(workers).get();
+            if (!psCollocation) {
+              modelTable.subscribe(workers).get();
+            }
             inputTable.load(workers, inputPath).get();
 
             jobMessageObserver.sendMessageToClient("Start training a model".getBytes());
@@ -300,42 +309,41 @@ public final class DolphinDriver {
               Thread.sleep(30000);
 
               inputTable.drop().get();
-              workers.forEach(worker -> {
-                try {
-                  modelTable.unsubscribe(worker.getId()).get();
-                } catch (InterruptedException | ExecutionException e) {
-                  throw new RuntimeException(e);
-                }
-              });
+              modelTable.drop().get();
 
               workers.forEach(AllocatedExecutor::close);
+              if (!psCollocation) {
+                servers.forEach(AllocatedExecutor::close);
+              }
 
               // start model evaluation with new workers (to completely empty the memory)
               final List<AllocatedExecutor> workersForEvaluation
-                  = etMaster.addExecutors(workers.size(), getWorkerExecutorConf()).get();
-              final AllocatedTable dummyTable = etMaster.createTable(
-                  TableConfiguration.newBuilder()
-                      .setId(DolphinParameters.InputTableId.DEFAULT_VALUE)
-                      .setKeyCodecClass(StreamingSerializableCodec.class)
-                      .setValueCodecClass(StreamingSerializableCodec.class)
-                      .setUpdateValueCodecClass(SerializableCodec.class)
-                      .setUpdateFunctionClass(VoidUpdateFunction.class)
-                      .setIsMutableTable(false)
-                      .setIsOrderedTable(true)
-                      .build(),
-                  workersForEvaluation).get();
+                  = etMaster.addExecutors(numWorkers, getWorkerExecutorConf()).get();
+              final List<AllocatedExecutor> serversForEvaluation = psCollocation ?
+                  workersForEvaluation : etMaster.addExecutors(numServers, getWorkerExecutorConf()).get();
 
-              modelTable.subscribe(workersForEvaluation).get();
+              final AllocatedTable dummyModelTable = etMaster.createTable(serverTableConf, serversForEvaluation).get();
+              final AllocatedTable dummyInputTable = etMaster.createTable(workerTableConf, workersForEvaluation).get();
 
-              dolphinMaster.evaluate(servers, workersForEvaluation);
+              if (!psCollocation) {
+                dummyModelTable.subscribe(workersForEvaluation).get();
+              }
+
+              dolphinMaster.evaluate(serversForEvaluation, workersForEvaluation);
 
               workersForEvaluation.forEach(AllocatedExecutor::close);
-              servers.forEach(AllocatedExecutor::close);
-
+              if (!psCollocation) {
+                serversForEvaluation.forEach(AllocatedExecutor::close);
+              }
             } else {
               workers.forEach(AllocatedExecutor::close);
-              servers.forEach(AllocatedExecutor::close);
+              if (!psCollocation) {
+                servers.forEach(AllocatedExecutor::close);
+              }
             }
+
+            driverStatusManager.finishDriver();
+
           } catch (Exception e) {
             LOG.log(Level.SEVERE, "Exception while running a job", e);
             throw new RuntimeException(e);

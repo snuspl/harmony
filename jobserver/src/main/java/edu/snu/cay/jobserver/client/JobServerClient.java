@@ -21,7 +21,7 @@ import edu.snu.cay.jobserver.Parameters.*;
 import edu.snu.cay.jobserver.driver.JobScheduler;
 import edu.snu.cay.jobserver.driver.DriverSideMsgHandler;
 import edu.snu.cay.jobserver.driver.JobServerDriver;
-import edu.snu.cay.jobserver.driver.JobServerStatusManager;
+import edu.snu.cay.common.reef.DriverStatusManager;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
 import edu.snu.cay.services.et.driver.impl.LoggingMetricReceiver;
 import edu.snu.cay.services.et.metric.configuration.MetricServiceDriverConf;
@@ -172,7 +172,7 @@ public final class JobServerClient {
         .build();
 
     final Configuration jobServerConf = Tang.Factory.getTang().newConfigurationBuilder()
-        .bindSetEntry(DriverIdleSources.class, JobServerStatusManager.class)
+        .bindSetEntry(DriverIdleSources.class, DriverStatusManager.class)
         .bindImplementation(JobScheduler.class, (Class<? extends JobScheduler>)
             Class.forName(driverParamInjector.getNamedInstance(Parameters.SchedulerClass.class)))
         .build();
