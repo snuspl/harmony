@@ -192,6 +192,7 @@ public final class DolphinMaster {
   public void evaluate(final List<AllocatedExecutor> servers, final List<AllocatedExecutor> workers) {
     workers.forEach(worker -> metricManager.startMetricCollection(worker.getId(), getWorkerMetricConf()));
 
+    modelChkpManager.waitChkpsToBeDone();
     modelChkpManager.setExecutors(servers, workers);
 
     final List<Future<RunningTasklet>> taskFutures = new ArrayList<>(workers.size());
@@ -206,8 +207,6 @@ public final class DolphinMaster {
         throw new RuntimeException(e);
       }
     });
-
-    modelChkpManager.waitChkpsToBeDone();
 
     checkTaskResults(taskResults);
 
