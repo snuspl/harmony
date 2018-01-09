@@ -25,6 +25,7 @@ import edu.snu.cay.jobserver.driver.JobMaster;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.services.et.driver.api.ETMaster;
+import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.exceptions.InjectionException;
@@ -32,7 +33,6 @@ import org.apache.reef.tang.exceptions.InjectionException;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 /**
  * Dolphin's {@link JobEntity} implementation.
@@ -97,20 +97,23 @@ public final class DolphinJobEntity implements JobEntity {
       final List<AllocatedExecutor> servers = executorGroups.get(0);
       final List<AllocatedExecutor> workers = executorGroups.get(1);
 
-      final Future<AllocatedTable> modelTableFuture =
-          etMaster.createTable(serverTableConf, servers);
-      final Future<AllocatedTable> inputTableFuture =
-          etMaster.createTable(workerTableConf, workers);
+      final AllocatedTable modelTable = etMaster.createTable(serverTableConf, servers).get();
       if (localModelTableConfOptional.isPresent()) {
         etMaster.createTable(localModelTableConfOptional.get(), workers).get();
       }
 
-      final AllocatedTable modelTable = modelTableFuture.get();
-      final AllocatedTable inputTable = inputTableFuture.get();
+      AllocatedTable inputTable;
+
+      try {
+        inputTable = etMaster.getTable(workerTableConf.getId());
+        // If the input table with the same id already exists, the table is re-used.
+      } catch (TableNotExistException e) {
+        inputTable = etMaster.createTable(workerTableConf, workers).get();
+        inputTable.load(workers, inputPath).get();
+      }
+
       tables.add(modelTable);
       tables.add(inputTable);
-
-      inputTable.load(workers, inputPath).get();
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
