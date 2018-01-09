@@ -105,7 +105,8 @@ public final class DolphinJobEntity implements JobEntity {
       AllocatedTable inputTable;
 
       try {
-        inputTable = etMaster.getTable(workerTableConf.getId()); // share
+        inputTable = etMaster.getTable(workerTableConf.getId());
+        // If the input table with the same id already exists, the table is re-used.
       } catch (TableNotExistException e) {
         inputTable = etMaster.createTable(workerTableConf, workers).get();
         inputTable.load(workers, inputPath).get();
