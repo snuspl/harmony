@@ -55,7 +55,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   private static final int NUM_TBL_CTR_MSG_THREADS = 8;
   private static final int NUM_MIGRATION_MSG_THREADS = 8;
   private static final int NUM_METRIC_MSG_THREADS = 4;
-  private static final int NUM_TBL_ACS_MSG_THREADS = 8;
+  private static final int NUM_TBL_ACS_MSG_THREADS = 1;
   private static final int NUM_CHKP_THREADS = 8;
   private static final int NUM_TASKLET_MSG_THREADS = 4;
 

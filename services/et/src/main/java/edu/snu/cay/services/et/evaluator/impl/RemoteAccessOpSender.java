@@ -15,7 +15,10 @@
  */
 package edu.snu.cay.services.et.evaluator.impl;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import edu.snu.cay.services.et.avro.*;
+import edu.snu.cay.services.et.common.DenseVectorSerializer;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsSenderThreads;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.SenderQueueSize;
@@ -77,8 +80,11 @@ public final class RemoteAccessOpSender {
   private final InjectionFuture<MessageSender> msgSenderFuture;
   private final InjectionFuture<RemoteAccessOpStat> networkUsageStatFuture;
 
+  private final DenseVectorSerializer denseVectorSerializer;
+
   @Inject
   private RemoteAccessOpSender(final InjectionFuture<Tables> tablesFuture,
+                               final DenseVectorSerializer denseVectorSerializer,
                                @Parameter(ExecutorIdentifier.class) final String executorId,
                                @Parameter(DriverIdentifier.class) final String driverId,
                                @Parameter(SenderQueueSize.class) final int queueSize,
@@ -92,6 +98,7 @@ public final class RemoteAccessOpSender {
     this.msgSenderFuture = msgSenderFuture;
     this.networkUsageStatFuture = networkUsageStatFuture;
     this.senderThreads = initSenderThreads(numSenderThreads, queueSize);
+    this.denseVectorSerializer = denseVectorSerializer;
   }
 
   /**
@@ -212,7 +219,7 @@ public final class RemoteAccessOpSender {
    * @param tableComponents {@link TableComponents}
    * @param msgSender {@link MessageSender}
    */
-  static <K, V, U> void encodeAndSendRequestMsg(final DataOpMetadata opMetadata,
+  <K, V, U> void encodeAndSendRequestMsg(final DataOpMetadata opMetadata,
                                                 final String targetExecutorId,
                                                 final String localExecutorId,
                                                 final TableComponents<K, V, U> tableComponents,
@@ -352,7 +359,19 @@ public final class RemoteAccessOpSender {
     return Pair.of(dataKey, dataValue);
   }
 
-  private static <K, V, U> Pair<DataKeys, DataValues> encodeMultiKeyOp(
+  private final AtomicLong serializationTime = new AtomicLong(0);
+
+  public long getSerializationTime() {
+    return serializationTime.getAndSet(0);
+  }
+
+  private final AtomicLong deserializationTime = new AtomicLong(0);
+
+  public long getDeserializationTime() {
+    return deserializationTime.getAndSet(0);
+  }
+
+  private <K, V, U> Pair<DataKeys, DataValues> encodeMultiKeyOp(
       final KVUSerializer<K, V, U> kvuSerializer,
       final MultiKeyDataOpMetadata<K, V, U> dataOpMetadata) {
     final DataKeys dataKeys = new DataKeys();
@@ -360,6 +379,8 @@ public final class RemoteAccessOpSender {
     final StreamingCodec<K> keyCodec = kvuSerializer.getKeyCodec();
     final StreamingCodec<V> valueCodec = kvuSerializer.getValueCodec();
     final Codec<U> updateValueCodec = kvuSerializer.getUpdateValueCodec();
+
+    final long startTime = System.currentTimeMillis();
 
     final List<ByteBuffer> encodedKeys = new ArrayList<>();
     dataOpMetadata.getKeys().forEach(key -> encodedKeys.add(ByteBuffer.wrap(keyCodec.encode(key))));
@@ -382,11 +403,23 @@ public final class RemoteAccessOpSender {
         throw new RuntimeException(String.format("Data update value is empty for UPDATE(%s)",
             dataOpMetadata.getKeys().toString()));
       }
-      dataOpMetadata.getUpdateValues().forEach(updateValue ->
-          encodedValues.add(ByteBuffer.wrap(updateValueCodec.encode(updateValue))));
+
+      dataOpMetadata.getUpdateValues().forEach(updateValue -> {
+        final Output output = new Output(Integer.BYTES +
+            Float.BYTES * ((edu.snu.cay.common.math.linalg.Vector) updateValue).length());
+        denseVectorSerializer.write(DenseVectorSerializer.KRYO, output,
+            (edu.snu.cay.common.math.linalg.Vector) updateValue);
+        output.close();
+        encodedValues.add(ByteBuffer.wrap(output.toBytes()));
+      });
+
+//      dataOpMetadata.getUpdateValues().forEach(updateValue ->
+//          encodedValues.add(ByteBuffer.wrap(updateValueCodec.encode(updateValue))));
     }
 
     dataValues.setValues(encodedValues);
+
+    serializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
     return Pair.of(dataKeys, dataValues);
   }
@@ -478,6 +511,8 @@ public final class RemoteAccessOpSender {
     final Codec<K> keyCodec = (Codec<K>) kvuSerializer.getKeyCodec();
     final Codec<V> valueCodec = (Codec<V>) kvuSerializer.getValueCodec();
 
+    final long startTime = System.currentTimeMillis();
+
     final OpType opType = operation.getMetadata().getOpType();
     if (operation.getMetadata().isSingleKey()) {
       final DataValue remoteDataValue = msg.getDataValue();
@@ -495,11 +530,20 @@ public final class RemoteAccessOpSender {
       final Map<K, V> decodedMap = new HashMap<>();
       for (int index = 0; index < encodedKeys.size(); index++) {
         final K key = keyCodec.decode(encodedKeys.get(index).array());
-        final V value = valueCodec.decode(encodedValues.get(index).array());
+        final V value;
+        if (opType.equals(OpType.GET_OR_INIT)) {
+          value = (V) denseVectorSerializer.read(DenseVectorSerializer.KRYO,
+              new Input(encodedValues.get(index).array()),
+              edu.snu.cay.common.math.linalg.Vector.class);
+        } else {
+          value = valueCodec.decode(encodedValues.get(index).array());
+        }
         decodedMap.put(key, value);
       }
       operation.getDataOpResult().onCompleted(decodedMap, isSuccess);
     }
+
+    deserializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
     deregisterOp(tableId, opId);
     LOG.log(Level.FINEST, "Remote operation is finished. OpId: {0}", opId);

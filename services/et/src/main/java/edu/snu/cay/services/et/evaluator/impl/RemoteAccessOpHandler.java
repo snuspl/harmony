@@ -15,7 +15,11 @@
  */
 package edu.snu.cay.services.et.evaluator.impl;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.services.et.avro.*;
+import edu.snu.cay.services.et.common.DenseVectorSerializer;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.HandlerQueueSize;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsHandlerThreads;
@@ -40,6 +44,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -48,7 +53,7 @@ import java.util.logging.Logger;
  * A class that 1) handles remote access request msgs that other executors sent to this executor
  * and 2) sends the result of the operation to the origin.
  */
-final class RemoteAccessOpHandler {
+public final class RemoteAccessOpHandler {
   private static final Logger LOG = Logger.getLogger(RemoteAccessOpHandler.class.getName());
   private static final int QUEUE_TIMEOUT_MS = 3000;
 
@@ -63,6 +68,10 @@ final class RemoteAccessOpHandler {
   private final InjectionFuture<Tables> tablesFuture;
   private final InjectionFuture<MessageSender> msgSenderFuture;
 
+  private final InjectionFuture<RemoteAccessOpSender> opSenderFuture;
+
+  private final DenseVectorSerializer denseVectorSerializer;
+
   /**
    * Maintains an operation tracker for each table.
    */
@@ -70,6 +79,8 @@ final class RemoteAccessOpHandler {
 
   @Inject
   private RemoteAccessOpHandler(final InjectionFuture<Tables> tablesFuture,
+                                final DenseVectorSerializer denseVectorSerializer,
+                                final InjectionFuture<RemoteAccessOpSender> opSenderFuture,
                                 @Parameter(DriverIdentifier.class) final String driverId,
                                 @Parameter(ExecutorIdentifier.class) final String executorId,
                                 @Parameter(HandlerQueueSize.class) final int queueSize,
@@ -81,6 +92,8 @@ final class RemoteAccessOpHandler {
     this.msgSenderFuture = msgSenderFuture;
     this.numHandlerThreads = numHandlerThreads;
     this.handlerThreads = initExecutor(numHandlerThreads, queueSize);
+    this.opSenderFuture = opSenderFuture;
+    this.denseVectorSerializer = denseVectorSerializer;
   }
 
   /**
@@ -331,7 +344,7 @@ final class RemoteAccessOpHandler {
                                   final String targetId) {
     LOG.log(Level.FINE, "Redirect Op for TableId: {0} to {2}",
         new Object[]{opMetadata.getTableId(), targetId});
-    RemoteAccessOpSender.encodeAndSendRequestMsg(opMetadata, targetId, executorId,
+    opSenderFuture.get().encodeAndSendRequestMsg(opMetadata, targetId, executorId,
         tableComponents, msgSenderFuture.get());
   }
 
@@ -369,6 +382,7 @@ final class RemoteAccessOpHandler {
     if (msg.getIsSingleKey()) {
       final DataKey dataKey = msg.getDataKey();
       final DataValue dataValue = msg.getDataValue();
+      final long startTime = System.currentTimeMillis();
       final K decodedKey = keyCodec.decode(dataKey.getKey().array());
 
       // decode data values
@@ -378,6 +392,7 @@ final class RemoteAccessOpHandler {
       // decode update data value
       final U decodedUpdateValue = opType.equals(OpType.UPDATE) ?
           updateValueCodec.decode(dataValue.getValue().array()) : null;
+      deserializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
       final int blockId = blockPartitioner.getBlockId(decodedKey);
       final SingleKeyDataOpMetadata<K, V, U> operation = new SingleKeyDataOpMetadata<>(origEvalId,
@@ -396,6 +411,7 @@ final class RemoteAccessOpHandler {
       final List<V> valueList;
       final List<U> updateValueList;
 
+      final long startTime = System.currentTimeMillis();
       switch (opType) {
       case PUT:
         valueList = new ArrayList<>();
@@ -410,12 +426,15 @@ final class RemoteAccessOpHandler {
       case UPDATE:
         valueList = Collections.emptyList();
         updateValueList = new ArrayList<>();
-        dataValues.getValues().forEach(value -> updateValueList.add(updateValueCodec.decode(value.array())));
+        dataValues.getValues().forEach(value -> updateValueList.add(
+            (U) denseVectorSerializer.read(DenseVectorSerializer.KRYO, new Input(value.array()), Vector.class)));
+//        dataValues.getValues().forEach(value -> updateValueList.add(updateValueCodec.decode(value.array())));
         break;
         //TODO #176: support multi-key versions of other op types (e.g. put_if_absent, remove)
       default:
         throw new RuntimeException("Undefined type of OpMetadata");
       }
+      deserializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
       // All keys match to same block id
       final int blockId = blockPartitioner.getBlockId(keyList.get(0));
@@ -454,6 +473,18 @@ final class RemoteAccessOpHandler {
     return hashedKey % numHandlerThreads;
   }
 
+  private final AtomicLong serializationTime = new AtomicLong(0);
+
+  public long getSerializationTime() {
+    return serializationTime.getAndSet(0);
+  }
+
+  private final AtomicLong deserializationTime = new AtomicLong(0);
+
+  public long getDeserializationTime() {
+    return deserializationTime.getAndSet(0);
+  }
+
   /**
    * Sends the result to the original executor.
    */
@@ -475,7 +506,16 @@ final class RemoteAccessOpHandler {
         final DataValue dataValue;
         if (localOutput != null) {
           dataValue = new DataValue();
-          dataValue.setValue(ByteBuffer.wrap(valueCodec.encode(localOutput)));
+          final long startTime = System.currentTimeMillis();
+          if (opMetadata.getOpType().equals(OpType.GET_OR_INIT)) {
+            final Output output = new Output(Integer.BYTES + Float.BYTES * ((Vector) localOutput).length());
+            denseVectorSerializer.write(DenseVectorSerializer.KRYO, output, (Vector) localOutput);
+            output.close();
+            dataValue.setValue(ByteBuffer.wrap(output.toBytes()));
+          } else {
+            dataValue.setValue(ByteBuffer.wrap(valueCodec.encode(localOutput)));
+          }
+          serializationTime.addAndGet(System.currentTimeMillis() - startTime);
         } else {
           dataValue = null;
         }
@@ -486,10 +526,19 @@ final class RemoteAccessOpHandler {
         final List<ByteBuffer> encodedKeyList = new ArrayList<>(localOutputs.size());
         final List<ByteBuffer> encodedValueList = new ArrayList<>(localOutputs.size());
 
+        final long startTime = System.currentTimeMillis();
         localOutputs.forEach(pair -> {
           encodedKeyList.add(ByteBuffer.wrap(keyCodec.encode(pair.getKey())));
-          encodedValueList.add(ByteBuffer.wrap(valueCodec.encode(pair.getValue())));
+          if (opMetadata.getOpType().equals(OpType.GET_OR_INIT)) {
+            final Output output = new Output(Integer.BYTES + Float.BYTES * ((Vector) pair.getValue()).length());
+            denseVectorSerializer.write(DenseVectorSerializer.KRYO, output, (Vector) pair.getValue());
+            output.close();
+            encodedValueList.add(ByteBuffer.wrap(output.toBytes()));
+          } else {
+            encodedValueList.add(ByteBuffer.wrap(valueCodec.encode(pair.getValue())));
+          }
         });
+        serializationTime.addAndGet(System.currentTimeMillis() - startTime);
         dataKeys.setKeys(encodedKeyList);
         dataValues.setValues(encodedValueList);
         msgSenderFuture.get().sendTableAccessResMsg(origEvalId, opMetadata.getOpId(),

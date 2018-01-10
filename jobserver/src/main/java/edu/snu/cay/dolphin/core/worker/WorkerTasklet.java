@@ -19,9 +19,12 @@ import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.TaskUnitScheduler;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.evaluator.impl.RemoteAccessOpHandler;
+import edu.snu.cay.services.et.evaluator.impl.RemoteAccessOpSender;
 import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
+import org.apache.reef.tang.InjectionFuture;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
@@ -51,6 +54,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
   private final TaskUnitScheduler taskUnitScheduler;
 
+  private final InjectionFuture<RemoteAccessOpSender> opSenderFuture;
+  private final InjectionFuture<RemoteAccessOpHandler> opHandlerFuture;
+
   /**
    * A boolean flag that becomes true when {@link #close()} is called,
    * which consequently stops the task from training and terminates it.
@@ -60,6 +66,8 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
+                        final InjectionFuture<RemoteAccessOpSender> opSenderFuture,
+                        final InjectionFuture<RemoteAccessOpHandler> opHandlerFuture,
                         final TaskUnitScheduler taskUnitScheduler,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
@@ -80,6 +88,8 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.trainer = trainer;
     this.metricCollector = metricCollector;
     this.taskUnitScheduler = taskUnitScheduler;
+    this.opSenderFuture = opSenderFuture;
+    this.opHandlerFuture = opHandlerFuture;
   }
 
   @Override
@@ -101,9 +111,14 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
     int epochIdx = startingEpoch;
     while (true) {
+      final long epochStatTime = System.currentTimeMillis();
       LOG.log(Level.INFO, "Starting epoch {0}", epochIdx);
 
       trainingDataProvider.prepareDataForEpoch();
+
+      int epochPullTime = 0;
+      int epochCompTime = 0;
+      int epochPushTime = 0;
 
       int miniBatchIdx = 0;
       while (true) {
@@ -122,23 +137,41 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         trainer.setMiniBatchData(miniBatchData);
 
-        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
+//        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
+        opSenderFuture.get().getSerializationTime();
+        opSenderFuture.get().getDeserializationTime();
+        opHandlerFuture.get().getSerializationTime();
+        opHandlerFuture.get().getDeserializationTime();
         final long pullStartTime = System.currentTimeMillis();
         trainer.pullModel();
         final double pullTime = (System.currentTimeMillis() - pullStartTime) / 1000D;
-        taskUnitScheduler.onTaskUnitFinished(pullTaskUnitInfo);
+        epochPullTime += pullTime;
+
+        final long handlerPullSerializationTime = opHandlerFuture.get().getSerializationTime();
+        final long handlerPullDeserializationTime = opHandlerFuture.get().getDeserializationTime();
+        final long senderPullSerializationTime = opSenderFuture.get().getSerializationTime();
+        final long senderPullDeserializationTime = opSenderFuture.get().getDeserializationTime();
+//        taskUnitScheduler.onTaskUnitFinished(pullTaskUnitInfo);
+        LOG.log(Level.INFO, "Pull serialization time. sender: {0}, handler: {1}, total: {2}",
+            new Object[]{senderPullSerializationTime, handlerPullSerializationTime,
+                senderPullSerializationTime + handlerPullSerializationTime});
+        LOG.log(Level.INFO, "Pull Deserialization time. sender: {0}, handler: {1}, total: {2}",
+            new Object[]{senderPullDeserializationTime, handlerPullDeserializationTime,
+                senderPullDeserializationTime + handlerPullDeserializationTime});
 
         taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         final long compStartTime = System.currentTimeMillis();
         trainer.localCompute();
         final double compTime = (System.currentTimeMillis() - compStartTime) / 1000D;
+        epochCompTime += compTime;
         taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
 
-        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
+//        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
         final long pushStartTime = System.currentTimeMillis();
         trainer.pushUpdate();
         final double pushTime = (System.currentTimeMillis() - pushStartTime) / 1000D;
-        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
+        epochPushTime += pushTime;
+//        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
 
         progressReporter.reportBatchFinish(miniBatchIdx);
 
@@ -152,6 +185,10 @@ public final class WorkerTasklet<K, V> implements Tasklet {
           return;
         }
       }
+
+      LOG.log(Level.INFO, "EpochPullTime: {0}, EpochCompTime: {1}, EpochPushTime: {2}, Total: {3}, epoch: {4}",
+          new Object[]{epochPullTime, epochCompTime, epochPushTime,
+              epochPullTime + epochCompTime + epochPushTime, System.currentTimeMillis() - epochStatTime});
 
       trainer.onEpochFinished(epochIdx);
       epochIdx++;
