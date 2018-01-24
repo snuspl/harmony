@@ -64,7 +64,7 @@ public final class ETTrainingDataProvider<K, V> implements TrainingDataProvider<
       final Map<K, V> batchData = blockIterator.next().getAll();
       final List<Map.Entry<K, V>> entryList = new ArrayList<>(batchData.entrySet());
 
-      Collections.shuffle(entryList); // shuffle to avoid bias
+//      Collections.shuffle(entryList); // shuffle to avoid bias
 
       LOG.log(Level.INFO, "Size of training data for next mini-batch: {0}", batchData.size());
       return entryList;

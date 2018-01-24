@@ -381,8 +381,8 @@ public final class MigrationExecutor implements EventHandler<MigrationMsg> {
             while (itemIter.hasNext()) {
               try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                    DataOutputStream dos = new DataOutputStream(baos)) {
-                final StreamingCodec<K> keyCodec = (StreamingCodec<K>) kvuSerializer.getKeyCodec();
-                final StreamingCodec<V> valueCodec = (StreamingCodec<V>) kvuSerializer.getValueCodec();
+                final StreamingCodec<K> keyCodec = kvuSerializer.getKeyCodec();
+                final StreamingCodec<V> valueCodec = kvuSerializer.getValueCodec();
 
                 // aggregate items into a chunk
                 int count = 0;

@@ -52,6 +52,9 @@ final class TableComponents<K, V, U> {
    */
   private final KVUSerializer<K, V, U> kvuSerializer;
 
+
+  private final EncodedKeyCache<K> encodedKeyCache;
+
   /**
    * A function for updating values in the table.
    */
@@ -69,6 +72,7 @@ final class TableComponents<K, V, U> {
                           final TableMetadata tableMetadata,
                           final BlockStore<K, V, U> blockStore,
                           final KVUSerializer<K, V, U> kvuSerializer,
+                          final EncodedKeyCache<K> encodedKeyCache,
                           final UpdateFunction<K, V, U> updateFunction,
                           final BulkDataLoader bulkDataLoader,
                           final BlockPartitioner<K> blockPartitioner) {
@@ -76,6 +80,7 @@ final class TableComponents<K, V, U> {
     this.ownershipCache = ownershipCache;
     this.blockStore = blockStore;
     this.kvuSerializer = kvuSerializer;
+    this.encodedKeyCache = encodedKeyCache;
     this.updateFunction = updateFunction;
     this.bulkDataLoader = bulkDataLoader;
     this.blockPartitioner = blockPartitioner;
@@ -99,6 +104,10 @@ final class TableComponents<K, V, U> {
 
   KVUSerializer<K, V, U> getSerializer() {
     return kvuSerializer;
+  }
+
+  EncodedKeyCache<K> getEncodedKeyCache() {
+    return encodedKeyCache;
   }
 
   BlockPartitioner<K> getBlockPartitioner() {

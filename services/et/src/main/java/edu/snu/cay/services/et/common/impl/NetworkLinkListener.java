@@ -62,7 +62,8 @@ final class NetworkLinkListener implements LinkListener<Message<ETMsg>> {
               tableAccessReqMsg.getTableId(), socketAddress));
 
           remoteAccessOpSender.onFailedMsg(tableAccessReqMsg.getTableId(), tableAccessReqMsg.getDataKey(),
-              tableAccessReqMsg.getReplyRequired(), tableAccessMsg.getOperationId(), msg);
+              tableAccessReqMsg.getBlockId(), tableAccessReqMsg.getReplyRequired(),
+              tableAccessMsg.getOperationId(), msg);
           return;
         }
       }

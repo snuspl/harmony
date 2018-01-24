@@ -143,7 +143,7 @@ public final class RemoteAccessOpSender {
      * @param queueSize a size of a thread queue
      */
     SenderThread(final int queueSize) {
-      this.opQueue = new ArrayBlockingQueue<>(queueSize);
+      this.opQueue = new LinkedBlockingQueue<>(); // new ArrayBlockingQueue<>(queueSize);
       this.drainSize = queueSize >= DRAIN_PORTION ? queueSize / DRAIN_PORTION : 1;
       this.localOps = new ArrayList<>(drainSize);
     }
@@ -220,19 +220,21 @@ public final class RemoteAccessOpSender {
    * @param msgSender {@link MessageSender}
    */
   <K, V, U> void encodeAndSendRequestMsg(final DataOpMetadata opMetadata,
-                                                final String targetExecutorId,
-                                                final String localExecutorId,
-                                                final TableComponents<K, V, U> tableComponents,
-                                                final MessageSender msgSender) {
+                                         final String targetExecutorId,
+                                         final String localExecutorId,
+                                         final TableComponents<K, V, U> tableComponents,
+                                         final MessageSender msgSender) {
 
     final KVUSerializer<K, V, U> kvuSerializer = tableComponents.getSerializer();
+    final EncodedKeyCache<K> encodedKeyCache = tableComponents.getEncodedKeyCache();
     if (opMetadata.isSingleKey()) {
       final SingleKeyDataOpMetadata<K, V, U> singleOpMetadata = (SingleKeyDataOpMetadata) opMetadata;
-      final Pair<DataKey, DataValue> singleKVPair = encodeSingleKeyOp(kvuSerializer, singleOpMetadata);
+      final Pair<DataKey, DataValue> singleKVPair = encodeSingleKeyOp(kvuSerializer, encodedKeyCache, singleOpMetadata);
       sendSingleKeyReqMsg(opMetadata, targetExecutorId, localExecutorId, tableComponents, msgSender, singleKVPair);
     } else {
       final MultiKeyDataOpMetadata<K, V, U> multiKeyDataOpMetadata = (MultiKeyDataOpMetadata) opMetadata;
-      final Pair<DataKeys, DataValues> multiKVPair = encodeMultiKeyOp(kvuSerializer, multiKeyDataOpMetadata);
+      final Pair<DataKeys, DataValues> multiKVPair = encodeMultiKeyOp(kvuSerializer, encodedKeyCache,
+          multiKeyDataOpMetadata);
       sendMultiKeyReqMsg(opMetadata, targetExecutorId, localExecutorId, tableComponents, msgSender, multiKVPair);
     }
   }
@@ -248,7 +250,7 @@ public final class RemoteAccessOpSender {
     while (true) {
       try {
         msgSender.sendTableAccessReqMsg(opMetadata.getOrigId(), executorIdToSendMsg, opMetadata.getOpId(),
-            opMetadata.getTableId(), opMetadata.getOpType(), opMetadata.isReplyRequired(),
+            opMetadata.getTableId(), opMetadata.getBlockId(), opMetadata.getOpType(), opMetadata.isReplyRequired(),
             kvPair.getKey(), kvPair.getValue());
         break;
       } catch (NetworkException e) {
@@ -289,7 +291,7 @@ public final class RemoteAccessOpSender {
     while (true) {
       try {
         msgSender.sendTableAccessReqMsg(opMetadata.getOrigId(), executorIdToSendMsg, opMetadata.getOpId(),
-            opMetadata.getTableId(), opMetadata.getOpType(), opMetadata.isReplyRequired(),
+            opMetadata.getTableId(), opMetadata.getBlockId(), opMetadata.getOpType(), opMetadata.isReplyRequired(),
             kvPair.getKey(), kvPair.getValue());
         break;
       } catch (NetworkException e) {
@@ -320,7 +322,7 @@ public final class RemoteAccessOpSender {
   }
 
   private static <K, V, U> Pair<DataKey, DataValue> encodeSingleKeyOp(
-      final KVUSerializer<K, V, U> kvuSerializer,
+      final KVUSerializer<K, V, U> kvuSerializer, final EncodedKeyCache<K> encodedKeyCache,
       final SingleKeyDataOpMetadata<K, V, U> dataOpMetadata) {
 
     final DataKey dataKey = new DataKey();
@@ -372,7 +374,7 @@ public final class RemoteAccessOpSender {
   }
 
   private <K, V, U> Pair<DataKeys, DataValues> encodeMultiKeyOp(
-      final KVUSerializer<K, V, U> kvuSerializer,
+      final KVUSerializer<K, V, U> kvuSerializer, final EncodedKeyCache<K> encodedKeyCache,
       final MultiKeyDataOpMetadata<K, V, U> dataOpMetadata) {
     final DataKeys dataKeys = new DataKeys();
     final DataValues dataValues = new DataValues();
@@ -383,7 +385,9 @@ public final class RemoteAccessOpSender {
     final long startTime = System.currentTimeMillis();
 
     final List<ByteBuffer> encodedKeys = new ArrayList<>();
-    dataOpMetadata.getKeys().forEach(key -> encodedKeys.add(ByteBuffer.wrap(keyCodec.encode(key))));
+    dataOpMetadata.getKeys().forEach(key ->
+        encodedKeys.add(ByteBuffer.wrap(encodedKeyCache.getEncodedKey(key).getEncoded())));
+//    dataOpMetadata.getKeys().forEach(key -> encodedKeys.add(ByteBuffer.wrap(keyCodec.encode(key))));
     dataKeys.setKeys(encodedKeys);
 
     // use encodedValues for both data value and update value
@@ -405,12 +409,15 @@ public final class RemoteAccessOpSender {
       }
 
       dataOpMetadata.getUpdateValues().forEach(updateValue -> {
-        final Output output = new Output(Integer.BYTES +
-            Float.BYTES * ((edu.snu.cay.common.math.linalg.Vector) updateValue).length());
-        denseVectorSerializer.write(DenseVectorSerializer.KRYO, output,
-            (edu.snu.cay.common.math.linalg.Vector) updateValue);
-        output.close();
-        encodedValues.add(ByteBuffer.wrap(output.toBytes()));
+        if (cachedByteBuffer == null) {
+          final Output output = new Output(Integer.BYTES +
+              Float.BYTES * ((edu.snu.cay.common.math.linalg.Vector) updateValue).length());
+          denseVectorSerializer.write(DenseVectorSerializer.KRYO, output,
+              (edu.snu.cay.common.math.linalg.Vector) updateValue);
+          output.close();
+          this.cachedByteBuffer = ByteBuffer.wrap(output.toBytes());
+        }
+        encodedValues.add(cachedByteBuffer);
       });
 
 //      dataOpMetadata.getUpdateValues().forEach(updateValue ->
@@ -424,6 +431,7 @@ public final class RemoteAccessOpSender {
     return Pair.of(dataKeys, dataValues);
   }
 
+  private volatile ByteBuffer cachedByteBuffer = null;
 
   /**
    * Send operation to remote evaluators. Note that this method is for single-key.
@@ -506,10 +514,10 @@ public final class RemoteAccessOpSender {
       return;
     }
 
-    final KVUSerializer kvuSerializer = ongoingOps.tableComponents.getSerializer();
+    final KVUSerializer<K, V, ?> kvuSerializer = ongoingOps.tableComponents.getSerializer();
 
-    final Codec<K> keyCodec = (Codec<K>) kvuSerializer.getKeyCodec();
-    final Codec<V> valueCodec = (Codec<V>) kvuSerializer.getValueCodec();
+    final StreamingCodec<K> keyCodec = kvuSerializer.getKeyCodec();
+    final StreamingCodec<V> valueCodec = kvuSerializer.getValueCodec();
 
     final long startTime = System.currentTimeMillis();
 
@@ -532,9 +540,14 @@ public final class RemoteAccessOpSender {
         final K key = keyCodec.decode(encodedKeys.get(index).array());
         final V value;
         if (opType.equals(OpType.GET_OR_INIT)) {
-          value = (V) denseVectorSerializer.read(DenseVectorSerializer.KRYO,
-              new Input(encodedValues.get(index).array()),
-              edu.snu.cay.common.math.linalg.Vector.class);
+          if (cachedValue == null) {
+            value = (V) denseVectorSerializer.read(DenseVectorSerializer.KRYO,
+                new Input(encodedValues.get(index).array()),
+                edu.snu.cay.common.math.linalg.Vector.class);
+            cachedValue = value;
+          } else {
+            value = (V) cachedValue;
+          }
         } else {
           value = valueCodec.decode(encodedValues.get(index).array());
         }
@@ -549,10 +562,12 @@ public final class RemoteAccessOpSender {
     LOG.log(Level.FINEST, "Remote operation is finished. OpId: {0}", opId);
   }
 
+  private volatile Object cachedValue = null;
+
   /**
    * Handle failed messages, by resending after re-resolving target executor.
    */
-  public <K, V, U> void onFailedMsg(final String tableId, final DataKey dataKey,
+  public <K, V, U> void onFailedMsg(final String tableId, final DataKey dataKey, final int blockId,
                                     final boolean replyRequired, final long opId, final ETMsg etMsg) {
 
     final TableComponents<K, V, U> tableComponents;
@@ -561,9 +576,6 @@ public final class RemoteAccessOpSender {
           tablesFuture.get().getTableComponents(tableId);
 
       final OwnershipCache ownershipCache = tableComponents.getOwnershipCache();
-
-      final K key = tableComponents.getSerializer().getKeyCodec().decode(dataKey.getKey().array());
-      final int blockId = tableComponents.getBlockPartitioner().getBlockId(key);
 
       String executorIdToSendMsg;
 

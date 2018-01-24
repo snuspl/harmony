@@ -137,6 +137,8 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         trainer.setMiniBatchData(miniBatchData);
 
+//        Thread.sleep(5000);
+
 //        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
         opSenderFuture.get().getSerializationTime();
         opSenderFuture.get().getDeserializationTime();
@@ -159,6 +161,8 @@ public final class WorkerTasklet<K, V> implements Tasklet {
             new Object[]{senderPullDeserializationTime, handlerPullDeserializationTime,
                 senderPullDeserializationTime + handlerPullDeserializationTime});
 
+//        Thread.sleep(5000);
+
         taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         final long compStartTime = System.currentTimeMillis();
         trainer.localCompute();
@@ -166,12 +170,32 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         epochCompTime += compTime;
         taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
 
+//        Thread.sleep(5000);
+
+        opSenderFuture.get().getSerializationTime();
+        opSenderFuture.get().getDeserializationTime();
+        opHandlerFuture.get().getSerializationTime();
+        opHandlerFuture.get().getDeserializationTime();
+        opHandlerFuture.get().getUpdateTime();
 //        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
         final long pushStartTime = System.currentTimeMillis();
         trainer.pushUpdate();
         final double pushTime = (System.currentTimeMillis() - pushStartTime) / 1000D;
         epochPushTime += pushTime;
+
+        final long handlerPushSerializationTime = opHandlerFuture.get().getSerializationTime();
+        final long handlerPushDeserializationTime = opHandlerFuture.get().getDeserializationTime();
+        final long senderPushSerializationTime = opSenderFuture.get().getSerializationTime();
+        final long senderPushDeserializationTime = opSenderFuture.get().getDeserializationTime();
+        final long updateTime = opHandlerFuture.get().getUpdateTime();
 //        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
+        LOG.log(Level.INFO, "Push serialization time. sender: {0}, handler: {1}, total: {2}",
+            new Object[]{senderPushSerializationTime, handlerPushSerializationTime,
+                senderPushSerializationTime + handlerPushSerializationTime});
+        LOG.log(Level.INFO, "Push Deserialization time. sender: {0}, handler: {1}, total: {2}",
+            new Object[]{senderPushDeserializationTime, handlerPushDeserializationTime,
+                senderPushDeserializationTime + handlerPushDeserializationTime});
+        LOG.log(Level.INFO, "Update time: {0}", updateTime);
 
         progressReporter.reportBatchFinish(miniBatchIdx);
 

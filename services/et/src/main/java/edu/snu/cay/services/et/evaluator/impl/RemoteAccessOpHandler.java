@@ -24,7 +24,6 @@ import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.HandlerQueueSize;
 import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsHandlerThreads;
 import edu.snu.cay.services.et.evaluator.api.Block;
-import edu.snu.cay.services.et.evaluator.api.BlockPartitioner;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.exceptions.BlockNotExistsException;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
@@ -45,7 +44,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -138,7 +136,7 @@ public final class RemoteAccessOpHandler {
      * @param queueSize a size of a thread queue
      */
     HandlerThread(final int queueSize) {
-      this.opQueue = new ArrayBlockingQueue<>(queueSize);
+      this.opQueue = new LinkedBlockingQueue<>(); //new ArrayBlockingQueue<>(queueSize);
       this.drainSize = queueSize >= DRAIN_PORTION ? queueSize / DRAIN_PORTION : 1;
       this.localOps = new ArrayList<>(drainSize);
     }
@@ -155,7 +153,6 @@ public final class RemoteAccessOpHandler {
             if (operation == null) {
               continue;
             }
-
             processOp(operation);
           } catch (final InterruptedException e) {
             LOG.log(Level.SEVERE, "Poll failed with InterruptedException", e);
@@ -185,46 +182,46 @@ public final class RemoteAccessOpHandler {
       final TableComponents<K, V, U> tableComponents = tableOpTrackers.get(tableId).tableComponents;
       final OwnershipCache ownershipCache = tableComponents.getOwnershipCache();
 
-      final Pair<Optional<String>, Lock> remoteEvalIdWithLock = ownershipCache.resolveExecutorWithLock(blockId);
+//      final Pair<Optional<String>, Lock> remoteEvalIdWithLock = ownershipCache.resolveExecutorWithLock(blockId);
+//      try {
+//        final Optional<String> remoteEvalIdOptional = remoteEvalIdWithLock.getKey();
+//        final boolean isLocal = !remoteEvalIdOptional.isPresent();
+//        if (isLocal) {
       try {
-        final Optional<String> remoteEvalIdOptional = remoteEvalIdWithLock.getKey();
-        final boolean isLocal = !remoteEvalIdOptional.isPresent();
-        if (isLocal) {
-          try {
-            final BlockStore<K, V, U> blockStore = tableComponents.getBlockStore();
-            final Block<K, V, U> block = blockStore.get(blockId);
+        final BlockStore<K, V, U> blockStore = tableComponents.getBlockStore();
+        final Block<K, V, U> block = blockStore.get(blockId);
 
-            if (opMetaData.isSingleKey()) {
-              final boolean[] isSuccess = {true};
-              final V singleKeyOutput =
-                  (V) processSingleKeyOp(block, (SingleKeyDataOpMetadata) opMetaData, isSuccess);
+        if (opMetaData.isSingleKey()) {
+          final boolean[] isSuccess = {true};
+          final V singleKeyOutput =
+              (V) processSingleKeyOp(block, (SingleKeyDataOpMetadata) opMetaData, isSuccess);
 
-              if (opMetaData.isReplyRequired()) {
-                sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
-                    singleKeyOutput, Collections.emptyList(), isSuccess[0]);
-              }
-            } else {
-              final boolean[] isSuccess = {true};
-              final List<Pair<K, V>> multiKeyOutputs =
-                  (List<Pair<K, V>>) processMultiKeyOp(block, (MultiKeyDataOpMetadata) opMetaData, isSuccess);
-
-              if (opMetaData.isReplyRequired()) {
-                sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
-                    null, multiKeyOutputs, isSuccess[0]);
-              }
-            }
-          } catch (final BlockNotExistsException e) {
-            throw new RuntimeException(e);
+          if (opMetaData.isReplyRequired()) {
+            sendResultToOrigin(opMetaData, tableComponents.getSerializer(), tableComponents.getEncodedKeyCache(),
+                singleKeyOutput, Collections.emptyList(), isSuccess[0]);
           }
-
         } else {
-          // a case that operation comes to this executor based on wrong or stale ownership info
-          redirect(opMetaData, tableComponents, remoteEvalIdOptional.get());
+          final boolean[] isSuccess = {true};
+          final List<Pair<K, V>> multiKeyOutputs =
+              (List<Pair<K, V>>) processMultiKeyOp(block, (MultiKeyDataOpMetadata) opMetaData, isSuccess);
+
+          if (opMetaData.isReplyRequired()) {
+            sendResultToOrigin(opMetaData, tableComponents.getSerializer(), tableComponents.getEncodedKeyCache(),
+                null, multiKeyOutputs, isSuccess[0]);
+          }
         }
-      } finally {
-        final Lock ownershipLock = remoteEvalIdWithLock.getValue();
-        ownershipLock.unlock();
+      } catch (final BlockNotExistsException e) {
+        throw new RuntimeException(e);
       }
+//
+//        } else {
+//          // a case that operation comes to this executor based on wrong or stale ownership info
+//          redirect(opMetaData, tableComponents, remoteEvalIdOptional.get());
+//        }
+//      } finally {
+//        final Lock ownershipLock = remoteEvalIdWithLock.getValue();
+//        ownershipLock.unlock();
+//      }
 
       deregisterOp(tableId);
     }
@@ -303,11 +300,13 @@ public final class RemoteAccessOpHandler {
         isSuccess[0] = true;
         break;
       case UPDATE:
+        final long updateStartTime = System.currentTimeMillis();
         for (int index = 0; index < opMetadata.getKeys().size(); index++) {
           final K key = opMetadata.getKeys().get(index);
           final V localOutput = block.update(key, opMetadata.getUpdateValues().get(index));
-          outputs.add(Pair.of(key, localOutput));
+//          outputs.add(Pair.of(key, localOutput));
         }
+        updateTime.addAndGet(System.currentTimeMillis() - updateStartTime);
         isSuccess[0] = true;
         break;
         //TODO #176: support multi-key versions of other op types (e.g. put_if_absent, remove)
@@ -356,6 +355,7 @@ public final class RemoteAccessOpHandler {
     final OpType opType = msg.getOpType();
     final boolean replyRequired = msg.getReplyRequired();
     final String tableId = msg.getTableId();
+    final int blockId = msg.getBlockId();
 
     final TableComponents<K, V, U> tableComponents;
     try {
@@ -377,7 +377,6 @@ public final class RemoteAccessOpHandler {
     final StreamingCodec<K> keyCodec = kvuSerializer.getKeyCodec();
     final StreamingCodec<V> valueCodec = kvuSerializer.getValueCodec();
     final Codec<U> updateValueCodec = kvuSerializer.getUpdateValueCodec();
-    final BlockPartitioner<K> blockPartitioner = tableComponents.getBlockPartitioner();
 
     if (msg.getIsSingleKey()) {
       final DataKey dataKey = msg.getDataKey();
@@ -394,7 +393,6 @@ public final class RemoteAccessOpHandler {
           updateValueCodec.decode(dataValue.getValue().array()) : null;
       deserializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
-      final int blockId = blockPartitioner.getBlockId(decodedKey);
       final SingleKeyDataOpMetadata<K, V, U> operation = new SingleKeyDataOpMetadata<>(origEvalId,
           opId, opType, replyRequired, tableId, blockId, decodedKey, decodedValue, decodedUpdateValue);
 
@@ -426,8 +424,13 @@ public final class RemoteAccessOpHandler {
       case UPDATE:
         valueList = Collections.emptyList();
         updateValueList = new ArrayList<>();
-        dataValues.getValues().forEach(value -> updateValueList.add(
-            (U) denseVectorSerializer.read(DenseVectorSerializer.KRYO, new Input(value.array()), Vector.class)));
+        dataValues.getValues().forEach(value -> {
+          if (cachedValue == null) {
+            cachedValue = denseVectorSerializer.read(DenseVectorSerializer.KRYO,
+                new Input(value.array()), Vector.class);
+          }
+          updateValueList.add((U) cachedValue);
+        });
 //        dataValues.getValues().forEach(value -> updateValueList.add(updateValueCodec.decode(value.array())));
         break;
         //TODO #176: support multi-key versions of other op types (e.g. put_if_absent, remove)
@@ -437,7 +440,6 @@ public final class RemoteAccessOpHandler {
       deserializationTime.addAndGet(System.currentTimeMillis() - startTime);
 
       // All keys match to same block id
-      final int blockId = blockPartitioner.getBlockId(keyList.get(0));
       final MultiKeyDataOpMetadata<K, V, ?> operation = new MultiKeyDataOpMetadata<>(origEvalId,
           opId, opType, replyRequired, tableId, blockId, keyList, valueList, updateValueList);
 
@@ -445,6 +447,8 @@ public final class RemoteAccessOpHandler {
       handlerThreads.get(threadIdx).enqueue(operation);
     }
   }
+
+  private volatile Object cachedValue = null;
 
   /**
    * Redirects operation to the master, when it has no metadata of a requested table.
@@ -458,11 +462,11 @@ public final class RemoteAccessOpHandler {
       LOG.log(Level.WARNING, "The table access request (Table: {0}, opId: {1}) has failed." +
           " Will redirect the message to the Driver for fallback.", new Object[] {tableId, opId});
       if (msg.getIsSingleKey()) {
-        msgSenderFuture.get().sendTableAccessReqMsg(origEvalId, driverId, opId, tableId, opType, replyRequired,
-            msg.getDataKey(), msg.getDataValue());
+        msgSenderFuture.get().sendTableAccessReqMsg(origEvalId, driverId, opId, tableId, msg.getBlockId(),
+            opType, replyRequired, msg.getDataKey(), msg.getDataValue());
       } else {
-        msgSenderFuture.get().sendTableAccessReqMsg(origEvalId, driverId, opId, tableId, opType, replyRequired,
-            msg.getDataKeys(), msg.getDataValues());
+        msgSenderFuture.get().sendTableAccessReqMsg(origEvalId, driverId, opId, tableId, msg.getBlockId(),
+            opType, replyRequired, msg.getDataKeys(), msg.getDataValues());
       }
     } catch (NetworkException e) {
       throw new RuntimeException(e);
@@ -485,11 +489,18 @@ public final class RemoteAccessOpHandler {
     return deserializationTime.getAndSet(0);
   }
 
+  private final AtomicLong updateTime = new AtomicLong(0);
+
+  public long getUpdateTime() {
+    return updateTime.getAndSet(0);
+  }
+
   /**
    * Sends the result to the original executor.
    */
   private <K, V> void sendResultToOrigin(final DataOpMetadata opMetadata,
                                          final KVUSerializer<K, V, ?> kvuSerializer,
+                                         final EncodedKeyCache<K> encodedKeyCache,
                                          @Nullable final V localOutput,
                                          final List<Pair<K, V>> localOutputs,
                                          final boolean isSuccess) {
@@ -528,12 +539,16 @@ public final class RemoteAccessOpHandler {
 
         final long startTime = System.currentTimeMillis();
         localOutputs.forEach(pair -> {
-          encodedKeyList.add(ByteBuffer.wrap(keyCodec.encode(pair.getKey())));
+          encodedKeyList.add(ByteBuffer.wrap(encodedKeyCache.getEncodedKey(pair.getKey()).getEncoded()));
+//          encodedKeyList.add(ByteBuffer.wrap(keyCodec.encode(pair.getKey())));
           if (opMetadata.getOpType().equals(OpType.GET_OR_INIT)) {
             final Output output = new Output(Integer.BYTES + Float.BYTES * ((Vector) pair.getValue()).length());
-            denseVectorSerializer.write(DenseVectorSerializer.KRYO, output, (Vector) pair.getValue());
-            output.close();
-            encodedValueList.add(ByteBuffer.wrap(output.toBytes()));
+            if (cachedBytebuffer == null) {
+              denseVectorSerializer.write(DenseVectorSerializer.KRYO, output, (Vector) pair.getValue());
+              output.close();
+              cachedBytebuffer = ByteBuffer.wrap(output.toBytes());
+            }
+            encodedValueList.add(cachedBytebuffer);
           } else {
             encodedValueList.add(ByteBuffer.wrap(valueCodec.encode(pair.getValue())));
           }
@@ -549,6 +564,8 @@ public final class RemoteAccessOpHandler {
       LOG.log(Level.INFO, "The origin {0} has been removed, so the message is just discarded", origEvalId);
     }
   }
+
+  private volatile ByteBuffer cachedBytebuffer = null;
 
   /**
    * Wait all ongoing operations for a given {@code tableId} to be finished.
@@ -635,50 +652,51 @@ public final class RemoteAccessOpHandler {
      * Register a operation for a table.
      * @return true if operation has been accepted
      */
-    synchronized boolean registerOp() {
-      final boolean accept;
-      switch ((State) stateMachine.getCurrentState()) {
-      case PROCESSING:
-        numOps.incrementAndGet();
-        accept = true;
-        break;
-      case FLUSHING:
-      case FLUSHED:
-        accept = false;
-        break;
-      default:
-        throw new RuntimeException("Unexpected state");
-      }
-      return accept;
+    boolean registerOp() {
+//      final boolean accept;
+//      switch ((State) stateMachine.getCurrentState()) {
+//      case PROCESSING:
+//        numOps.incrementAndGet();
+//        accept = true;
+//        break;
+//      case FLUSHING:
+//      case FLUSHED:
+//        accept = false;
+//        break;
+//      default:
+//        throw new RuntimeException("Unexpected state");
+//      }
+//      return accept;
+      return true;
     }
 
     /**
      * Deregister a operation for a table.
      */
-    synchronized void deregisterOp() {
-      switch ((State) stateMachine.getCurrentState()) {
-      case PROCESSING:
-        numOps.decrementAndGet();
-        break;
-      case FLUSHING:
-        final int remainingOps = numOps.decrementAndGet();
-        if (remainingOps == 0) {
-          LOG.log(Level.INFO, "No ops. Transit to FLUSHED state");
-          stateMachine.setState(State.FLUSHED);
-        }
-        break;
-      case FLUSHED:
-        throw new RuntimeException();
-      default:
-        throw new RuntimeException("Unexpected state");
-      }
+    void deregisterOp() {
+//      switch ((State) stateMachine.getCurrentState()) {
+//      case PROCESSING:
+//        numOps.decrementAndGet();
+//        break;
+//      case FLUSHING:
+//        final int remainingOps = numOps.decrementAndGet();
+//        if (remainingOps == 0) {
+//          LOG.log(Level.INFO, "No ops. Transit to FLUSHED state");
+//          stateMachine.setState(State.FLUSHED);
+//        }
+//        break;
+//      case FLUSHED:
+//        throw new RuntimeException();
+//      default:
+//        throw new RuntimeException("Unexpected state");
+//      }
     }
 
     /**
      * Flushing the ongoing operations in the table.
      * It returns after all operations are flushed out.
      */
-    synchronized void flush() {
+    void flush() {
       switch ((State) stateMachine.getCurrentState()) {
       case PROCESSING:
         // transit to FLUSHING state. do not accept more ops.

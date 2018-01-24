@@ -48,14 +48,14 @@ public interface MessageSender {
    * The operation should be given a unique {@code opId}.
    */
   void sendTableAccessReqMsg(String origId, String destId, long opId,
-                             String tableId, OpType opType, boolean replyRequired,
+                             String tableId, int blockId, OpType opType, boolean replyRequired,
                              DataKey dataKey, @Nullable DataValue dataValue) throws NetworkException;
 
   /**
    * Sends a TableAccessReqMsg of the multi-key version.
    */
   void sendTableAccessReqMsg(String origId, String destId, long opId,
-                             String tableId, OpType opType, boolean replyRequired,
+                             String tableId, int blockId, OpType opType, boolean replyRequired,
                              DataKeys dataKeys, @Nullable DataValues dataValues) throws NetworkException;
 
   /**

@@ -58,7 +58,7 @@ public final class MessageSenderImpl implements MessageSender {
 
   @Override
   public void sendTableAccessReqMsg(final String origId, final String destId,
-                                    final long opId, final String tableId,
+                                    final long opId, final String tableId, final int blockId,
                                     final OpType opType, final boolean replyRequired,
                                     final DataKey dataKey, @Nullable final DataValue dataValue)
       throws NetworkException {
@@ -70,6 +70,7 @@ public final class MessageSenderImpl implements MessageSender {
                 TableAccessReqMsg.newBuilder()
                     .setOrigId(origId)
                     .setTableId(tableId)
+                    .setBlockId(blockId)
                     .setOpType(opType)
                     .setReplyRequired(replyRequired)
                     .setDataKey(dataKey)
@@ -87,7 +88,7 @@ public final class MessageSenderImpl implements MessageSender {
 
   @Override
   public void sendTableAccessReqMsg(final String origId, final String destId,
-                                    final long opId, final String tableId,
+                                    final long opId, final String tableId, final int blockId,
                                     final OpType opType, final boolean replyRequired,
                                     final DataKeys dataKeys, @Nullable final DataValues dataValues)
       throws NetworkException {
@@ -99,6 +100,7 @@ public final class MessageSenderImpl implements MessageSender {
                 TableAccessReqMsg.newBuilder()
                     .setOrigId(origId)
                     .setTableId(tableId)
+                    .setBlockId(blockId)
                     .setOpType(opType)
                     .setReplyRequired(replyRequired)
                     .setIsSingleKey(false)

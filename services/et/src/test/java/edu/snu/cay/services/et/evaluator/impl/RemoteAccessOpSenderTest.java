@@ -121,7 +121,7 @@ public class RemoteAccessOpSenderTest {
 
       remoteAccessOpSender.onTableAccessResMsg(opId, tableAccessResMsg);
       return null;
-    }).when(mockMsgSender).sendTableAccessReqMsg(anyString(), anyString(), anyLong(), anyString(),
+    }).when(mockMsgSender).sendTableAccessReqMsg(anyString(), anyString(), anyLong(), anyString(), anyInt(),
         any(OpType.class), anyBoolean(), any(DataKey.class), anyObject());
 
     final String key = "key";

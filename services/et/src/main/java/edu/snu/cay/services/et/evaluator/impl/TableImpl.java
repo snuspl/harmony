@@ -59,6 +59,9 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
    */
   private final StreamingCodec<K> keyCodec;
 
+
+  private final EncodedKeyCache<K> encodedKeyCache;
+
   /**
    * Internal components for a table.
    */
@@ -83,6 +86,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   private TableImpl(@Parameter(TableIdentifier.class) final String tableId,
                     @Parameter(ExecutorIdentifier.class) final String executorId,
                     @Parameter(KeyCodec.class) final StreamingCodec<K> keyCodec,
+                    final EncodedKeyCache<K> encodedKeyCache,
                     final TableComponents tableComponents,
                     final Tablet<K, V, U> tablet,
                     final RemoteAccessOpSender remoteAccessOpSender,
@@ -90,6 +94,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
     this.tableId = tableId;
     this.executorId = executorId;
     this.keyCodec = keyCodec;
+    this.encodedKeyCache = encodedKeyCache;
     this.tableComponents = tableComponents;
     this.tablet = tablet;
     this.remoteAccessOpSender = remoteAccessOpSender;
@@ -111,7 +116,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       throw new NullPointerException(NULL_VALUE_ERR_MSG);
     }
 
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
     final Optional<String> remoteIdOptional;
@@ -162,7 +167,8 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       }
 
       final K key = kvPair.getLeft();
-      final int blockId = blockPartitioner.getBlockId(key);
+      final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
+      final int blockId = blockPartitioner.getBlockId(encodedKey);
       blockToPairListMap.computeIfAbsent(blockId, b -> new ArrayList<>()).add(kvPair);
     }
 
@@ -212,7 +218,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       throw new NullPointerException(NULL_VALUE_ERR_MSG);
     }
 
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
     final Optional<String> remoteIdOptional;
@@ -246,7 +252,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
 
   @Override
   public DataOpResult<V> get(final K key, final boolean copy) {
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
     final Optional<String> remoteIdOptional;
@@ -284,7 +290,8 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   public Future<Map<K, V>> multiGet(final List<K> keys, final boolean copy) {
     final Map<Integer, List<K>> blockToKeyListMap = new HashMap<>();
     for (final K key : keys) {
-      final int blockId = blockPartitioner.getBlockId(key);
+      final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
+      final int blockId = blockPartitioner.getBlockId(encodedKey);
       blockToKeyListMap.computeIfAbsent(blockId, b -> new ArrayList<>()).add(key);
     }
 
@@ -327,7 +334,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
 
   @Override
   public Future<V> getOrInit(final K key, final boolean copy) {
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
     final Optional<String> remoteIdOptional;
@@ -366,7 +373,8 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   public Future<Map<K, V>> multiGetOrInit(final List<K> keys, final boolean copy) {
     final Map<Integer, List<K>> blockToKeyListMap = new HashMap<>();
     for (final K key : keys) {
-      final int blockId = blockPartitioner.getBlockId(key);
+      final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
+      final int blockId = blockPartitioner.getBlockId(encodedKey);
       blockToKeyListMap.computeIfAbsent(blockId, b -> new ArrayList<>()).add(key);
     }
 
@@ -422,7 +430,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       throw new NullPointerException(NULL_VALUE_ERR_MSG);
     }
 
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
 
@@ -467,7 +475,8 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
       }
 
       final K key = kuEntry.getKey();
-      final int blockId = blockPartitioner.getBlockId(key);
+      final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
+      final int blockId = blockPartitioner.getBlockId(encodedKey);
       blockToSubMaps.putIfAbsent(blockId, new HashMap<>());
       blockToSubMaps.get(blockId).put(key, kuEntry.getValue());
     }
@@ -511,7 +520,7 @@ public final class TableImpl<K, V, U> implements Table<K, V, U> {
   }
 
   private DataOpResult<V> removeInternal(final K key, final boolean replyRequired) {
-    final EncodedKey<K> encodedKey = new EncodedKey<>(key, keyCodec);
+    final EncodedKey<K> encodedKey = encodedKeyCache.getEncodedKey(key);
 
     final int blockId = blockPartitioner.getBlockId(encodedKey);
     final Optional<String> remoteIdOptional;

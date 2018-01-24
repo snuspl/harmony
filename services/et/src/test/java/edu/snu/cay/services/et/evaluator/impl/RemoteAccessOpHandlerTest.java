@@ -242,7 +242,7 @@ public final class RemoteAccessOpHandlerTest {
       assertEquals("The request should be redirected to the driver", DRIVER_ID, destId);
       assertEquals("The op ID should be kept same", origOpId, opId);
       return null;
-    }).when(mockMsgSender).sendTableAccessReqMsg(anyString(), anyString(), anyLong(), anyString(),
+    }).when(mockMsgSender).sendTableAccessReqMsg(anyString(), anyString(), anyLong(), anyString(), anyInt(),
         any(OpType.class), anyBoolean(), any(DataKey.class), anyObject());
 
     final TableComponents<String, Integer, Integer> tableComponents = tables.getTableComponents(TABLE_ID);

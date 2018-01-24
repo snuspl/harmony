@@ -81,6 +81,7 @@
     {"name": "opType", "type": {"type": "enum",
         "name": "OpType", "symbols": ["PUT", "PUT_IF_ABSENT", "GET", "GET_OR_INIT", "REMOVE", "UPDATE"]}},
     {"name": "tableId", "type": "string"},
+    {"name": "blockId", "type": "int"},
     {"name": "dataKey", "type": ["null", "DataKey"], "default": null},
     {"name": "dataValue", "type": ["null", "DataValue"], "default": null},
     {"name": "dataKeys", "type": ["null", "DataKeys"], "default": null},
