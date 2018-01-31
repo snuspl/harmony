@@ -119,7 +119,12 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         modelAccessor.getAndResetMetrics();
         final long miniBatchStartTime = System.currentTimeMillis();
-        trainer.runMiniBatch(miniBatchData);
+
+        trainer.setMiniBatchData(miniBatchData);
+        trainer.pullModel();
+        trainer.localCompute();
+        trainer.pushUpdate();
+
         final double miniBatchElapsedTime = (System.currentTimeMillis() - miniBatchStartTime) / 1000.0D;
 
         progressReporter.reportBatchFinish(miniBatchIdx);

@@ -91,19 +91,34 @@ final class AddIntegerTrainer implements Trainer {
   public void initGlobalSettings() {
   }
 
+  private volatile Collection miniBatchTrainingData;
+
   @Override
-  public void runMiniBatch(final Collection miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
+    for (int key = 0; key < numberOfKeys; key++) {
+      final Integer value = modelAccessor.pull(key);
+      LOG.log(Level.INFO, "Current value associated with key {0} is {1}", new Object[]{key, value});
+    }
+  }
+
+  @Override
+  public void localCompute() {
     try {
       Thread.sleep(computeTime * miniBatchTrainingData.size());
     } catch (final InterruptedException e) {
       LOG.log(Level.WARNING, "Interrupted while sleeping to simulate computation", e);
     }
+  }
 
+  @Override
+  public void pushUpdate() {
     for (int key = 0; key < numberOfKeys; key++) {
       modelAccessor.push(key, delta);
-
-      final Integer value = modelAccessor.pull(key);
-      LOG.log(Level.INFO, "Current value associated with key {0} is {1}", new Object[]{key, value});
     }
   }
 

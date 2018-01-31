@@ -54,12 +54,12 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    * Number of possible classes for a data instance.
    */
   private final int numClasses;
-  
+
   /**
    * Number of features for a data instance.
    */
   private final int numFeatures;
-  
+
   /**
    * Number of features of each model partition.
    */
@@ -165,7 +165,9 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
         classPartitionIndices.add(classIndex * numPartitionsPerClass + partitionIndex);
       }
     }
-  
+
+    this.keyToGradientMap = new HashMap<>(numClasses * numPartitionsPerClass);
+
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
     LOG.log(Level.INFO, "Step size = {0}", stepSize);
     LOG.log(Level.INFO, "Number of total mini-batches in an epoch = {0}", numTotalMiniBatches);
@@ -176,11 +178,22 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   public void initGlobalSettings() {
   }
 
-  @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData) {
-    // pull data when mini-batch is started
-    pullModels();
+  private volatile Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData;
 
+  private volatile Vector[] aggregatedMiniBatchGradients;
+
+  @Override
+  public void setMiniBatchData(final Collection<Map.Entry<Long, MLRData>> newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
+    this.partitions = pullModels();
+  }
+
+  @Override
+  public void localCompute() {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
@@ -191,10 +204,33 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
       // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
+      final int drainSize = instances.size() / numTrainerThreads;
+      //Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
+
+      final CountDownLatch modelSetupLatch = new CountDownLatch(numTrainerThreads);
+      final int numClassesPerThread = numClasses / numTrainerThreads;
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+        final int finalThreadIdx = threadIdx;
         final Future<Vector[]> future = executor.submit(() -> {
+
+          final Vector[] params = model.getParams();
+
+          final int startIdx = numClassesPerThread * finalThreadIdx;
+          final int endIdx = finalThreadIdx == numTrainerThreads - 1 ? numClasses : startIdx + numClassesPerThread;
+          for (int classIndex = startIdx; classIndex < endIdx; ++classIndex) {
+            // 0 ~ (numPartitionsPerClass - 1) is for class 0
+            // numPartitionsPerClass ~ (2 * numPartitionsPerClass - 1) is for class 1
+            // and so on
+            final List<Vector> partialModelsForThisClass =
+                partitions.subList(classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
+
+            // concat partitions into one long vector
+            params[classIndex] = vectorFactory.concatDense(partialModelsForThisClass);
+          }
+
+          modelSetupLatch.countDown();
+
           final List<Map.Entry<Long, MLRData>> drainedInstances = new ArrayList<>(drainSize);
           final Vector[] threadGradient = new Vector[numClasses];
           for (int classIdx = 0; classIdx < numClasses; classIdx++) {
@@ -202,13 +238,15 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
           }
           LOG.log(Level.INFO, "Gradient vectors are initialized. Used memory: {0} MB", MemoryUtils.getUsedMemoryMB());
 
+          modelSetupLatch.await();
+
           int count = 0;
           while (true) {
             final int numDrained = instances.drainTo(drainedInstances, drainSize);
             if (numDrained == 0) {
               break;
             }
-            
+
             drainedInstances.forEach(instance -> updateGradient(instance.getValue(), threadGradient));
             drainedInstances.clear();
             count += numDrained;
@@ -227,10 +265,25 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     }
 
     final List<Vector[]> threadGradients = ThreadUtils.retrieveResults(futures);
-    final Vector[] gradients = aggregateGradient(threadGradients);
+    aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
 
-    // push gradients
-    pushAndResetGradients(gradients);
+    for (int classIndex = 0; classIndex < numClasses; classIndex++) {
+      final Vector gradient = aggregatedMiniBatchGradients[classIndex];
+
+      for (int partitionIndex = 0; partitionIndex < numPartitionsPerClass; ++partitionIndex) {
+        final int partitionStart = partitionIndex * numFeaturesPerPartition;
+        final int partitionEnd = (partitionIndex + 1) * numFeaturesPerPartition;
+        if (keyToGradientMap.put(classIndex * numPartitionsPerClass + partitionIndex,
+            gradient.slice(partitionStart, partitionEnd)) != null) {
+          throw new RuntimeException();
+        }
+      }
+    }
+  }
+
+  @Override
+  public void pushUpdate() {
+    pushAndResetGradients();
   }
 
   @Override
@@ -263,12 +316,12 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     map.put("testAvgAccuracy", (double) testLossRegLossAvgAccuracy.getThird());
     return map;
   }
-  
+
   /**
    * Pull models one last time and perform validation.
    */
   private MLRModel pullModelsToEvaluate(final List<Integer> keys, final Table<Integer, Vector, Vector> modelTable) {
-    final List<Vector> partitions = modelAccessor.pull(keys, modelTable);
+    partitions = modelAccessor.pull(keys, modelTable);
 
     final MLRModel mlrModel = new MLRModel(new Vector[numClasses]);
     final Vector[] params = mlrModel.getParams();
@@ -295,21 +348,23 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   /**
    * Pull up-to-date model parameters from server, which become accessible via {@link ModelHolder#getModel()}.
    */
-  private void pullModels() {
-    final List<Vector> partitions = modelAccessor.pull(classPartitionIndices);
-    final Vector[] params = model.getParams();
+  private List<Vector> pullModels() {
+    return modelAccessor.pull(classPartitionIndices);
 
-    for (int classIndex = 0; classIndex < numClasses; ++classIndex) {
-      // 0 ~ (numPartitionsPerClass - 1) is for class 0
-      // numPartitionsPerClass ~ (2 * numPartitionsPerClass - 1) is for class 1
-      // and so on
-      final List<Vector> partialModelsForThisClass =
-          partitions.subList(classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
-
-      // concat partitions into one long vector
-      params[classIndex] = vectorFactory.concatDense(partialModelsForThisClass);
-    }
+    //    final Vector[] params = model.getParams();
+//    for (int classIndex = 0; classIndex < numClasses; ++classIndex) {
+//      // 0 ~ (numPartitionsPerClass - 1) is for class 0
+//      // numPartitionsPerClass ~ (2 * numPartitionsPerClass - 1) is for class 1
+//      // and so on
+//      final List<Vector> partialModelsForThisClass =
+//          partitions.subList(classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
+//
+//      // concat partitions into one long vector
+//      params[classIndex] = vectorFactory.concatDense(partialModelsForThisClass);
+//    }
   }
+
+  private  volatile List<Vector> partitions;
 
   /**
    * Processes one training data instance and update the intermediate model.
@@ -349,7 +404,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    */
   private Vector[] aggregateGradient(final List<Vector[]> threadGradients) {
     final Vector[] gradients = new Vector[numClasses];
-    
+
     for (int classIdx = 0; classIdx < numClasses; classIdx++) {
       gradients[classIdx] = vectorFactory.createDenseZeros(numFeatures);
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
@@ -359,25 +414,15 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     return gradients;
   }
 
+  private final Map<Integer, Vector> keyToGradientMap;
+
   /**
    * Push the gradients to parameter server.
    * @param gradients an array of vectors each of which is gradient in a class.
    */
-  private void pushAndResetGradients(final Vector[] gradients) {
-    for (int classIndex = 0; classIndex < numClasses; classIndex++) {
-      final Vector gradient = gradients[classIndex];
-
-      final Map<Integer, Vector> keyToGradientMap = new HashMap<>(numPartitionsPerClass);
-
-      for (int partitionIndex = 0; partitionIndex < numPartitionsPerClass; ++partitionIndex) {
-        final int partitionStart = partitionIndex * numFeaturesPerPartition;
-        final int partitionEnd = (partitionIndex + 1) * numFeaturesPerPartition;
-        keyToGradientMap.put(classIndex * numPartitionsPerClass + partitionIndex,
-            gradient.slice(partitionStart, partitionEnd));
-      }
-
-      modelAccessor.push(keyToGradientMap);
-    }
+  private void pushAndResetGradients() {
+    modelAccessor.push(keyToGradientMap);
+    keyToGradientMap.clear();
   }
 
   /**
