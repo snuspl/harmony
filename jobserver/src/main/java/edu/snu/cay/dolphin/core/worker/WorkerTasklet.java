@@ -22,6 +22,8 @@ import edu.snu.cay.dolphin.metric.avro.EpochMetrics;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitScheduler;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
@@ -53,6 +55,10 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
+  private final TaskUnitScheduler taskUnitScheduler;
+  private final TaskUnitInfo commTaskUnitInfo;
+  private final TaskUnitInfo compTaskUnitInfo;
+
   /**
    * A boolean flag that becomes true when {@link #close()} is called,
    * which consequently stops the task from training and terminates it.
@@ -62,6 +68,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
+                        final TaskUnitScheduler taskUnitScheduler,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
                         final MiniBatchBarrier miniBatchBarrier,
@@ -72,6 +79,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
                         final MetricCollector metricCollector) {
     this.taskletId = taskletId;
     this.startingEpoch = startingEpoch;
+    this.taskUnitScheduler = taskUnitScheduler;
     this.progressReporter = progressReporter;
     this.workerGlobalBarrier = workerGlobalBarrier;
     this.miniBatchBarrier = miniBatchBarrier;
@@ -80,6 +88,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.testDataProvider = testDataProvider;
     this.trainer = trainer;
     this.metricCollector = metricCollector;
+
+    this.commTaskUnitInfo = new TaskUnitInfo(taskletId, "COMM", TaskUnitInfo.ResourceType.NET);
+    this.compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
   }
 
   @Override
@@ -113,6 +124,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         LOG.log(Level.INFO, "Starting batch {0} in epoch {1}", new Object[] {miniBatchIdx, epochIdx});
         if (miniBatchBarrier.await()) {
+          taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
           cleanup();
           return;
         }
@@ -120,9 +132,19 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         modelAccessor.getAndResetMetrics();
         final long miniBatchStartTime = System.currentTimeMillis();
 
+        if (epochIdx == 0 && miniBatchIdx == 0) {
+          taskUnitScheduler.waitSchedule(commTaskUnitInfo);
+        }
+
         trainer.setMiniBatchData(miniBatchData);
         trainer.pullModel();
+        taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
+
+        taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         trainer.localCompute();
+        taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
+
+        taskUnitScheduler.waitSchedule(commTaskUnitInfo);
         trainer.pushUpdate();
 
         final double miniBatchElapsedTime = (System.currentTimeMillis() - miniBatchStartTime) / 1000.0D;
@@ -137,6 +159,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         if (abortFlag.get()) {
           LOG.log(Level.INFO, "The tasklet {0} is getting closed.", taskletId);
+          taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
           return;
         }
       }
