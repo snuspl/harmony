@@ -200,9 +200,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     // collects the gradients computed by multiple threads
     final List<Future<Vector[]>> futures = new ArrayList<>(numTrainerThreads);
     try {
-      // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
-      // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
+      // Threads drain multiple instances from shared queue, as many as nInstances / nThreads.
+      final int drainSize = instances.size() / numTrainerThreads;
 
       final CountDownLatch modelSetupLatch = new CountDownLatch(numTrainerThreads);
       final int numClassesPerThread = numClasses / numTrainerThreads;
