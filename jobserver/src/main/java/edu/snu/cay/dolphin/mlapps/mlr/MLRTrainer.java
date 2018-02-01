@@ -180,8 +180,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   private volatile Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData;
 
-  private volatile Vector[] aggregatedMiniBatchGradients;
-
   @Override
   public void setMiniBatchData(final Collection<Map.Entry<Long, MLRData>> newMiniBatchTrainingData) {
     this.miniBatchTrainingData = newMiniBatchTrainingData;
@@ -265,7 +263,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     }
 
     final List<Vector[]> threadGradients = ThreadUtils.retrieveResults(futures);
-    aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
+    final Vector[] aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
 
     for (int classIndex = 0; classIndex < numClasses; classIndex++) {
       final Vector gradient = aggregatedMiniBatchGradients[classIndex];
@@ -350,18 +348,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    */
   private List<Vector> pullModels() {
     return modelAccessor.pull(classPartitionIndices);
-
-    //    final Vector[] params = model.getParams();
-//    for (int classIndex = 0; classIndex < numClasses; ++classIndex) {
-//      // 0 ~ (numPartitionsPerClass - 1) is for class 0
-//      // numPartitionsPerClass ~ (2 * numPartitionsPerClass - 1) is for class 1
-//      // and so on
-//      final List<Vector> partialModelsForThisClass =
-//          partitions.subList(classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
-//
-//      // concat partitions into one long vector
-//      params[classIndex] = vectorFactory.concatDense(partialModelsForThisClass);
-//    }
   }
 
   private  volatile List<Vector> partitions;
@@ -418,7 +404,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   /**
    * Push the gradients to parameter server.
-   * @param gradients an array of vectors each of which is gradient in a class.
    */
   private void pushAndResetGradients() {
     modelAccessor.push(keyToGradientMap);
