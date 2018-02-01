@@ -202,8 +202,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
       // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = instances.size() / numTrainerThreads;
-      //Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
+      final int drainSize = Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
 
       final CountDownLatch modelSetupLatch = new CountDownLatch(numTrainerThreads);
       final int numClassesPerThread = numClasses / numTrainerThreads;
