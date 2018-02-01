@@ -160,9 +160,8 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
     // collect gradients computed in each thread
     final List<Future<Map<Integer, Vector>>> futures = new ArrayList<>(numTrainerThreads);
     try {
-      // Threads drain multiple instances from shared queue, as many as nInstances / (nThreads)^2.
-      // This way we can mitigate the slowdown from straggler threads.
-      final int drainSize = Math.max(instances.size() / numTrainerThreads / numTrainerThreads, 1);
+      // Threads drain multiple instances from shared queue, as many as nInstances / nThreads.
+      final int drainSize = instances.size() / numTrainerThreads;
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final Future<Map<Integer, Vector>> future = executor.submit(() -> {
