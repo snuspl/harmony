@@ -93,21 +93,33 @@ final class AddVectorTrainer implements Trainer {
 
   @Override
   public void initGlobalSettings() {
+
   }
 
   @Override
-  public void runMiniBatch(final Collection miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection miniBatchTrainingData) {
+    // do not use data
+  }
+
+  @Override
+  public void pullModel() {
     // 1. pull model to compute with
     final List<Vector> valueList = modelAccessor.pull(keyList);
     LOG.log(Level.FINE, "Current values associated with keys {0} is {1}", new Object[]{keyList, valueList});
+  }
 
+  @Override
+  public void localCompute() {
     // 2. sleep to simulate computation
     try {
       Thread.sleep(computeTime);
     } catch (final InterruptedException e) {
       LOG.log(Level.WARNING, "Interrupted while sleeping to simulate computation", e);
     }
+  }
 
+  @Override
+  public void pushUpdate() {
     // 3. push computed model
     for (final int key : keyList) {
       modelAccessor.push(key, delta);

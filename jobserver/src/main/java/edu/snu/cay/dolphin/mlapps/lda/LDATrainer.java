@@ -120,18 +120,32 @@ final class LDATrainer implements Trainer<Long, Document> {
     pushAndResetGradients(topicChanges);
   }
 
+  private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
+
+  private volatile TopicChanges aggregatedMiniBatchResult;
+
   @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, Document>> miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection<Map.Entry<Long, Document>> newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
     final List<Integer> words = getKeys(miniBatchTrainingData);
 
     pullModels(words);
+  }
 
+  @Override
+  public void localCompute() {
     final List<TopicChanges> results = sampler.sample(miniBatchTrainingData);
 
-    final TopicChanges aggregated = aggregateChanges(results);
+    aggregatedMiniBatchResult = aggregateChanges(results);
+  }
 
-    // push gradients
-    pushAndResetGradients(aggregated);
+  @Override
+  public void pushUpdate() {
+    pushAndResetGradients(aggregatedMiniBatchResult);
   }
 
   @Override

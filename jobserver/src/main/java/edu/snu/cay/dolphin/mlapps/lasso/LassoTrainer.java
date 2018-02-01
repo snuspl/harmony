@@ -123,20 +123,27 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
   public void initGlobalSettings() {
   }
 
+  private volatile Collection<Map.Entry<Long, LassoData>> miniBatchTrainingData;
+
+  @Override
+  public void setMiniBatchData(final Collection<Map.Entry<Long, LassoData>> newMiniBatchTrainingData) {
+    this.miniBatchTrainingData = newMiniBatchTrainingData;
+  }
+
+  @Override
+  public void pullModel() {
+    pullModels();
+  }
+
   /**
-   * {@inheritDoc} <br>
-   * 1) Pull model from server. <br>
-   * 2) Compute the optimal value, dot(x_i, y - Sigma_{j != i} x_j * model(j)) / dot(x_i, x_i) for each dimension
-   *    (in cyclic).
-   *    When computing the optimal value, precalculate sigma_{all j} x_j * model(j) and calculate
-   *    Sigma_{j != i} x_j * model(j) fast by just subtracting x_i * model(i)
-   * 3) Push value to server.
+   * Compute the optimal value, dot(x_i, y - Sigma_{j != i} x_j * model(j)) / dot(x_i, x_i) for each dimension
+   * (in cyclic).
+   * When computing the optimal value, precalculate sigma_{all j} x_j * model(j) and calculate
+   * Sigma_{j != i} x_j * model(j) fast by just subtracting x_i * model(i)
    */
   @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, LassoData>> miniBatchTrainingData) {
+  public void localCompute() {
     final int numInstancesToProcess = miniBatchTrainingData.size();
-
-    pullModels();
 
     // After get feature vectors from each instances, make it concatenate them into matrix for the faster calculation.
     // Pre-calculate sigma_{all j} x_j * model(j) and assign the value into 'preCalculate' vector.
@@ -164,7 +171,10 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
           (float) sthresh((columnVector.dot(yValues.sub(preCalculate))) / columnNorm, lambda, columnNorm));
       preCalculate.addi(columnVector.scale(newModel.get(featureIdx)));
     }
+  }
 
+  @Override
+  public void pushUpdate() {
     pushGradients();
   }
 
@@ -233,7 +243,7 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
     newModel = oldModel.copy();
   }
 
-    /**
+  /**
    * Pull up-to-date model parameters from server.
    */
   private void pullModels(final Table modelTable) {

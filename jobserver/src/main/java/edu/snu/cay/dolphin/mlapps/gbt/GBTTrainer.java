@@ -52,7 +52,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * CONTINUOUS_FEATURE : features with real-number type.
    */
   private static final int CONTINUOUS_FEATURE = 0;
-  
+
   /**
    * Threshold for checking whether two Float values are the same.
    */
@@ -96,7 +96,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * (e.g., if valueType == 5, y-value is in five categories)
    */
   private final FeatureType valueType;
-  
+
   /**
    * If valueType == FeatureType.CONTINUOUS, valueTypeNum == 0
    * If valueType == FeatureType.CATEGORICAL, valueTypeNum is a number of value's label types.
@@ -107,7 +107,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Maximum depth of the tree(for regularization).
    */
   private final int treeMaxDepth;
-  
+
   /**
    * Minimum size of leaf(for regularization).
    */
@@ -168,18 +168,15 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
   public void initGlobalSettings() {
   }
 
-  @Override
-  public void cleanup() {
-    executor.shutdown();
-  }
-
   /**
-   * Build tree for this training data based on the trees that are already built before this run iteration.
+   * Build tree for this training data based on the trees that are built within previous iterations.
    */
   @Override
-  public void runMiniBatch(final Collection<Map.Entry<Long, GBTData>> miniBatchTrainingData) {
+  public void setMiniBatchData(final Collection<Map.Entry<Long, GBTData>> miniBatchTrainingData) {
+    // TODO #26: GBT has small iterations in a mini-batch
+
     final List<Map.Entry<Long, GBTData>> instances = new ArrayList<>(miniBatchTrainingData);
-    
+
     // Divide into two cases : Regression / Classification
     if (valueType == FeatureType.CONTINUOUS) {
       preprocessAndBuildTree(CONTINUOUS_FEATURE, instances);
@@ -190,6 +187,26 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
     } else {
       throw new IllegalArgumentException("valueType must be either numerical type or categorical type.");
     }
+  }
+
+  @Override
+  public void pullModel() {
+
+  }
+
+  @Override
+  public void localCompute() {
+
+  }
+
+  @Override
+  public void pushUpdate() {
+
+  }
+
+  @Override
+  public void cleanup() {
+    executor.shutdown();
   }
 
   /**
@@ -298,7 +315,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
       // Split this node by the best choice of a feature and a value.
       bestSplit(gbTree, dataTree, sortedTreeList, groupedTreeList, labelList, gValues, nodeIdx, dataSize);
     }
-    
+
     dataTree.clear();
   }
 
@@ -353,7 +370,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
     if (bestGain > 0) {
       gbTree.add(Pair.of(bestFeature, bestSplitValue));
       splitActualDataAndSetPosition(dataTree, sortedTreeList, groupedTreeList, labelList, nodeIdx, bestFeature,
-                                    bestSplitValue, position);
+          bestSplitValue, position);
       splitPreprocessedData(dataTree, sortedTreeList, groupedTreeList, labelList, gValues, nodeIdx, position);
     } else {
       gbTree.makeLeaf(nodeIdx, dataTree, gValues, lambda);
@@ -372,16 +389,16 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Left child and right child must have at least one member(they must not be empty).
    */
   private Tuple3<Float, Integer, Float> bestSplitRealNumberFeature(final List<Pair<Integer, Float>> sortedByFeature,
-                                                                     final List<Float> gValues, final int feature,
-                                                                     final Float gSum, final Float totalGain,
-                                                                     final Float bestGain, final int bestFeature,
-                                                                     final Float bestSplitValue) {
+                                                                   final List<Float> gValues, final int feature,
+                                                                   final Float gSum, final Float totalGain,
+                                                                   final Float bestGain, final int bestFeature,
+                                                                   final Float bestSplitValue) {
     final int nodeSize = sortedByFeature.size();
     Float retGain = bestGain;
     int retFeature = bestFeature;
     Float retSplitValue = bestSplitValue;
     Float gL = 0f;
-    
+
     for (int dataIdx = 0; dataIdx < nodeSize - 1; dataIdx++) {
       boolean childNotExistError = false;
       final Pair<Integer, Float> data = sortedByFeature.get(dataIdx);
@@ -614,7 +631,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
       groupedTreeList.add(new GroupedTree(treeMaxDepth));
       labelList.add(new ArrayList<>());
     }
-    
+
     int dataIdx = 0;
     for (final Map.Entry<Long, GBTData> instance : instances) {
       final Vector featureVector = instance.getValue().getFeature();
@@ -824,7 +841,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
         dataIdx++;
       }
       LOG.log(Level.INFO, "number of misclassified data : {0}, error rate : {1}",
-              new Object[]{misclassifiedNum, (float) misclassifiedNum / epochDataSize});
+          new Object[]{misclassifiedNum, (float) misclassifiedNum / epochDataSize});
     }
   }
 
@@ -887,7 +904,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Calculate the gain value with given data.
    */
   private Float calculateGain(final Float gL, final Float gR, final int countLeft, final int countRight,
-                               final Float totalGain) {
+                              final Float totalGain) {
     return (gL * gL / (2 * countLeft + lambda)) + (gR * gR / (2 * countRight + lambda)) - totalGain;
   }
 
@@ -904,7 +921,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
     }
     return ret;
   }
-  
+
   /**
    * @param codeSize codeSize-bit gray code is produced in this method.
    * @return List of gray code sequence. The size of the list is 2^{@param codeSize}.
