@@ -197,7 +197,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
 
-    // collects the gradients computed by multiple threads
     final List<Future<Vector[]>> futures = new ArrayList<>(numTrainerThreads);
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / nThreads.
@@ -210,6 +209,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
         final int finalThreadIdx = threadIdx;
         final Future<Vector[]> future = executor.submit(() -> {
 
+          // 1. setup model that is for all threads
           final Vector[] params = model.getParams();
 
           final int startIdx = numClassesPerThread * finalThreadIdx;
@@ -227,6 +227,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
           modelSetupLatch.countDown();
 
+          // 2. setup per-thread data structure for aggregating gradients
           final List<Map.Entry<Long, MLRData>> drainedInstances = new ArrayList<>(drainSize);
           final Vector[] threadGradient = new Vector[numClasses];
           for (int classIdx = 0; classIdx < numClasses; classIdx++) {
@@ -234,8 +235,10 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
           }
           LOG.log(Level.INFO, "Gradient vectors are initialized. Used memory: {0} MB", MemoryUtils.getUsedMemoryMB());
 
+          // progress to next step after finishing model setup
           modelSetupLatch.await();
 
+          // 3. start generating gradients from training data
           int count = 0;
           while (true) {
             final int numDrained = instances.drainTo(drainedInstances, drainSize);
@@ -260,6 +263,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
       throw new RuntimeException(e);
     }
 
+    // collect the gradients computed by multiple threads
     final List<Vector[]> threadGradients = ThreadUtils.retrieveResults(futures);
     final Vector[] aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
 
