@@ -56,8 +56,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final MetricCollector metricCollector;
 
   private final TaskUnitScheduler taskUnitScheduler;
-  private final TaskUnitInfo commTaskUnitInfo;
+  private final TaskUnitInfo pullTaskUnitInfo;
   private final TaskUnitInfo compTaskUnitInfo;
+  private final TaskUnitInfo pushTaskUnitInfo;
 
   /**
    * A boolean flag that becomes true when {@link #close()} is called,
@@ -89,8 +90,9 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.trainer = trainer;
     this.metricCollector = metricCollector;
 
-    this.commTaskUnitInfo = new TaskUnitInfo(taskletId, "COMM", TaskUnitInfo.ResourceType.NET);
+    this.pullTaskUnitInfo = new TaskUnitInfo(taskletId, "PULL", TaskUnitInfo.ResourceType.NET);
     this.compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
+    this.pushTaskUnitInfo = new TaskUnitInfo(taskletId, "PUSH", TaskUnitInfo.ResourceType.NET);
   }
 
   @Override
@@ -124,7 +126,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         LOG.log(Level.INFO, "Starting batch {0} in epoch {1}", new Object[] {miniBatchIdx, epochIdx});
         if (miniBatchBarrier.await()) {
-          taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
           cleanup();
           return;
         }
@@ -132,20 +133,18 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         modelAccessor.getAndResetMetrics();
         final long miniBatchStartTime = System.currentTimeMillis();
 
-        if (epochIdx == 0 && miniBatchIdx == 0) {
-          taskUnitScheduler.waitSchedule(commTaskUnitInfo);
-        }
-
         trainer.setMiniBatchData(miniBatchData);
+        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
         trainer.pullModel();
-        taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
+        taskUnitScheduler.onTaskUnitFinished(pullTaskUnitInfo);
 
         taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         trainer.localCompute();
         taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
 
-        taskUnitScheduler.waitSchedule(commTaskUnitInfo);
+        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
         trainer.pushUpdate();
+        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
 
         final double miniBatchElapsedTime = (System.currentTimeMillis() - miniBatchStartTime) / 1000.0D;
 
@@ -159,7 +158,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
 
         if (abortFlag.get()) {
           LOG.log(Level.INFO, "The tasklet {0} is getting closed.", taskletId);
-          taskUnitScheduler.onTaskUnitFinished(commTaskUnitInfo);
           return;
         }
       }
