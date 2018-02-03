@@ -53,6 +53,7 @@ public final class TaskletRuntime {
   @Inject
   private TaskletRuntime(final Injector taskletBaseInjector,
                          final MessageSender msgSender,
+                         final TaskUnitScheduler taskUnitScheduler,
                          @Parameter(NumTasklets.class) final int numTasklets) {
     this.taskletBaseInjector = taskletBaseInjector;
     this.msgSender = msgSender;

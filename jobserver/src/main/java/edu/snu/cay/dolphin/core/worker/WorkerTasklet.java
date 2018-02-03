@@ -22,6 +22,8 @@ import edu.snu.cay.dolphin.metric.avro.EpochMetrics;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitScheduler;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
@@ -53,6 +55,11 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
+  private final TaskUnitScheduler taskUnitScheduler;
+  private final TaskUnitInfo pullTaskUnitInfo;
+  private final TaskUnitInfo compTaskUnitInfo;
+  private final TaskUnitInfo pushTaskUnitInfo;
+
   /**
    * A boolean flag that becomes true when {@link #close()} is called,
    * which consequently stops the task from training and terminates it.
@@ -62,6 +69,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
+                        final TaskUnitScheduler taskUnitScheduler,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
                         final MiniBatchBarrier miniBatchBarrier,
@@ -72,6 +80,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
                         final MetricCollector metricCollector) {
     this.taskletId = taskletId;
     this.startingEpoch = startingEpoch;
+    this.taskUnitScheduler = taskUnitScheduler;
     this.progressReporter = progressReporter;
     this.workerGlobalBarrier = workerGlobalBarrier;
     this.miniBatchBarrier = miniBatchBarrier;
@@ -80,6 +89,10 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.testDataProvider = testDataProvider;
     this.trainer = trainer;
     this.metricCollector = metricCollector;
+
+    this.pullTaskUnitInfo = new TaskUnitInfo(taskletId, "PULL", TaskUnitInfo.ResourceType.NET);
+    this.compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
+    this.pushTaskUnitInfo = new TaskUnitInfo(taskletId, "PUSH", TaskUnitInfo.ResourceType.NET);
   }
 
   @Override
@@ -121,9 +134,17 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         final long miniBatchStartTime = System.currentTimeMillis();
 
         trainer.setMiniBatchData(miniBatchData);
+        taskUnitScheduler.waitSchedule(pullTaskUnitInfo);
         trainer.pullModel();
+        taskUnitScheduler.onTaskUnitFinished(pullTaskUnitInfo);
+
+        taskUnitScheduler.waitSchedule(compTaskUnitInfo);
         trainer.localCompute();
+        taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
+
+        taskUnitScheduler.waitSchedule(pushTaskUnitInfo);
         trainer.pushUpdate();
+        taskUnitScheduler.onTaskUnitFinished(pushTaskUnitInfo);
 
         final double miniBatchElapsedTime = (System.currentTimeMillis() - miniBatchStartTime) / 1000.0D;
 
