@@ -231,6 +231,7 @@ final class ExecutorManager {
 
       final JVMProcess jvmProcess = jvmProcessFactory.newEvaluatorProcess()
           .setMemory((int)(memSizeInMB * (1 - jvmHeapSlack)))
+          .addOption("-Djava.library.path=reef/global/libsigar-universal64-macosx.dylib")
           .addOption("-XX:+UseG1GC");
 
       allocatedEvaluator.setProcess(jvmProcess);

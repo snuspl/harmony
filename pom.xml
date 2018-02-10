@@ -178,6 +178,13 @@
         <artifactId>javacpp</artifactId>
         <version>${javacpp.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.hyperic</groupId>
+        <artifactId>sigar</artifactId>
+        <version>1.0</version>
+      </dependency>
+
+
     </dependencies>
   </dependencyManagement>
 

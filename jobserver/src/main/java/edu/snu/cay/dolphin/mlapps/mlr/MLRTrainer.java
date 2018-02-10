@@ -30,6 +30,9 @@ import edu.snu.cay.utils.Tuple3;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 import edu.snu.cay.dolphin.DolphinParameters.*;
+import org.hyperic.sigar.Cpu;
+import org.hyperic.sigar.CpuInfo;
+import org.hyperic.sigar.Sigar;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -192,6 +195,23 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   @Override
   public void localCompute() {
+    try {
+      System.out.println(System.getProperty("java.library.path"));
+      final Sigar sigar = new Sigar();
+      System.out.println("-----CPU Info-----");
+      System.out.println(sigar.getCpuPerc());
+      System.out.println(sigar.getCpu());
+      final CpuInfo[] cpuInfoList = sigar.getCpuInfoList();
+      final Cpu[] cpuList = sigar.getCpuList();
+      for (int c = 0; c < cpuInfoList.length; c++) {
+        System.out.println("CPU " + c);
+        System.out.println(cpuInfoList[c].toString());
+        System.out.println(cpuList[c].toString());
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());

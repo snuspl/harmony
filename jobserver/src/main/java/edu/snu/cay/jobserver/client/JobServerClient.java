@@ -162,6 +162,7 @@ public final class JobServerClient {
 
     final Configuration driverConf = DriverConfiguration.CONF
         .set(DriverConfiguration.GLOBAL_LIBRARIES, EnvironmentUtils.getClassLocation(JobServerDriver.class))
+        .set(DriverConfiguration.GLOBAL_FILES, "/tmp/libsigar-universal64-macosx.dylib")
         .set(DriverConfiguration.DRIVER_IDENTIFIER, "JobServer")
         .set(DriverConfiguration.DRIVER_MEMORY, driverParamInjector.getNamedInstance(DriverMemory.class))
         .set(DriverConfiguration.ON_DRIVER_STARTED, JobServerDriver.StartHandler.class)
