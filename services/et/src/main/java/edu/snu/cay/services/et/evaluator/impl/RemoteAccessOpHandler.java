@@ -293,7 +293,7 @@ final class RemoteAccessOpHandler {
         for (int index = 0; index < opMetadata.getKeys().size(); index++) {
           final K key = opMetadata.getKeys().get(index);
           final V localOutput = block.update(key, opMetadata.getUpdateValues().get(index));
-          outputs.add(Pair.of(key, localOutput));
+//          outputs.add(Pair.of(key, localOutput));
         }
         isSuccess[0] = true;
         break;

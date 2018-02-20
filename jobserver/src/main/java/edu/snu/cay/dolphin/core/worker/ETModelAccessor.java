@@ -64,7 +64,11 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   @Override
   public void push(final Map<K, P> keyToDeltaValueMap) {
     pushTracer.startTimer();
-    modelTable.multiUpdateNoReply(keyToDeltaValueMap);
+    try {
+      modelTable.multiUpdate(keyToDeltaValueMap).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
     pushTracer.recordTime(keyToDeltaValueMap.size());
   }
 
