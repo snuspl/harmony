@@ -82,6 +82,9 @@ public final class TaskUnitScheduler {
       case NET:
         netReadyQueue.put(taskUnitPair);
         break;
+      case VOID:
+        LOG.log(Level.INFO, "Schedule TaskUnit. TaskUnitInfo: {0}", taskUnitPair.getKey());
+        return;
       default:
         throw new RuntimeException();
       }
@@ -103,6 +106,8 @@ public final class TaskUnitScheduler {
     case NET:
       netSemaphore.release();
       break;
+    case VOID:
+      return;
     default:
       throw new RuntimeException();
     }

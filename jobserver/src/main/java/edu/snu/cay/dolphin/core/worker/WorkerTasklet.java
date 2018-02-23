@@ -56,6 +56,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final MetricCollector metricCollector;
 
   private final TaskUnitScheduler taskUnitScheduler;
+  private final TaskUnitInfo syncTaskUnitInfo;
   private final TaskUnitInfo pullTaskUnitInfo;
   private final TaskUnitInfo compTaskUnitInfo;
   private final TaskUnitInfo pushTaskUnitInfo;
@@ -90,6 +91,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.trainer = trainer;
     this.metricCollector = metricCollector;
 
+    this.syncTaskUnitInfo = new TaskUnitInfo(taskletId, "SYNC", TaskUnitInfo.ResourceType.VOID);
     this.pullTaskUnitInfo = new TaskUnitInfo(taskletId, "PULL", TaskUnitInfo.ResourceType.NET);
     this.compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
     this.pushTaskUnitInfo = new TaskUnitInfo(taskletId, "PUSH", TaskUnitInfo.ResourceType.NET);
@@ -125,7 +127,11 @@ public final class WorkerTasklet<K, V> implements Tasklet {
         }
 
         LOG.log(Level.INFO, "Starting batch {0} in epoch {1}", new Object[] {miniBatchIdx, epochIdx});
-        if (miniBatchBarrier.await()) {
+        taskUnitScheduler.waitSchedule(syncTaskUnitInfo);
+        final boolean finish = miniBatchBarrier.await();
+        taskUnitScheduler.onTaskUnitFinished(syncTaskUnitInfo);
+
+        if (finish) {
           cleanup();
           return;
         }
