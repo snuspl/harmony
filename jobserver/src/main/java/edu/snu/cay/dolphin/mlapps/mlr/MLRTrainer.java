@@ -20,18 +20,17 @@ import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
 import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.DolphinParameters;
+import edu.snu.cay.dolphin.DolphinParameters.*;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.MemoryUtils;
-import edu.snu.cay.utils.ThreadUtils;
 import edu.snu.cay.utils.Tuple3;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.io.network.group.impl.utils.ResettingCountDownLatch;
 import org.apache.reef.tang.annotations.Parameter;
-import edu.snu.cay.dolphin.DolphinParameters.*;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -40,7 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.*;
+import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.InitialStepSize;
+import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.NumClasses;
 
 /**
  * {@link Trainer} class for the MLRREEF application.
@@ -196,11 +196,15 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   @Override
   public void localCompute() {
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+    final CyclicBarrier barrier = new CyclicBarrier(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Long, MLRData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
 
-    final List<Future<Vector[]>> futures = new ArrayList<>(numTrainerThreads);
+    // collect the gradients computed by multiple threads
+    final Vector[][] threadGradients = new Vector[numTrainerThreads][];
+    final Vector[] gradients = new Vector[numClasses];
+
     try {
       // Threads drain multiple instances from shared queue, as many as nInstances / nThreads.
       final int drainSize = instances.size() / numTrainerThreads;
@@ -210,7 +214,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final int finalThreadIdx = threadIdx;
-        final Future<Vector[]> future = executor.submit(() -> {
+        executor.submit(() -> {
 
           // 1. setup model that is for all threads
           final Vector[] params = model.getParams();
@@ -253,34 +257,46 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
             drainedInstances.clear();
             count += numDrained;
           }
-          latch.countDown();
           LOG.log(Level.INFO, "{0} has computed {1} instances",
               new Object[] {Thread.currentThread().getName(), count});
-          return threadGradient;
+
+          threadGradients[finalThreadIdx] = threadGradient;
+
+          barrier.await();
+
+          // aggregate thread gradients for classes
+          for (int classIndex = startIdx; classIndex < endIdx; ++classIndex) {
+            gradients[classIndex] = vectorFactory.createDenseZeros(numFeatures);
+            for (int tIdx = 0; tIdx < numTrainerThreads; tIdx++) {
+              gradients[classIndex].addi(threadGradients[tIdx][classIndex]);
+            }
+          }
+
+          barrier.await();
+
+          // arrange gradients for partition
+          for (int classIndex = startIdx; classIndex < endIdx; ++classIndex) {
+            final Vector gradient = gradients[classIndex];
+
+            for (int partitionIndex = 0; partitionIndex < numPartitionsPerClass; ++partitionIndex) {
+              final int partitionStart = partitionIndex * numFeaturesPerPartition;
+              final int partitionEnd = (partitionIndex + 1) * numFeaturesPerPartition;
+              if (keyToGradientMap.put(classIndex * numPartitionsPerClass + partitionIndex,
+                  gradient.slice(partitionStart, partitionEnd)) != null) {
+                throw new RuntimeException();
+              }
+            }
+          }
+
+          latch.countDown();
+          return null;
         });
-        futures.add(future);
       }
       latch.await();
+
     } catch (final InterruptedException e) {
       LOG.log(Level.SEVERE, "Exception occurred.", e);
       throw new RuntimeException(e);
-    }
-
-    // collect the gradients computed by multiple threads
-    final List<Vector[]> threadGradients = ThreadUtils.retrieveResults(futures);
-    final Vector[] aggregatedMiniBatchGradients = aggregateGradient(threadGradients);
-
-    for (int classIndex = 0; classIndex < numClasses; classIndex++) {
-      final Vector gradient = aggregatedMiniBatchGradients[classIndex];
-
-      for (int partitionIndex = 0; partitionIndex < numPartitionsPerClass; ++partitionIndex) {
-        final int partitionStart = partitionIndex * numFeaturesPerPartition;
-        final int partitionEnd = (partitionIndex + 1) * numFeaturesPerPartition;
-        if (keyToGradientMap.put(classIndex * numPartitionsPerClass + partitionIndex,
-            gradient.slice(partitionStart, partitionEnd)) != null) {
-          throw new RuntimeException();
-        }
-      }
     }
   }
 
