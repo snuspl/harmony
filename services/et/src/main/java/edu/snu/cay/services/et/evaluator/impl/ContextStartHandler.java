@@ -25,6 +25,8 @@ import org.apache.reef.tang.annotations.Parameter;
 import org.apache.reef.wake.EventHandler;
 
 import javax.inject.Inject;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Handles initial setup of executor.
@@ -32,6 +34,7 @@ import javax.inject.Inject;
 @Private
 @EvaluatorSide
 public final class ContextStartHandler implements EventHandler<ContextStart> {
+  private static final Logger LOG = Logger.getLogger(ContextStartHandler.class.getName());
   private final NetworkConnection<ETMsg> networkConnection;
   private final String evaluatorId;
 
@@ -40,6 +43,7 @@ public final class ContextStartHandler implements EventHandler<ContextStart> {
                               @Parameter(EvaluatorIdentifier.class) final String evaluatorId) {
     this.networkConnection = networkConnection;
     this.evaluatorId = evaluatorId;
+    LOG.log(Level.INFO, "Executor started: {0}", System.currentTimeMillis());
   }
 
   @Override
