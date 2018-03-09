@@ -24,6 +24,7 @@ public final class TaskUnitInfo {
   private final ResourceType resourceType;
 
   public enum ResourceType {
+    VOID,
     CPU,
     NET
   }
