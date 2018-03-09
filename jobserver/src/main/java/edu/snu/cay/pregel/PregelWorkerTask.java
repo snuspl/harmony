@@ -22,9 +22,12 @@ import edu.snu.cay.pregel.graph.api.Vertex;
 import edu.snu.cay.pregel.graph.impl.ComputationCallable;
 import edu.snu.cay.pregel.graph.impl.MessageManager;
 import edu.snu.cay.pregel.graph.impl.Partition;
+import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitScheduler;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.reef.annotations.audience.EvaluatorSide;
@@ -63,11 +66,18 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
 
   private final int numWorkerThreads;
 
+  private final TaskUnitScheduler taskUnitScheduler;
+  private final TaskUnitInfo compTaskUnitInfo;
+  private final TaskUnitInfo sendTaskUnitInfo;
+  private final TaskUnitInfo syncTaskUnitInfo;
+
   @Inject
   private PregelWorkerTask(final MessageManager<Long, M> messageManager,
+                           final TaskUnitScheduler taskUnitScheduler,
                            final WorkerMsgManager workerMsgManager,
                            final Computation<V, E, M> computation,
                            final TableAccessor tableAccessor,
+                           @Parameter(TaskletIdentifier.class) final String taskletId,
                            @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                            @Parameter(PregelParameters.NumWorkerThreads.class) final int numWorkerThreads,
                            @Parameter(PregelParameters.VertexTableId.class) final String vertexTableId)
@@ -79,6 +89,11 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
     this.numWorkerThreads = numWorkerThreads == Integer.parseInt(PregelParameters.NumWorkerThreads.UNSET_VALUE) ?
         Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
         numWorkerThreads;
+
+    this.taskUnitScheduler = taskUnitScheduler;
+    this.compTaskUnitInfo = new TaskUnitInfo(taskletId, "COMP", TaskUnitInfo.ResourceType.CPU);
+    this.sendTaskUnitInfo = new TaskUnitInfo(taskletId, "SEND", TaskUnitInfo.ResourceType.NET);
+    this.syncTaskUnitInfo = new TaskUnitInfo(taskletId, "SYNC", TaskUnitInfo.ResourceType.VOID);
   }
 
   @Override
@@ -98,6 +113,7 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
       final Map<Long, Vertex<V, E>> vertexMap = vertexTable.getLocalTablet().getDataMap();
       final List<Partition<V, E>> vertexPartitions = partitionVertices(vertexMap, numWorkerThreads);
 
+      taskUnitScheduler.waitSchedule(compTaskUnitInfo);
       // compute each partition with a thread pool
       for (int threadIdx = 0; threadIdx < numWorkerThreads; threadIdx++) {
         final Partition<V, E> partition = vertexPartitions.get(threadIdx);
@@ -111,14 +127,19 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
       for (final Future<Integer> computeFuture : futureList) {
         numActiveVertices += computeFuture.get();
       }
+      taskUnitScheduler.onTaskUnitFinished(compTaskUnitInfo);
 
+      taskUnitScheduler.waitSchedule(sendTaskUnitInfo);
       // before finishing superstep, confirm that all outgoing messages are completely sent out
       final boolean messageExist = messageManager.flushAllMessages();
+      taskUnitScheduler.onTaskUnitFinished(sendTaskUnitInfo);
 
       LOG.log(Level.INFO, "Superstep {0} is finished", superStepCount);
 
+      taskUnitScheduler.waitSchedule(syncTaskUnitInfo);
       // master will decide whether to continue or not
       final boolean continueSuperstep = workerMsgManager.waitForTryNextSuperstepMsg(numActiveVertices, messageExist);
+      taskUnitScheduler.onTaskUnitFinished(syncTaskUnitInfo);
 
       if (!continueSuperstep) {
         break;
