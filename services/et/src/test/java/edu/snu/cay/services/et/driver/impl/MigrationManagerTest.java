@@ -387,5 +387,10 @@ public final class MigrationManagerTest {
     public void sendTaskletStopMsg(final String executorId, final String taskletId) {
 
     }
+
+    @Override
+    public void sendTaskUnitReadyMsg(final Set<String> executorIds, final String jobId) {
+
+    }
   }
 }

@@ -26,6 +26,7 @@ import org.apache.reef.tang.annotations.DefaultImplementation;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Interface for master to send messages to executors.
@@ -116,4 +117,6 @@ public interface MessageSender {
    * Sends a message for stopping a tasklet in an executor.
    */
   void sendTaskletStopMsg(String executorId, String taskletId);
+
+  void sendTaskUnitReadyMsg(Set<String> executorIds, String jobId);
 }

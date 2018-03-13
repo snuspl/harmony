@@ -68,6 +68,7 @@ public final class MessageHandlerImpl implements MessageHandler {
 
   private final InjectionFuture<Tables> tablesFuture;
   private final InjectionFuture<TaskletRuntime> taskletRuntimeFuture;
+  private final InjectionFuture<LocalTaskUnitScheduler> taskUnitSchedulerFuture;
 
   private final ConfigurationSerializer confSerializer;
   private final InjectionFuture<MessageSender> msgSenderFuture;
@@ -80,6 +81,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   @Inject
   private MessageHandlerImpl(final InjectionFuture<Tables> tablesFuture,
                              final InjectionFuture<TaskletRuntime> taskletRuntimeFuture,
+                             final InjectionFuture<LocalTaskUnitScheduler> taskUnitSchedulerFuture,
                              final ConfigurationSerializer confSerializer,
                              final InjectionFuture<MessageSender> msgSenderFuture,
                              final InjectionFuture<RemoteAccessOpHandler> remoteAccessHandlerFuture,
@@ -89,6 +91,7 @@ public final class MessageHandlerImpl implements MessageHandler {
                              final InjectionFuture<ChkpManagerSlave> chkpManagerSlaveFuture) {
     this.tablesFuture = tablesFuture;
     this.taskletRuntimeFuture = taskletRuntimeFuture;
+    this.taskUnitSchedulerFuture = taskUnitSchedulerFuture;
     this.confSerializer = confSerializer;
     this.msgSenderFuture = msgSenderFuture;
     this.remoteAccessHandlerFuture = remoteAccessHandlerFuture;
@@ -356,6 +359,9 @@ public final class MessageHandlerImpl implements MessageHandler {
           break;
         case Stop:
           taskletRuntimeFuture.get().stopTasklet(msg.getTaskletId());
+          break;
+        case Ready:
+          taskUnitSchedulerFuture.get().onTaskUnitReady(msg.getTaskletId());
           break;
         default:
           throw new RuntimeException("Unexpected control msg type");

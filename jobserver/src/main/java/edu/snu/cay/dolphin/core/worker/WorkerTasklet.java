@@ -23,7 +23,7 @@ import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
-import edu.snu.cay.services.et.evaluator.impl.TaskUnitScheduler;
+import edu.snu.cay.services.et.evaluator.impl.LocalTaskUnitScheduler;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.tang.annotations.Parameter;
@@ -55,7 +55,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
-  private final TaskUnitScheduler taskUnitScheduler;
+  private final LocalTaskUnitScheduler taskUnitScheduler;
   private final TaskUnitInfo syncTaskUnitInfo;
   private final TaskUnitInfo pullTaskUnitInfo;
   private final TaskUnitInfo compTaskUnitInfo;
@@ -70,7 +70,7 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Inject
   private WorkerTasklet(@Parameter(TaskletIdentifier.class) final String taskletId,
                         @Parameter(DolphinParameters.StartingEpochIdx.class) final int startingEpoch,
-                        final TaskUnitScheduler taskUnitScheduler,
+                        final LocalTaskUnitScheduler taskUnitScheduler,
                         final ProgressReporter progressReporter,
                         final WorkerGlobalBarrier workerGlobalBarrier,
                         final MiniBatchBarrier miniBatchBarrier,

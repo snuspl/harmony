@@ -525,4 +525,28 @@ public final class MessageSenderImpl implements MessageSender {
       throw new RuntimeException("NetworkException while sending TaskletStatusMessage", e);
     }
   }
+
+  @Override
+  public void sendTaskUnitWaitMsg(final String taskletId) {
+    final TaskletControlMsg taskletControlMsg = TaskletControlMsg.newBuilder()
+        .setType(TaskletControlType.Wait)
+        .build();
+
+    final byte[] innerMsg = AvroUtils.toBytes(
+        TaskletMsg.newBuilder()
+            .setType(TaskletMsgType.TaskletControlMsg)
+            .setTaskletId(taskletId)
+            .setTaskletControlMsg(taskletControlMsg)
+            .build(), TaskletMsg.class);
+
+    final ETMsg msg = ETMsg.newBuilder()
+        .setType(ETMsgType.TaskletMsg)
+        .setInnerMsg(ByteBuffer.wrap(innerMsg)).build();
+
+    try {
+      networkConnection.send(driverId, msg);
+    } catch (final NetworkException e) {
+      throw new RuntimeException("NetworkException while sending TaskletWait message", e);
+    }
+  }
 }

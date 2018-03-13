@@ -163,4 +163,10 @@ public interface MessageSender {
    * Sends a tasklet status message to master.
    */
   void sendTaskletStatusMsg(String taskletId, TaskletStatusType status);
+
+  /**
+   * Sends a message to master that a taskunit waits to be ready.
+   * @param taskletId
+   */
+  void sendTaskUnitWaitMsg(String taskletId);
 }

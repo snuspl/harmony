@@ -63,6 +63,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   private final String driverId;
 
   private final TaskletCustomMsgHandler taskletCustomMsgHandler;
+  private final InjectionFuture<GlobalTaskUnitScheduler> globalTaskSchedulerFuture;
   private final InjectionFuture<TableControlAgent> tableControlAgentFuture;
   private final InjectionFuture<MigrationManager> migrationManagerFuture;
   private final InjectionFuture<MetricReceiver> metricReceiver;
@@ -82,6 +83,7 @@ public final class MessageHandlerImpl implements MessageHandler {
   @Inject
   private MessageHandlerImpl(@Parameter(DriverIdentifier.class) final String driverId,
                              final TaskletCustomMsgHandler taskletCustomMsgHandler,
+                             final InjectionFuture<GlobalTaskUnitScheduler> globalTaskSchedulerFuture,
                              final InjectionFuture<TableControlAgent> tableControlAgentFuture,
                              final InjectionFuture<ExecutorManager> executorManagerFuture,
                              final InjectionFuture<TableManager> tableManagerFuture,
@@ -92,6 +94,7 @@ public final class MessageHandlerImpl implements MessageHandler {
                              final InjectionFuture<ChkpManagerMaster> chkpManagerMasterFuture) {
     this.driverId = driverId;
     this.taskletCustomMsgHandler = taskletCustomMsgHandler;
+    this.globalTaskSchedulerFuture = globalTaskSchedulerFuture;
     this.metricReceiver = metricReceiver;
     this.tableControlAgentFuture = tableControlAgentFuture;
     this.migrationManagerFuture = migrationManagerFuture;
@@ -308,6 +311,13 @@ public final class MessageHandlerImpl implements MessageHandler {
       break;
     case TaskletStatusMsg:
       allocatedExecutor.onTaskletStatusMessage(msg.getTaskletId(), msg.getTaskletStatusMsg());
+      break;
+    case TaskletControlMsg:
+      if (msg.getTaskletControlMsg().getType().equals(TaskletControlType.Wait)) {
+        globalTaskSchedulerFuture.get().onTaskUnitWaitMsg(msg.getTaskletId(), executorId);
+      } else {
+        throw new RuntimeException("Unexpected message: " + msg);
+      }
       break;
     default:
       throw new RuntimeException("Unexpected message: " + msg);

@@ -27,7 +27,7 @@ import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
-import edu.snu.cay.services.et.evaluator.impl.TaskUnitScheduler;
+import edu.snu.cay.services.et.evaluator.impl.LocalTaskUnitScheduler;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.reef.annotations.audience.EvaluatorSide;
@@ -66,14 +66,14 @@ public final class PregelWorkerTask<V, E, M> implements Tasklet {
 
   private final int numWorkerThreads;
 
-  private final TaskUnitScheduler taskUnitScheduler;
+  private final LocalTaskUnitScheduler taskUnitScheduler;
   private final TaskUnitInfo compTaskUnitInfo;
   private final TaskUnitInfo sendTaskUnitInfo;
   private final TaskUnitInfo syncTaskUnitInfo;
 
   @Inject
   private PregelWorkerTask(final MessageManager<Long, M> messageManager,
-                           final TaskUnitScheduler taskUnitScheduler,
+                           final LocalTaskUnitScheduler taskUnitScheduler,
                            final WorkerMsgManager workerMsgManager,
                            final Computation<V, E, M> computation,
                            final TableAccessor tableAccessor,
