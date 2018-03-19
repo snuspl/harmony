@@ -25,7 +25,7 @@ import java.util.Map;
 /**
  * An abstraction of each access to a remote table.
  */
-final class RemoteDataOp<K, V, U> {
+final class RemoteDataOp<K, V, U> implements Comparable<RemoteDataOp> {
   /**
    * The executor id where this operation is heading for.
    */
@@ -76,6 +76,16 @@ final class RemoteDataOp<K, V, U> {
     this.dataOpResult = aggregateDataOpResult;
   }
 
+  RemoteDataOp(final DataOpMetadata dataOpMetadata) {
+    this.targetId = null;
+    this.dataOpMetadata = dataOpMetadata;
+    this.dataOpResult = null;
+  }
+
+  boolean isHandlerOp() {
+    return dataOpResult == null;
+  }
+
   /**
    * @return the executor id where this operation is heading for
    */
@@ -95,5 +105,16 @@ final class RemoteDataOp<K, V, U> {
    */
   DataOpResult<?> getDataOpResult() {
     return dataOpResult;
+  }
+
+  @Override
+  public int compareTo(final RemoteDataOp o) {
+    if (this.getMetadata().getOpId() > o.getMetadata().getOpId()) {
+      return 1;
+    } else if (this.getMetadata().getOpId() < o.getMetadata().getOpId()) {
+      return -1;
+    } else {
+      return 0;
+    }
   }
 }

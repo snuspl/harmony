@@ -18,6 +18,6 @@ package edu.snu.cay.services.et.configuration.parameters.remoteaccess;
 import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 
-@NamedParameter(doc = "Max number of ops that can be queued in op handler", default_value = "1024")
-public final class HandlerQueueSize implements Name<Integer> {
+@NamedParameter(doc = "The number of threads for handling remote access.", default_value = "2")
+public final class NumCommThreads implements Name<Integer> {
 }

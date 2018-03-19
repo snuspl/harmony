@@ -108,13 +108,9 @@ public final class DolphinDriver {
                         @Parameter(DolphinParameters.WorkerMemSize.class) final int workerMemSize,
                         @Parameter(DolphinParameters.NumWorkerCores.class) final int numWorkerCores,
                         @Parameter(DolphinParameters.NumServerSenderThreads.class) final int numServerSenderThreads,
-                        @Parameter(DolphinParameters.NumServerHandlerThreads.class) final int numServerHandlerThreads,
                         @Parameter(DolphinParameters.ServerSenderQueueSize.class) final int serverSenderQueueSize,
-                        @Parameter(DolphinParameters.ServerHandlerQueueSize.class) final int serverHandlerQueueSize,
                         @Parameter(DolphinParameters.NumWorkerSenderThreads.class) final int numWorkerSenderThreads,
-                        @Parameter(DolphinParameters.NumWorkerHandlerThreads.class) final int numWorkerHandlerThreads,
                         @Parameter(DolphinParameters.WorkerSenderQueueSize.class) final int workerSenderQueueSize,
-                        @Parameter(DolphinParameters.WorkerHandlerQueueSize.class) final int workerHandlerQueueSize,
                         @Parameter(DolphinParameters.NumWorkerBlocks.class) final int numWorkerBlocks,
                         @Parameter(DolphinParameters.NumServerBlocks.class) final int numServerBlocks,
                         @Parameter(ETDolphinLauncher.SerializedParamConf.class) final String serializedParamConf,
@@ -139,16 +135,14 @@ public final class DolphinDriver {
     final Configuration serverConf = confSerializer.fromString(serializedServerConf);
     final Injector serverInjector = Tang.Factory.getTang().newInjector(serverConf);
     this.serverResourceConf = buildResourceConf(numServerCores, serverMemSize);
-    this.serverRemoteAccessConf = buildRemoteAccessConf(numServerSenderThreads, serverSenderQueueSize,
-        numServerHandlerThreads, serverHandlerQueueSize);
+    this.serverRemoteAccessConf = buildRemoteAccessConf(numServerSenderThreads, serverSenderQueueSize);
     this.serverTableConf = buildServerTableConf(serverInjector, numServerBlocks, userParamConf);
 
     // initialize worker-side configurations
     final Configuration workerConf = confSerializer.fromString(serializedWorkerConf);
     final Injector workerInjector = Tang.Factory.getTang().newInjector(workerConf);
     this.workerResourceConf = buildResourceConf(numWorkerCores, workerMemSize);
-    this.workerRemoteAccessConf = buildRemoteAccessConf(numWorkerSenderThreads, workerSenderQueueSize,
-        numWorkerHandlerThreads, workerHandlerQueueSize);
+    this.workerRemoteAccessConf = buildRemoteAccessConf(numWorkerSenderThreads, workerSenderQueueSize);
     this.workerTableConf = buildWorkerTableConf(workerInjector, numWorkerBlocks, userParamConf);
     this.inputPath = workerInjector.getNamedInstance(Parameters.InputDir.class);
 
@@ -175,14 +169,10 @@ public final class DolphinDriver {
   }
 
   private static RemoteAccessConfiguration buildRemoteAccessConf(final int numSenderThreads,
-                                                                 final int senderQueueSize,
-                                                                 final int numHandlerThreads,
-                                                                 final int handlerQueueSize) {
+                                                                 final int senderQueueSize) {
     return RemoteAccessConfiguration.newBuilder()
-        .setNumSenderThreads(numSenderThreads)
-        .setSenderQueueSize(senderQueueSize)
-        .setNumHandlerThreads(numHandlerThreads)
-        .setHandlerQueueSize(handlerQueueSize)
+        .setNumCommThreads(numSenderThreads)
+        .setCommQueueSize(senderQueueSize)
         .build();
   }
 

@@ -17,12 +17,9 @@ package edu.snu.cay.services.et.evaluator.impl;
 
 import edu.snu.cay.services.et.avro.*;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsSenderThreads;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.SenderQueueSize;
 import edu.snu.cay.services.et.evaluator.api.DataOpResult;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
-import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.parameters.DriverIdentifier;
 import org.apache.reef.exception.evaluator.NetworkException;
@@ -47,7 +44,6 @@ import java.util.logging.Logger;
 
 public final class RemoteAccessOpSender {
   private static final Logger LOG = Logger.getLogger(RemoteAccessOpSender.class.getName());
-  private static final int QUEUE_TIMEOUT_MS = 3000;
   private static final long RESEND_INTERVAL_MS = 100;
 
   /**
@@ -55,21 +51,11 @@ public final class RemoteAccessOpSender {
    */
   private final AtomicLong remoteOpIdCounter = new AtomicLong(0);
 
-  private final List<SenderThread> senderThreads;
-
-  private final int numSenderThreads;
-
   /**
    * A map holding ongoing operations until they finish.
    * It only maintains operations requested from local clients.
    */
   private final Map<String, OngoingOps> tableIdToOngoingOps = new ConcurrentHashMap<>();
-
-  /**
-   * A boolean flag that becomes true when {@link #close()} is called,
-   * which consequently terminates all sender threads.
-   */
-  private volatile boolean closeFlag = false;
 
   private final String executorId;
   private final String driverId;
@@ -77,131 +63,36 @@ public final class RemoteAccessOpSender {
   private final InjectionFuture<MessageSender> msgSenderFuture;
   private final InjectionFuture<RemoteAccessOpStat> networkUsageStatFuture;
 
+  private final CommManager commManager;
+
   @Inject
   private RemoteAccessOpSender(final InjectionFuture<Tables> tablesFuture,
+                               final CommManager commManager,
                                @Parameter(ExecutorIdentifier.class) final String executorId,
                                @Parameter(DriverIdentifier.class) final String driverId,
-                               @Parameter(SenderQueueSize.class) final int queueSize,
-                               @Parameter(NumRemoteOpsSenderThreads.class) final int numSenderThreads,
                                final InjectionFuture<MessageSender> msgSenderFuture,
                                final InjectionFuture<RemoteAccessOpStat> networkUsageStatFuture) {
     this.tablesFuture = tablesFuture;
     this.executorId = executorId;
     this.driverId = driverId;
-    this.numSenderThreads = numSenderThreads;
     this.msgSenderFuture = msgSenderFuture;
     this.networkUsageStatFuture = networkUsageStatFuture;
-    this.senderThreads = initSenderThreads(numSenderThreads, queueSize);
+    this.commManager = commManager;
   }
 
-  /**
-   * Initialize {@link SenderThread}s that execute operations sequentially in their own local queue.
-   * They send remote access request messages to an executor that owns a block that contains a key of an operation.
-   */
-  private List<SenderThread> initSenderThreads(final int numThreads, final int queueSize) {
-    LOG.log(Level.INFO, "Initializing {0} Sender threads with queue size: {1}",
-        new Object[]{numThreads, queueSize});
-    final ExecutorService executorService = CatchableExecutors.newFixedThreadPool(numThreads);
-    final List<SenderThread> threads = new ArrayList<>(numThreads);
-    for (int i = 0; i < numThreads; i++) {
-      final SenderThread senderThread = new SenderThread(queueSize);
-      threads.add(senderThread);
-      executorService.submit(senderThread);
-    }
-    return threads;
-  }
+  <K, V, U> void processOp(final RemoteDataOp<K, V, U> op) {
+    final DataOpMetadata opMetadata = op.getMetadata();
+    final String tableId = opMetadata.getTableId();
 
-  /**
-   * Close this {@link RemoteAccessOpSender} by terminating all sender threads.
-   */
-  void close() {
-    closeFlag = true;
-  }
+    LOG.log(Level.FINEST, "Process op: [OpId: {0}, origId: {1}, table: {2}]]",
+        new Object[]{opMetadata.getOpId(), opMetadata.getOrigId(), tableId});
 
-  /**
-   * A thread abstraction that sending messages in parallel.
-   * Several threads are initiated at the beginning and run as long-running background services.
-   * Each thread takes charge of a disjoint set of key-space (See {@link #getThreadIdx(int)}).
-   */
-  private final class SenderThread implements Runnable {
-    private static final int DRAIN_PORTION = 16;
-    private final BlockingQueue<RemoteDataOp> opQueue;
+    final TableComponents<K, V, U> tableComponents = tableIdToOngoingOps.get(tableId).tableComponents;
+    encodeAndSendRequestMsg(opMetadata, op.getTargetId(), executorId, tableComponents, msgSenderFuture.get());
 
-    // Operations drained from the opQueue, and processed locally.
-    private final ArrayList<RemoteDataOp> localOps;
-
-    private final int drainSize;
-
-    /**
-     * @param queueSize a size of a thread queue
-     */
-    SenderThread(final int queueSize) {
-      this.opQueue = new ArrayBlockingQueue<>(queueSize);
-      this.drainSize = queueSize >= DRAIN_PORTION ? queueSize / DRAIN_PORTION : 1;
-      this.localOps = new ArrayList<>(drainSize);
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void run() {
-      try {
-        while (!closeFlag) {
-          try {
-            final RemoteDataOp op = opQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            if (op == null) {
-              continue;
-            }
-
-            processOp(op);
-          } catch (InterruptedException e) {
-            continue;
-          }
-
-          opQueue.drainTo(localOps, drainSize);
-          localOps.forEach(this::processOp);
-          localOps.clear();
-        }
-
-        // catch and rethrow RuntimeException after leaving a log
-        // otherwise, the thread disappears without any noticeable marks
-      } catch (final Exception e) {
-        LOG.log(Level.SEVERE, "Sender thread has been down due to unexpected exception", e);
-        throw new RuntimeException(e);
-      }
-    }
-
-    private <K, V, U> void processOp(final RemoteDataOp<K, V, U> op) {
-      final DataOpMetadata opMetadata = op.getMetadata();
-      final String tableId = opMetadata.getTableId();
-
-      LOG.log(Level.FINEST, "Process op: [OpId: {0}, origId: {1}, table: {2}]]",
-          new Object[]{opMetadata.getOpId(), opMetadata.getOrigId(), tableId});
-
-      final TableComponents<K, V, U> tableComponents = tableIdToOngoingOps.get(tableId).tableComponents;
-      encodeAndSendRequestMsg(opMetadata, op.getTargetId(), executorId, tableComponents, msgSenderFuture.get());
-
-      // for operations that require replies, deregister them when receiving the reply
-      if (!opMetadata.isReplyRequired()) {
-        deregisterOp(tableId, opMetadata.getOpId());
-      }
-    }
-
-    /**
-     * Enqueue operation into a thread's queue.
-     * The operations will be processed sequentially by this thread.
-     */
-    void enqueue(final RemoteDataOp op) {
-      LOG.log(Level.FINEST, "Enqueue Op. OpId: {0}, origId: {1}",
-          new Object[]{op.getMetadata().getOpId(), op.getMetadata().getOrigId()});
-
-      while (true) {
-        try {
-          opQueue.put(op);
-          break;
-        } catch (final InterruptedException e) {
-          LOG.log(Level.SEVERE, "InterruptedException while enqueuing op", e);
-        }
-      }
+    // for operations that require replies, deregister them when receiving the reply
+    if (!opMetadata.isReplyRequired()) {
+      deregisterOp(tableId, opMetadata.getOpId());
     }
   }
 
@@ -425,8 +316,7 @@ public final class RemoteAccessOpSender {
 
     registerOp(operation, tableComponents);
 
-    final int threadIdx = getThreadIdx(blockId);
-    senderThreads.get(threadIdx).enqueue(operation);
+    commManager.enqueueSenderOp(operation);
   }
 
   /**
@@ -450,12 +340,8 @@ public final class RemoteAccessOpSender {
         new Object[]{opMetadata.getOpId(), opMetadata.getOpType(), targetEvalId});
 
     registerOp(operation, tableComponents);
-    final int threadIdx = getThreadIdx(blockId);
-    senderThreads.get(threadIdx).enqueue(operation);
-  }
 
-  private int getThreadIdx(final int hashedKey) {
-    return hashedKey % numSenderThreads;
+    commManager.enqueueSenderOp(operation);
   }
 
   /**

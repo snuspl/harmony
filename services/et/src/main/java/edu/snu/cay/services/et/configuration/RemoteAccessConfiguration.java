@@ -15,10 +15,8 @@
  */
 package edu.snu.cay.services.et.configuration;
 
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.HandlerQueueSize;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsHandlerThreads;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsSenderThreads;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.SenderQueueSize;
+import edu.snu.cay.services.et.configuration.parameters.remoteaccess.CommQueueSize;
+import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumCommThreads;
 import org.apache.reef.annotations.audience.Private;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.JavaConfigurationBuilder;
@@ -60,23 +58,13 @@ public final class RemoteAccessConfiguration {
     private Builder() {
     }
 
-    public Builder setHandlerQueueSize(final int handlerQueueSize) {
-      innerBuilder.bindNamedParameter(HandlerQueueSize.class, Integer.toString(handlerQueueSize));
+    public Builder setCommQueueSize(final int senderQueueSize) {
+      innerBuilder.bindNamedParameter(CommQueueSize.class, Integer.toString(senderQueueSize));
       return this;
     }
 
-    public Builder setSenderQueueSize(final int senderQueueSize) {
-      innerBuilder.bindNamedParameter(SenderQueueSize.class, Integer.toString(senderQueueSize));
-      return this;
-    }
-
-    public Builder setNumSenderThreads(final int numSenderThreads) {
-      innerBuilder.bindNamedParameter(NumRemoteOpsSenderThreads.class, Integer.toString(numSenderThreads));
-      return this;
-    }
-
-    public Builder setNumHandlerThreads(final int numHandlerThreads) {
-      innerBuilder.bindNamedParameter(NumRemoteOpsHandlerThreads.class, Integer.toString(numHandlerThreads));
+    public Builder setNumCommThreads(final int numSenderThreads) {
+      innerBuilder.bindNamedParameter(NumCommThreads.class, Integer.toString(numSenderThreads));
       return this;
     }
 

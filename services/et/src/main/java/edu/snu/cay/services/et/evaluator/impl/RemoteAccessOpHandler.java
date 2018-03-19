@@ -17,14 +17,11 @@ package edu.snu.cay.services.et.evaluator.impl;
 
 import edu.snu.cay.services.et.avro.*;
 import edu.snu.cay.services.et.configuration.parameters.ExecutorIdentifier;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.HandlerQueueSize;
-import edu.snu.cay.services.et.configuration.parameters.remoteaccess.NumRemoteOpsHandlerThreads;
 import edu.snu.cay.services.et.evaluator.api.Block;
 import edu.snu.cay.services.et.evaluator.api.BlockPartitioner;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.exceptions.BlockNotExistsException;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
-import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.StateMachine;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.parameters.DriverIdentifier;
@@ -50,18 +47,13 @@ import java.util.logging.Logger;
  */
 final class RemoteAccessOpHandler {
   private static final Logger LOG = Logger.getLogger(RemoteAccessOpHandler.class.getName());
-  private static final int QUEUE_TIMEOUT_MS = 3000;
-
-  private final int numHandlerThreads;
-
-  private final List<HandlerThread> handlerThreads;
-
-  private volatile boolean closeFlag = false;
 
   private final String driverId;
   private final String executorId;
   private final InjectionFuture<Tables> tablesFuture;
   private final InjectionFuture<MessageSender> msgSenderFuture;
+
+  private final CommManager commManager;
 
   /**
    * Maintains an operation tracker for each table.
@@ -70,259 +62,162 @@ final class RemoteAccessOpHandler {
 
   @Inject
   private RemoteAccessOpHandler(final InjectionFuture<Tables> tablesFuture,
+                                final CommManager commManager,
                                 @Parameter(DriverIdentifier.class) final String driverId,
                                 @Parameter(ExecutorIdentifier.class) final String executorId,
-                                @Parameter(HandlerQueueSize.class) final int queueSize,
-                                @Parameter(NumRemoteOpsHandlerThreads.class) final int numHandlerThreads,
                                 final InjectionFuture<MessageSender> msgSenderFuture) {
     this.driverId = driverId;
     this.executorId = executorId;
     this.tablesFuture = tablesFuture;
+    this.commManager = commManager;
     this.msgSenderFuture = msgSenderFuture;
-    this.numHandlerThreads = numHandlerThreads;
-    this.handlerThreads = initExecutor(numHandlerThreads, queueSize);
   }
 
-  /**
-   * Initialize threads that dequeue and execute operation from the {@code opQueue}.
-   * That is, these threads serve operations requested from remote clients.
-   */
-  private List<HandlerThread> initExecutor(final int numThreads, final int queueSize) {
-    LOG.log(Level.INFO, "Initializing {0} Handler threads with queue size: {1}",
-        new Object[]{numThreads, queueSize});
-    final ExecutorService executor = CatchableExecutors.newFixedThreadPool(numThreads);
-    final List<HandlerThread> threads = new ArrayList<>(numThreads);
-    for (int i = 0; i < numThreads; i++) {
-      final HandlerThread handlerThread = new HandlerThread(queueSize);
-      threads.add(handlerThread);
-      executor.submit(handlerThread);
-    }
-    return threads;
-  }
+  @SuppressWarnings("unchecked")
+  <K, V, U> void processOp(final DataOpMetadata opMetaData) {
+    final String tableId = opMetaData.getTableId();
+    final int blockId = opMetaData.getBlockId();
 
-  /**
-   * Close this {@link RemoteAccessOpHandler} by terminating all handler threads.
-   */
-  void close() {
-    closeFlag = true;
-  }
+    LOG.log(Level.FINEST, "Process op: [OpId: {0}, origId: {1}, tableId: {2}, blockId: {3}]]",
+        new Object[]{opMetaData.getOpId(), opMetaData.getOrigId(), tableId, blockId});
 
-  /**
-   * A runnable that handles operations requested from remote clients.
-   * Several threads are initiated at the beginning and run as long-running background services.
-   * Each thread takes charge of a disjoint set of key-space (See {@link #getThreadIdx(int)}).
-   */
-  private final class HandlerThread implements Runnable {
-    private static final int DRAIN_PORTION = 16;
-    private final BlockingQueue<DataOpMetadata> opQueue;
+    final TableComponents<K, V, U> tableComponents = tableOpTrackers.get(tableId).tableComponents;
+    final OwnershipCache ownershipCache = tableComponents.getOwnershipCache();
 
-    // Operations drained from the opQueue, and processed locally.
-    private final ArrayList<DataOpMetadata> localOps;
-
-    private final int drainSize;
-
-    /**
-     * @param queueSize a size of a thread queue
-     */
-    HandlerThread(final int queueSize) {
-      this.opQueue = new ArrayBlockingQueue<>(queueSize);
-      this.drainSize = queueSize >= DRAIN_PORTION ? queueSize / DRAIN_PORTION : 1;
-      this.localOps = new ArrayList<>(drainSize);
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void run() {
-      try {
-        while (!closeFlag) {
-          // First, poll and execute a single operation.
-          // Poll with a timeout will prevent busy waiting, when the queue is empty.
-          try {
-            final DataOpMetadata operation = opQueue.poll(QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            if (operation == null) {
-              continue;
-            }
-
-            processOp(operation);
-          } catch (final InterruptedException e) {
-            LOG.log(Level.SEVERE, "Poll failed with InterruptedException", e);
-          }
-
-          opQueue.drainTo(localOps, drainSize);
-          localOps.forEach(this::processOp);
-          localOps.clear();
-        }
-
-        // catch and rethrow RuntimeException after leaving a log
-        // otherwise, the thread disappears without any noticeable marks
-      } catch (final RuntimeException e) {
-        LOG.log(Level.SEVERE, "Handler thread has been down due to RuntimeException", e);
-        throw e;
-      }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <K, V, U> void processOp(final DataOpMetadata opMetaData) {
-      final String tableId = opMetaData.getTableId();
-      final int blockId = opMetaData.getBlockId();
-
-      LOG.log(Level.FINEST, "Process op: [OpId: {0}, origId: {1}, tableId: {2}, blockId: {3}]]",
-          new Object[]{opMetaData.getOpId(), opMetaData.getOrigId(), tableId, blockId});
-
-      final TableComponents<K, V, U> tableComponents = tableOpTrackers.get(tableId).tableComponents;
-      final OwnershipCache ownershipCache = tableComponents.getOwnershipCache();
-
-      final Pair<Optional<String>, Lock> remoteEvalIdWithLock = ownershipCache.resolveExecutorWithLock(blockId);
-      try {
-        final Optional<String> remoteEvalIdOptional = remoteEvalIdWithLock.getKey();
-        final boolean isLocal = !remoteEvalIdOptional.isPresent();
-        if (isLocal) {
-          try {
-            final BlockStore<K, V, U> blockStore = tableComponents.getBlockStore();
-            final Block<K, V, U> block = blockStore.get(blockId);
-
-            if (opMetaData.isSingleKey()) {
-              final boolean[] isSuccess = {true};
-              final V singleKeyOutput =
-                  (V) processSingleKeyOp(block, (SingleKeyDataOpMetadata) opMetaData, isSuccess);
-
-              if (opMetaData.isReplyRequired()) {
-                sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
-                    singleKeyOutput, Collections.emptyList(), isSuccess[0]);
-              }
-            } else {
-              final boolean[] isSuccess = {true};
-              final List<Pair<K, V>> multiKeyOutputs =
-                  (List<Pair<K, V>>) processMultiKeyOp(block, (MultiKeyDataOpMetadata) opMetaData, isSuccess);
-
-              if (opMetaData.isReplyRequired()) {
-                sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
-                    null, multiKeyOutputs, isSuccess[0]);
-              }
-            }
-          } catch (final BlockNotExistsException e) {
-            throw new RuntimeException(e);
-          }
-
-        } else {
-          // a case that operation comes to this executor based on wrong or stale ownership info
-          redirect(opMetaData, tableComponents, remoteEvalIdOptional.get());
-        }
-      } finally {
-        final Lock ownershipLock = remoteEvalIdWithLock.getValue();
-        ownershipLock.unlock();
-      }
-
-      deregisterOp(tableId);
-    }
-
-    private <K, V, U> V processSingleKeyOp(final Block<K, V, U> block,
-                                           final SingleKeyDataOpMetadata<K, V, U> opMetadata,
-                                           final boolean[] isSuccess) {
-      final V output;
-      final OpType opType = opMetadata.getOpType();
-      switch (opType) {
-      case PUT:
-        output = block.put(opMetadata.getKey(), opMetadata.getValue().get());
-        isSuccess[0] = true;
-        break;
-      case PUT_IF_ABSENT:
-        output = block.putIfAbsent(opMetadata.getKey(), opMetadata.getValue().get());
-        isSuccess[0] = true;
-        break;
-      case GET:
-        output = block.get(opMetadata.getKey());
-        isSuccess[0] = true;
-        break;
-      case GET_OR_INIT:
-        output = block.getOrInit(opMetadata.getKey());
-        isSuccess[0] = true;
-        break;
-      case REMOVE:
-        output = block.remove(opMetadata.getKey());
-        isSuccess[0] = true;
-        break;
-      case UPDATE:
-        output = block.update(opMetadata.getKey(), opMetadata.getUpdateValue().get());
-        isSuccess[0] = true;
-        break;
-      default:
-        LOG.log(Level.WARNING, "Undefined type of opMetaData.");
-        output = null;
-        isSuccess[0] = false;
-        break;
-      }
-      return output;
-    }
-
-    private <K, V, U> List<Pair<K, V>> processMultiKeyOp(final Block<K, V, U> block,
-                                                         final MultiKeyDataOpMetadata<K, V, U> opMetadata,
-                                                         final boolean[] isSuccess) {
-      final List<Pair<K, V>> outputs = new ArrayList<>();
-      final OpType opType = opMetadata.getOpType();
-      switch (opType) {
-      case PUT:
-        for (int index = 0; index < opMetadata.getKeys().size(); index++) {
-          final K key = opMetadata.getKeys().get(index);
-          final V localOutput = block.put(key, opMetadata.getValues().get(index));
-          if (localOutput != null) {
-            outputs.add(Pair.of(key, localOutput));
-          }
-        }
-        isSuccess[0] = true;
-        break;
-      case GET:
-        opMetadata.getKeys().forEach(key -> {
-          final V localOutput = block.get(key);
-          if (localOutput != null) {
-            outputs.add(Pair.of(key, localOutput));
-          }
-        });
-        isSuccess[0] = true;
-        break;
-      case GET_OR_INIT:
-        opMetadata.getKeys().forEach(key -> {
-          final V localOutput = block.getOrInit(key);
-          if (localOutput != null) {
-            outputs.add(Pair.of(key, localOutput));
-          }
-        });
-        isSuccess[0] = true;
-        break;
-      case UPDATE:
-        for (int index = 0; index < opMetadata.getKeys().size(); index++) {
-          final K key = opMetadata.getKeys().get(index);
-          final V localOutput = block.update(key, opMetadata.getUpdateValues().get(index));
-//          outputs.add(Pair.of(key, localOutput));
-        }
-        isSuccess[0] = true;
-        break;
-        //TODO #176: support multi-key versions of other op types (e.g. put_if_absent, remove)
-      default:
-        LOG.log(Level.WARNING, "Undefined type of opMetaData.");
-        isSuccess[0] = false;
-        break;
-      }
-      return outputs;
-    }
-
-    /**
-     * Enqueue operation into a thread's queue.
-     * The operations will be processed sequentially by this thread.
-     */
-    void enqueue(final DataOpMetadata op) {
-      LOG.log(Level.FINEST, "Enqueue Op. OpId: {0}, origId: {1}", new Object[]{op.getOpId(), op.getOrigId()});
-
-      while (true) {
+    final Pair<Optional<String>, Lock> remoteEvalIdWithLock = ownershipCache.resolveExecutorWithLock(blockId);
+    try {
+      final Optional<String> remoteEvalIdOptional = remoteEvalIdWithLock.getKey();
+      final boolean isLocal = !remoteEvalIdOptional.isPresent();
+      if (isLocal) {
         try {
-          opQueue.put(op);
-          break;
-        } catch (final InterruptedException e) {
-          LOG.log(Level.SEVERE, "InterruptedException while enqueuing op", e);
+          final BlockStore<K, V, U> blockStore = tableComponents.getBlockStore();
+          final Block<K, V, U> block = blockStore.get(blockId);
+
+          if (opMetaData.isSingleKey()) {
+            final boolean[] isSuccess = {true};
+            final V singleKeyOutput =
+                (V) processSingleKeyOp(block, (SingleKeyDataOpMetadata) opMetaData, isSuccess);
+
+            if (opMetaData.isReplyRequired()) {
+              sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
+                  singleKeyOutput, Collections.emptyList(), isSuccess[0]);
+            }
+          } else {
+            final boolean[] isSuccess = {true};
+            final List<Pair<K, V>> multiKeyOutputs =
+                (List<Pair<K, V>>) processMultiKeyOp(block, (MultiKeyDataOpMetadata) opMetaData, isSuccess);
+
+            if (opMetaData.isReplyRequired()) {
+              sendResultToOrigin(opMetaData, tableComponents.getSerializer(),
+                  null, multiKeyOutputs, isSuccess[0]);
+            }
+          }
+        } catch (final BlockNotExistsException e) {
+          throw new RuntimeException(e);
+        }
+
+      } else {
+        // a case that operation comes to this executor based on wrong or stale ownership info
+        redirect(opMetaData, tableComponents, remoteEvalIdOptional.get());
+      }
+    } finally {
+      final Lock ownershipLock = remoteEvalIdWithLock.getValue();
+      ownershipLock.unlock();
+    }
+
+    deregisterOp(tableId);
+  }
+
+  private <K, V, U> V processSingleKeyOp(final Block<K, V, U> block,
+                                         final SingleKeyDataOpMetadata<K, V, U> opMetadata,
+                                         final boolean[] isSuccess) {
+    final V output;
+    final OpType opType = opMetadata.getOpType();
+    switch (opType) {
+    case PUT:
+      output = block.put(opMetadata.getKey(), opMetadata.getValue().get());
+      isSuccess[0] = true;
+      break;
+    case PUT_IF_ABSENT:
+      output = block.putIfAbsent(opMetadata.getKey(), opMetadata.getValue().get());
+      isSuccess[0] = true;
+      break;
+    case GET:
+      output = block.get(opMetadata.getKey());
+      isSuccess[0] = true;
+      break;
+    case GET_OR_INIT:
+      output = block.getOrInit(opMetadata.getKey());
+      isSuccess[0] = true;
+      break;
+    case REMOVE:
+      output = block.remove(opMetadata.getKey());
+      isSuccess[0] = true;
+      break;
+    case UPDATE:
+      output = block.update(opMetadata.getKey(), opMetadata.getUpdateValue().get());
+      isSuccess[0] = true;
+      break;
+    default:
+      LOG.log(Level.WARNING, "Undefined type of opMetaData.");
+      output = null;
+      isSuccess[0] = false;
+      break;
+    }
+    return output;
+  }
+
+  private <K, V, U> List<Pair<K, V>> processMultiKeyOp(final Block<K, V, U> block,
+                                                       final MultiKeyDataOpMetadata<K, V, U> opMetadata,
+                                                       final boolean[] isSuccess) {
+    final List<Pair<K, V>> outputs = new ArrayList<>();
+    final OpType opType = opMetadata.getOpType();
+    switch (opType) {
+    case PUT:
+      for (int index = 0; index < opMetadata.getKeys().size(); index++) {
+        final K key = opMetadata.getKeys().get(index);
+        final V localOutput = block.put(key, opMetadata.getValues().get(index));
+        if (localOutput != null) {
+          outputs.add(Pair.of(key, localOutput));
         }
       }
+      isSuccess[0] = true;
+      break;
+    case GET:
+      opMetadata.getKeys().forEach(key -> {
+        final V localOutput = block.get(key);
+        if (localOutput != null) {
+          outputs.add(Pair.of(key, localOutput));
+        }
+      });
+      isSuccess[0] = true;
+      break;
+    case GET_OR_INIT:
+      opMetadata.getKeys().forEach(key -> {
+        final V localOutput = block.getOrInit(key);
+        if (localOutput != null) {
+          outputs.add(Pair.of(key, localOutput));
+        }
+      });
+      isSuccess[0] = true;
+      break;
+    case UPDATE:
+      for (int index = 0; index < opMetadata.getKeys().size(); index++) {
+        final K key = opMetadata.getKeys().get(index);
+        final V localOutput = block.update(key, opMetadata.getUpdateValues().get(index));
+//        outputs.add(Pair.of(key, localOutput));
+      }
+      isSuccess[0] = true;
+      break;
+    //TODO #176: support multi-key versions of other op types (e.g. put_if_absent, remove)
+    default:
+      LOG.log(Level.WARNING, "Undefined type of opMetaData.");
+      isSuccess[0] = false;
+      break;
     }
+    return outputs;
   }
+
 
   /**
    * Redirects an operation to the target executor.
@@ -383,8 +278,7 @@ final class RemoteAccessOpHandler {
       final SingleKeyDataOpMetadata<K, V, U> operation = new SingleKeyDataOpMetadata<>(origEvalId,
           opId, opType, replyRequired, tableId, blockId, decodedKey, decodedValue, decodedUpdateValue);
 
-      final int threadIdx = getThreadIdx(blockId);
-      handlerThreads.get(threadIdx).enqueue(operation);
+      commManager.enqueueHandlerOp(operation);
 
     } else {
       final DataKeys dataKeys = msg.getDataKeys();
@@ -422,8 +316,7 @@ final class RemoteAccessOpHandler {
       final MultiKeyDataOpMetadata<K, V, ?> operation = new MultiKeyDataOpMetadata<>(origEvalId,
           opId, opType, replyRequired, tableId, blockId, keyList, valueList, updateValueList);
 
-      final int threadIdx = getThreadIdx(blockId);
-      handlerThreads.get(threadIdx).enqueue(operation);
+      commManager.enqueueHandlerOp(operation);
     }
   }
 
@@ -448,10 +341,6 @@ final class RemoteAccessOpHandler {
     } catch (NetworkException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private int getThreadIdx(final int hashedKey) {
-    return hashedKey % numHandlerThreads;
   }
 
   /**

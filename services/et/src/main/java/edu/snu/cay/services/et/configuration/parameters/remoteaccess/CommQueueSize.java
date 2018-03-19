@@ -19,5 +19,5 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 
 @NamedParameter(doc = "Max number of ops that can be queued for each sender thread", default_value = "1024")
-public final class SenderQueueSize implements Name<Integer> {
+public final class CommQueueSize implements Name<Integer> {
 }

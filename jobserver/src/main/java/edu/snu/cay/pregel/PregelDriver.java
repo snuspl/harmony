@@ -127,10 +127,8 @@ public final class PregelDriver {
             .setMemSizeInMB(workerMemSize)
             .build())
         .setRemoteAccessConf(RemoteAccessConfiguration.newBuilder()
-            .setHandlerQueueSize(2048)
-            .setNumHandlerThreads(4)
-            .setSenderQueueSize(2048)
-            .setNumSenderThreads(4)
+            .setCommQueueSize(2048)
+            .setNumCommThreads(4)
             .build())
         .build();
   }

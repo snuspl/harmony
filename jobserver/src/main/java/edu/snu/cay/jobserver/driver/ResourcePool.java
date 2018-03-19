@@ -50,9 +50,7 @@ final class ResourcePool {
                        @Parameter(Parameters.ExecutorMemSize.class) final int executorMemSize,
                        @Parameter(Parameters.ExecutorNumCores.class) final int executorNumCores,
                        @Parameter(Parameters.ExecutorNumTasklets.class) final int executorNumTasklets,
-                       @Parameter(Parameters.HandlerQueueSize.class) final int handlerQueueSize,
                        @Parameter(Parameters.SenderQueueSize.class) final int senderQueueSize,
-                       @Parameter(Parameters.HandlerNumThreads.class) final int handlerNumThreads,
                        @Parameter(Parameters.SenderNumThreads.class) final int senderNumThreads) {
     this.etMaster = etMaster;
     this.numExecutors = numExecutors;
@@ -63,10 +61,8 @@ final class ResourcePool {
             .setMemSizeInMB(executorMemSize)
             .build())
         .setRemoteAccessConf(RemoteAccessConfiguration.newBuilder()
-            .setHandlerQueueSize(handlerQueueSize)
-            .setSenderQueueSize(senderQueueSize)
-            .setNumHandlerThreads(handlerNumThreads)
-            .setNumSenderThreads(senderNumThreads)
+            .setCommQueueSize(senderQueueSize)
+            .setNumCommThreads(senderNumThreads)
             .build())
         .build();
   }
