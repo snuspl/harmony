@@ -19,15 +19,18 @@ import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * A class that partitions whole key space into the same length of disjoint ranges.
+ * Key space should be in positive area.
  */
 class KeySpacePartitioner {
   private final long partitionSize;
+  private final int numPartitions;
 
   KeySpacePartitioner(final long minKey,
                       final long maxKey,
                       final int numTotalPartitions) {
     // 1. the scale of partitionSize is always upper integer (32bit)
     this.partitionSize = (maxKey - minKey) / numTotalPartitions;
+    this.numPartitions = numTotalPartitions;
   }
 
   /**
@@ -36,7 +39,15 @@ class KeySpacePartitioner {
    */
   int getPartitionId(final long key) {
     // 2. so dividing key by partitionSize always results integer
-    return (int) (key / partitionSize);
+    final int partitionId = (int) (key / partitionSize);
+    if (partitionId < 0) {
+      return 0;
+    } else if (partitionId >= numPartitions) {
+      return numPartitions - 1;
+    } else {
+      return partitionId;
+    }
+
   }
 
   /**
@@ -45,6 +56,6 @@ class KeySpacePartitioner {
    */
   Pair<Long, Long> getKeySpace(final int partitionId) {
     final long minKey = partitionSize * partitionId;
-    return Pair.of(minKey, minKey + partitionSize - 1);
+    return Pair.of(minKey, minKey + (partitionSize - 1));
   }
 }
