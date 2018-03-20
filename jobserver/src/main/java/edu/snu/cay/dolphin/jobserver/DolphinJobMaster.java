@@ -16,12 +16,16 @@
 package edu.snu.cay.dolphin.jobserver;
 
 import edu.snu.cay.dolphin.DolphinMsg;
+import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.master.DolphinMaster;
 import edu.snu.cay.dolphin.core.master.MasterSideMsgHandler;
 import edu.snu.cay.jobserver.driver.JobMaster;
+import edu.snu.cay.jobserver.driver.JobServerDriver;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
 import edu.snu.cay.utils.AvroUtils;
+import org.apache.reef.tang.InjectionFuture;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -31,12 +35,18 @@ import java.util.List;
  */
 public final class DolphinJobMaster implements JobMaster {
 
+  private final boolean offlineModelEval;
+  private final InjectionFuture<JobServerDriver> jobServerDriverFuture;
   private final DolphinMaster dolphinMaster;
   private final MasterSideMsgHandler msgHandler;
 
   @Inject
-  private DolphinJobMaster(final DolphinMaster dolphinMaster,
+  private DolphinJobMaster(@Parameter(DolphinParameters.OfflineModelEvaluation.class) final boolean offlineModelEval,
+                           final InjectionFuture<JobServerDriver> jobServerDriverFuture,
+                           final DolphinMaster dolphinMaster,
                            final MasterSideMsgHandler msgHandler) {
+    this.offlineModelEval = offlineModelEval;
+    this.jobServerDriverFuture = jobServerDriverFuture;
     this.dolphinMaster = dolphinMaster;
     this.msgHandler = msgHandler;
   }
@@ -49,6 +59,10 @@ public final class DolphinJobMaster implements JobMaster {
 
   @Override
   public void start(final List<List<AllocatedExecutor>> executorGroups, final List<AllocatedTable> tables) {
+    if (offlineModelEval) {
+      jobServerDriverFuture.get().registerDolphinMasterToEvaluateModel(dolphinMaster);
+    }
+
     final List<AllocatedExecutor> servers = executorGroups.get(0);
     final List<AllocatedExecutor> workers = executorGroups.get(1);
 

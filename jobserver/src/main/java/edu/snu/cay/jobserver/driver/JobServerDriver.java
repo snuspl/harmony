@@ -16,6 +16,8 @@
 package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.common.reef.DriverStatusManager;
+import edu.snu.cay.dolphin.core.master.DolphinMaster;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ConfigurationUtils;
@@ -33,6 +35,9 @@ import org.apache.reef.wake.time.event.StartTime;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -150,6 +155,12 @@ public final class JobServerDriver {
     stateMachine.setState(State.INIT);
   }
 
+  private final List<DolphinMaster> dolphinMastersToEvaluateModel = Collections.synchronizedList(new ArrayList<>());
+
+  public void registerDolphinMasterToEvaluateModel(final DolphinMaster dolphinMaster) {
+    this.dolphinMastersToEvaluateModel.add(dolphinMaster);
+  }
+
   /**
    * Showdown JobServer immediately by forcibly closing all executors.
    */
@@ -157,6 +168,11 @@ public final class JobServerDriver {
     if (stateMachine.getCurrentState() != State.INIT) {
       return;
     }
+
+    sendMessageToClient("Start shutting down JobServer");
+
+    final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
+    dolphinMastersToEvaluateModel.forEach(dolphinMaster -> dolphinMaster.evaluate(executors, executors));
 
     sendMessageToClient("Shutdown JobServer");
 

@@ -42,9 +42,7 @@ import org.apache.reef.tang.exceptions.InjectionException;
 import org.apache.reef.tang.formats.CommandLine;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -146,7 +144,8 @@ public final class DolphinJobLauncher {
 
     // parameters for master
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
-        MaxNumEpochs.class, NumTotalMiniBatches.class, ClockSlack.class, ServerMetricFlushPeriodMs.class
+        MaxNumEpochs.class, NumTotalMiniBatches.class, ClockSlack.class,
+        ServerMetricFlushPeriodMs.class, OfflineModelEvaluation.class
     );
 
     // commonly used parameters for ML apps
@@ -172,10 +171,13 @@ public final class DolphinJobLauncher {
     );
 
     final CommandLine cl = new CommandLine();
-    userParamList.forEach(cl::registerShortNameOfClass);
-    serverParamList.forEach(cl::registerShortNameOfClass);
-    workerParamList.forEach(cl::registerShortNameOfClass);
-    // master-side params are already included in server/worker params
+    final Set<Class<? extends Name<?>>> paramSet = new HashSet<>();
+    paramSet.addAll(masterParamList);
+    paramSet.addAll(userParamList);
+    paramSet.addAll(serverParamList);
+    paramSet.addAll(workerParamList);
+
+    paramSet.forEach(cl::registerShortNameOfClass);
 
     final Configuration commandLineConf = cl.processCommandLine(args).getBuilder().build();
     final Configuration masterConf = extractParameterConf(masterParamList, commandLineConf);
