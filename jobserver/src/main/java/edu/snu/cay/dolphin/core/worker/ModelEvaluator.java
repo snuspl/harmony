@@ -20,6 +20,7 @@ import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.ModelEvalAnsMsg;
 import edu.snu.cay.dolphin.metric.avro.DolphinWorkerMetrics;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
+import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
@@ -42,6 +43,8 @@ import java.util.logging.Logger;
 public final class ModelEvaluator {
   private static final Logger LOG = Logger.getLogger(ModelEvaluator.class.getName());
 
+  private final JobLogger jobLogger;
+
   private final InjectionFuture<TableAccessor> tableAccessorFuture;
   private final InjectionFuture<MetricCollector> metricCollectorFuture;
   private final InjectionFuture<WorkerSideMsgSender> msgSenderFuture;
@@ -56,8 +59,10 @@ public final class ModelEvaluator {
   private ModelEvaluator(final InjectionFuture<TableAccessor> tableAccessorFuture,
                          final InjectionFuture<WorkerSideMsgSender> msgSenderFuture,
                          final InjectionFuture<MetricCollector> metricCollectorFuture,
+                         final JobLogger jobLogger,
                          @Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
                          @Parameter(DolphinParameters.InputTableId.class) final String inputTableId) {
+    this.jobLogger = jobLogger;
     this.tableAccessorFuture = tableAccessorFuture;
     this.modelTableId = modelTableId;
     this.inputTableId = inputTableId;
@@ -85,6 +90,8 @@ public final class ModelEvaluator {
       final Collection<Map.Entry> trainingData = inputTable.getLocalTablet().getDataMap().entrySet();
 
       final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData, modelTable);
+
+      jobLogger.log(Level.INFO, "ObjValue: {0}", objValue);
 
       final DolphinWorkerMetrics metrics = DolphinWorkerMetrics.newBuilder()
           .setType(WorkerMetricsType.ModelEvalMetrics)
