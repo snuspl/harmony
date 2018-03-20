@@ -22,6 +22,7 @@ import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ConfigurationUtils;
 import edu.snu.cay.utils.StateMachine;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.driver.context.FailedContext;
 import org.apache.reef.driver.evaluator.FailedEvaluator;
@@ -155,10 +156,11 @@ public final class JobServerDriver {
     stateMachine.setState(State.INIT);
   }
 
-  private final List<DolphinMaster> dolphinMastersToEvaluateModel = Collections.synchronizedList(new ArrayList<>());
+  private final Map<String, Pair<JobMaster, DolphinMaster>> dolphinMastersToEvaluateModel = new ConcurrentHashMap<>();
 
-  public void registerDolphinMasterToEvaluateModel(final DolphinMaster dolphinMaster) {
-    this.dolphinMastersToEvaluateModel.add(dolphinMaster);
+  public void registerDolphinMasterToEvaluateModel(final String jobId,
+                                                   final Pair<JobMaster, DolphinMaster> masterPair) {
+    dolphinMastersToEvaluateModel.put(jobId, masterPair);
   }
 
   /**
@@ -172,7 +174,10 @@ public final class JobServerDriver {
     sendMessageToClient("Start shutting down JobServer");
 
     final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
-    dolphinMastersToEvaluateModel.forEach(dolphinMaster -> dolphinMaster.evaluate(executors, executors));
+    dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
+      registerJobMaster(jobId, masterPair.getLeft());
+      masterPair.getRight().evaluate(executors, executors);
+    });
 
     sendMessageToClient("Shutdown JobServer");
 
