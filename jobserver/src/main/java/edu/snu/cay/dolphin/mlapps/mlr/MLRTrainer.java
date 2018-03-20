@@ -15,6 +15,7 @@
  */
 package edu.snu.cay.dolphin.mlapps.mlr;
 
+import com.google.common.util.concurrent.AtomicDouble;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
 import edu.snu.cay.common.param.Parameters;
@@ -28,12 +29,14 @@ import edu.snu.cay.utils.MemoryUtils;
 import edu.snu.cay.utils.ThreadUtils;
 import edu.snu.cay.utils.Tuple3;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.reef.io.network.group.impl.utils.ResettingCountDownLatch;
 import org.apache.reef.tang.annotations.Parameter;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 
 import javax.inject.Inject;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -304,8 +307,11 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     final MLRModel mlrModel = pullModelsToEvaluate(classPartitionIndices, modelTable);
 
     LOG.log(Level.INFO, "Start computing loss value");
-    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputData, null, mlrModel);
-    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(null, testData, mlrModel);
+    final List<MLRData> inputDataList = new ArrayList<>(inputData.size());
+    inputData.forEach(entry -> inputDataList.add(entry.getValue()));
+
+    final Tuple3<Float, Float, Float> trainingLossRegLossAvgAccuracy = computeLoss(inputDataList, mlrModel);
+    final Tuple3<Float, Float, Float> testLossRegLossAvgAccuracy = computeLoss(new ArrayList<>(testData), mlrModel);
 
     final Map<CharSequence, Double> map = new HashMap<>();
     map.put("loss", (double) trainingLossRegLossAvgAccuracy.getFirst());
@@ -415,62 +421,74 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   /**
    * Compute the loss value using the current models and given data instances.
    * May take long, so do not call frequently.
-   * Only one type of MLR data arguments is not null.
    */
-  private Tuple3<Float, Float, Float> computeLoss(final Collection<Map.Entry<Long, MLRData>> kvData,
-                                                  final Collection<MLRData> data,
+  private Tuple3<Float, Float, Float> computeLoss(final List<MLRData> kvData,
                                                   final MLRModel mlrModel) {
     final Vector[] params = mlrModel.getParams();
-    final int dataSize;
 
-    double loss = 0;
-    int correctPredictions = 0;
+    final AtomicDouble loss = new AtomicDouble(0);
+    final AtomicInteger correctPredictions = new AtomicInteger(0);
 
-    if (kvData == null) {
-      dataSize = data.size();
-      for (final MLRData entry : data) {
-        final Vector feature = entry.getFeature();
-        final int label = entry.getLabel();
-        final Vector predictions = predict(feature, params);
-        final int prediction = max(predictions).getLeft();
+    final int numItemsPerThread = kvData.size() / numTrainerThreads;
+    final int numRemainders = kvData.size() % numTrainerThreads;
 
-        if (label == prediction) {
-          ++correctPredictions;
+    final ResettingCountDownLatch latch = new ResettingCountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+      executor.submit(() -> {
+        final int startIdx = numItemsPerThread * finalThreadIdx;
+        final int endIdx = startIdx + numItemsPerThread + (numRemainders > finalThreadIdx ? 1 : 0);
+
+        for (final MLRData data : kvData.subList(startIdx, endIdx)) {
+          final Vector feature = data.getFeature();
+          final int label = data.getLabel();
+          final Vector predictions = predict(feature, params);
+          final int prediction = max(predictions).getLeft();
+
+          if (label == prediction) {
+            correctPredictions.incrementAndGet();
+          }
+
+          loss.addAndGet(-Math.log(predictions.get(label)));
         }
 
-        loss += -Math.log(predictions.get(label));
-      }
-    } else {
-      dataSize = kvData.size();
-      for (final Map.Entry<Long, MLRData> entry : kvData) {
-        final Vector feature = entry.getValue().getFeature();
-        final int label = entry.getValue().getLabel();
-        final Vector predictions = predict(feature, params);
-        final int prediction = max(predictions).getLeft();
-
-        if (label == prediction) {
-          ++correctPredictions;
-        }
-
-        loss += -Math.log(predictions.get(label));
-      }
+        latch.countDown();
+      });
     }
 
-    double regLoss = 0;
+    latch.awaitAndReset(numTrainerThreads);
+
+    final AtomicDouble regLoss = new AtomicDouble(0);
+
+    // skip this part entirely if lambda is zero, to avoid regularization operation overheads
     if (lambda != 0) {
-      // skip this part entirely if lambda is zero, to avoid regularization operation overheads
-      for (int classIndex = 0; classIndex < numClasses; ++classIndex) {
-        final Vector perClassParams = params[classIndex];
-        double l2norm = 0;
-        for (int vectorIndex = 0; vectorIndex < perClassParams.length(); ++vectorIndex) {
-          l2norm += perClassParams.get(vectorIndex) * perClassParams.get(vectorIndex);
-        }
-        regLoss += l2norm * lambda / 2;
-      }
-    }
-    regLoss /= numClasses;
+      final int numClassesPerThread = numClasses / numTrainerThreads;
+      final int numClassRemainders = numClasses % numTrainerThreads;
 
-    return new Tuple3<>((float) loss, (float) regLoss, (float) correctPredictions / dataSize);
+      for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+        final int finalThreadIdx = threadIdx;
+        executor.submit(() -> {
+          final int startIdx = numClassesPerThread * finalThreadIdx;
+          final int endIdx = startIdx + numClassRemainders + (numClassRemainders > finalThreadIdx ? 1 : 0);
+
+          for (int classIndex = startIdx; classIndex < endIdx; classIndex++) {
+            final Vector perClassParams = params[classIndex];
+            double l2norm = 0;
+            for (int vectorIndex = 0; vectorIndex < perClassParams.length(); ++vectorIndex) {
+              l2norm += perClassParams.get(vectorIndex) * perClassParams.get(vectorIndex);
+            }
+            regLoss.addAndGet(l2norm * lambda / 2);
+          }
+          latch.countDown();
+        });
+      }
+
+      latch.await();
+      regLoss.set(regLoss.get() / numClasses);
+    }
+
+    return new Tuple3<>((float) loss.get(), (float) regLoss.get(), (float) correctPredictions.get() / kvData.size());
   }
 
   /**
