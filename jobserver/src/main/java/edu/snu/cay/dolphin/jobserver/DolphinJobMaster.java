@@ -65,15 +65,15 @@ public final class DolphinJobMaster implements JobMaster {
 
   @Override
   public void start(final List<List<AllocatedExecutor>> executorGroups, final List<AllocatedTable> tables) {
-    if (offlineModelEval) {
-      jobServerDriverFuture.get().registerDolphinMasterToEvaluateModel(jobId, Pair.of(this, dolphinMaster));
-    }
-
     final List<AllocatedExecutor> servers = executorGroups.get(0);
     final List<AllocatedExecutor> workers = executorGroups.get(1);
 
     final AllocatedTable modelTable = tables.get(0);
     final AllocatedTable inputTable = tables.get(1);
     dolphinMaster.start(servers, workers, modelTable, inputTable);
+
+    if (offlineModelEval) {
+      jobServerDriverFuture.get().registerDolphinMasterToEvaluateModel(jobId, Pair.of(this, dolphinMaster));
+    }
   }
 }
