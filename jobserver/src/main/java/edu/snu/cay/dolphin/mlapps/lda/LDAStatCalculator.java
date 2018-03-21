@@ -15,17 +15,24 @@
  */
 package edu.snu.cay.dolphin.mlapps.lda;
 
+import com.google.common.util.concurrent.AtomicDouble;
+import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
+import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.math3.special.Gamma;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Compute log likelihoods of the model.
@@ -51,11 +58,17 @@ final class LDAStatCalculator {
 
   private final Table<Long, LDALocalModel, ?> localModelTable;
 
+  private final int numTrainerThreads;
+
+  private final ExecutorService executor;
+
   @Inject
   private LDAStatCalculator(@Parameter(LDAParameters.Alpha.class) final double alpha,
                             @Parameter(LDAParameters.Beta.class) final double beta,
                             @Parameter(LDAParameters.NumTopics.class) final int numTopics,
                             @Parameter(LDAParameters.NumVocabs.class) final int numVocabs,
+                            @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
+                            @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                             @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
                             final TableAccessor tableAccessor) throws TableNotExistException {
     this.alpha = alpha;
@@ -65,6 +78,13 @@ final class LDAStatCalculator {
 
     this.logGammaAlpha = Gamma.logGamma(alpha);
     this.logGammaBeta = Gamma.logGamma(beta);
+
+    // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
+    this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
+        Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
+        numTrainerThreads;
+    this.executor = CatchableExecutors.newFixedThreadPool(this.numTrainerThreads);
+
     this.localModelTable = tableAccessor.getTable(localModelTableId);
   }
 
@@ -79,26 +99,51 @@ final class LDAStatCalculator {
    * @return a portion of log likelihood computed from the given documentPairs
    */
   double computeDocLLH(final Collection<Map.Entry<Long, Document>> documentPairs) {
-    double result = documentPairs.size() * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha));
-    for (final Map.Entry<Long, Document> documentPair : documentPairs) {
-      final Document document = documentPair.getValue();
-      final LDALocalModel localModel;
-      try {
-        localModel = localModelTable.get(documentPair.getKey(), false).get();
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
+    final List<Map.Entry<Long, Document>> documentPairList = new ArrayList<>(documentPairs);
 
-      for (int j = 0; j < numTopics; j++) {
-        final int topicCount = localModel.getTopicCount(j);
-        if (topicCount < 0) {
-          localModel.setTopicCount(j, 0);
+    final int numItemsPerThread = documentPairList.size() / numTrainerThreads;
+    final int numRemainders = documentPairList.size() % numTrainerThreads;
+
+    final AtomicDouble result = new AtomicDouble(documentPairs.size()
+        * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha)));
+
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+      executor.submit(() -> {
+        final int startIdx = numItemsPerThread * finalThreadIdx;
+        final int endIdx = startIdx + numItemsPerThread + (finalThreadIdx < numRemainders ? 1 : 0);
+
+        for (final Map.Entry<Long, Document> documentPair : documentPairList.subList(startIdx, endIdx)) {
+          final Document document = documentPair.getValue();
+          final LDALocalModel localModel;
+          try {
+            localModel = localModelTable.get(documentPair.getKey(), false).get();
+          } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+          }
+
+          for (int j = 0; j < numTopics; j++) {
+            final int topicCount = localModel.getTopicCount(j);
+            if (topicCount < 0) {
+              localModel.setTopicCount(j, 0);
+            }
+            result.addAndGet(topicCount <= 0 ? logGammaAlpha : Gamma.logGamma(topicCount + alpha));
+          }
+          result.addAndGet(-Gamma.logGamma(document.size() + numTopics * alpha));
         }
-        result += topicCount <= 0 ? logGammaAlpha : Gamma.logGamma(topicCount + alpha);
-      }
-      result -= Gamma.logGamma(document.size() + numTopics * alpha);
+        latch.countDown();
+      });
     }
-    return result;
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    return result.get();
   }
 
   /**
