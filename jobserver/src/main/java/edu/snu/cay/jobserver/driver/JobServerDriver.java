@@ -74,6 +74,8 @@ public final class JobServerDriver {
   private final ExecutorService submitCommandHandler = CatchableExecutors.newFixedThreadPool(4);
   private final ExecutorService shutdownCommandHandler = CatchableExecutors.newFixedThreadPool(1);
 
+  private final Map<String, Pair<JobMaster, DolphinMaster>> dolphinMastersToEvaluateModel = new ConcurrentHashMap<>();
+
   @Inject
   private JobServerDriver(final ETMaster etMaster,
                           final JobMessageObserver jobMessageObserver,
@@ -155,8 +157,10 @@ public final class JobServerDriver {
     stateMachine.setState(State.INIT);
   }
 
-  private final Map<String, Pair<JobMaster, DolphinMaster>> dolphinMastersToEvaluateModel = new ConcurrentHashMap<>();
-
+  /**
+   * Register a pair of {@link JobMaster} and {@link DolphinMaster}
+   * to perform model evaluation later (See {@link #shutdown()}).
+   */
   public void registerDolphinMasterToEvaluateModel(final String jobId,
                                                    final Pair<JobMaster, DolphinMaster> masterPair) {
     dolphinMastersToEvaluateModel.put(jobId, masterPair);
@@ -164,6 +168,7 @@ public final class JobServerDriver {
 
   /**
    * Showdown JobServer immediately by forcibly closing all executors.
+   * Perform model evaluation before shutdown.
    */
   private synchronized void shutdown() {
     if (stateMachine.getCurrentState() != State.INIT) {
@@ -172,6 +177,7 @@ public final class JobServerDriver {
 
     sendMessageToClient("Start shutting down JobServer");
 
+    // perform model evaluation
     final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
     dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
       registerJobMaster(jobId, masterPair.getLeft());
