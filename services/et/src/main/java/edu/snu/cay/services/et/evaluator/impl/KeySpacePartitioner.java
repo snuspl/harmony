@@ -40,14 +40,7 @@ class KeySpacePartitioner {
   int getPartitionId(final long key) {
     // 2. so dividing key by partitionSize always results integer
     final int partitionId = (int) (key / partitionSize);
-    if (partitionId < 0) {
-      return 0;
-    } else if (partitionId >= numPartitions) {
-      return numPartitions - 1;
-    } else {
-      return partitionId;
-    }
-
+    return partitionId == numPartitions ? numPartitions - 1 : partitionId;
   }
 
   /**
@@ -56,6 +49,6 @@ class KeySpacePartitioner {
    */
   Pair<Long, Long> getKeySpace(final int partitionId) {
     final long minKey = partitionSize * partitionId;
-    return Pair.of(minKey, minKey + (partitionSize - 1));
+    return Pair.of(minKey, minKey + partitionSize - 1);
   }
 }
