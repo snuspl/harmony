@@ -311,7 +311,7 @@ public final class MigrationManagerTest {
 
     @Override
     public void sendTableLoadMsg(final long opId, final String executorId, final String tableId,
-                                 final HdfsSplitInfo hdfsSplitInfo) {
+                                 final List<HdfsSplitInfo> hdfsSplitInfos) {
 
     }
 
