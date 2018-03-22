@@ -182,6 +182,7 @@ public final class JobServerDriver {
     dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
       registerJobMaster(jobId, masterPair.getLeft());
       masterPair.getRight().evaluate(executors, executors);
+      deregisterJobMaster(jobId);
     });
 
     sendMessageToClient("Shutdown JobServer");
