@@ -593,7 +593,7 @@
   "fields":
   [
     {"name": "type", "type": {"type": "enum", "name": "TaskletControlType",
-        "symbols": ["Start", "Stop"]}},
+        "symbols": ["Start", "Stop", "Wait", "Ready"]}},
     {"name": "taskConf", "type": ["null", "string"], "default": null}
   ]
 },

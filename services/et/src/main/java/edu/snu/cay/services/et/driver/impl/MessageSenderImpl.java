@@ -32,6 +32,7 @@ import javax.inject.Inject;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A message sender implementation.
@@ -398,6 +399,32 @@ public final class MessageSenderImpl implements MessageSender {
 
     try {
       networkConnection.send(executorId, msg);
+    } catch (final NetworkException e) {
+      throw new RuntimeException("NetworkException while sending TaskletStop message", e);
+    }
+  }
+
+  @Override
+  public void sendTaskUnitReadyMsg(final Set<String> executorIds, final String jobId) {
+    final TaskletControlMsg taskletControlMsg = TaskletControlMsg.newBuilder()
+        .setType(TaskletControlType.Ready)
+        .build();
+
+    final byte[] innerMsg = AvroUtils.toBytes(
+        TaskletMsg.newBuilder()
+            .setType(TaskletMsgType.TaskletControlMsg)
+            .setTaskletId(jobId)
+            .setTaskletControlMsg(taskletControlMsg)
+            .build(), TaskletMsg.class);
+
+    final ETMsg msg = ETMsg.newBuilder()
+        .setType(ETMsgType.TaskletMsg)
+        .setInnerMsg(ByteBuffer.wrap(innerMsg)).build();
+
+    try {
+      for (final String executorId : executorIds) {
+        networkConnection.send(executorId, msg);
+      }
     } catch (final NetworkException e) {
       throw new RuntimeException("NetworkException while sending TaskletStop message", e);
     }

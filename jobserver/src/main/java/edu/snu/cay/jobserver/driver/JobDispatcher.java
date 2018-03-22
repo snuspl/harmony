@@ -17,6 +17,7 @@ package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.driver.impl.GlobalTaskUnitScheduler;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.client.JobMessageObserver;
@@ -35,14 +36,17 @@ final class JobDispatcher {
 
   private final InjectionFuture<JobServerDriver> jobServerDriverFuture;
   private final InjectionFuture<JobScheduler> jobSchedulerFuture;
+  private final InjectionFuture<GlobalTaskUnitScheduler> globalTaskUnitSchedulerFuture;
   private final JobMessageObserver jobMessageObserver;
 
   @Inject
   private JobDispatcher(final InjectionFuture<JobServerDriver> jobServerDriverFuture,
                         final InjectionFuture<JobScheduler> jobSchedulerFuture,
+                        final InjectionFuture<GlobalTaskUnitScheduler> globalTaskUnitSchedulerFuture,
                         final JobMessageObserver jobMessageObserver) {
     this.jobServerDriverFuture = jobServerDriverFuture;
     this.jobSchedulerFuture = jobSchedulerFuture;
+    this.globalTaskUnitSchedulerFuture = globalTaskUnitSchedulerFuture;
     this.jobMessageObserver = jobMessageObserver;
   }
 
@@ -60,12 +64,14 @@ final class JobDispatcher {
       try {
         final JobMaster jobMaster = jobEntity.getJobMaster();
         jobServerDriverFuture.get().registerJobMaster(jobEntity.getJobId(), jobMaster);
+        globalTaskUnitSchedulerFuture.get().onJobStart(jobEntity.getJobId(), executors.size());
 
         sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
         jobMaster.start(executorGroupsToTables.getLeft(), executorGroupsToTables.getRight());
 
       } finally {
         sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
+        globalTaskUnitSchedulerFuture.get().onJobFinish(jobEntity.getJobId());
         jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
         jobSchedulerFuture.get().onJobFinish(jobEntity);
       }

@@ -15,23 +15,23 @@
  */
 package edu.snu.cay.services.et.evaluator.impl;
 
+import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.reef.tang.InjectionFuture;
 
 import javax.inject.Inject;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
+import java.util.Map;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A class that schedules TaskUnits for CPU and Network resources.
+ * A class that locally schedules TaskUnits for CPU and Network resources.
  * Only one TaskUnit can run with each type of resources.
  */
-public final class TaskUnitScheduler {
-  private static final Logger LOG = Logger.getLogger(TaskUnitScheduler.class.getName());
+public final class LocalTaskUnitScheduler {
+  private static final Logger LOG = Logger.getLogger(LocalTaskUnitScheduler.class.getName());
 
   private final Semaphore cpuSemaphore = new Semaphore(1);
   private final Semaphore netSemaphore = new Semaphore(1);
@@ -39,8 +39,17 @@ public final class TaskUnitScheduler {
   private final BlockingQueue<Pair<TaskUnitInfo, CountDownLatch>> cpuReadyQueue = new LinkedBlockingQueue<>();
   private final BlockingQueue<Pair<TaskUnitInfo, CountDownLatch>> netReadyQueue = new LinkedBlockingQueue<>();
 
+  /**
+   * A jobs waiting to be ready by {@link edu.snu.cay.services.et.driver.impl.GlobalTaskUnitScheduler}.
+   */
+  private final Map<String, Pair<TaskUnitInfo, CountDownLatch>> waitingJobs = new ConcurrentHashMap<>();
+
+  private final InjectionFuture<MessageSender> msgSenderFuture;
+
   @Inject
-  private TaskUnitScheduler() {
+  private LocalTaskUnitScheduler(final InjectionFuture<MessageSender> msgSenderFuture) {
+    this.msgSenderFuture = msgSenderFuture;
+
     CatchableExecutors.newSingleThreadExecutor().submit(() -> {
       while (true) {
         try {
@@ -74,21 +83,42 @@ public final class TaskUnitScheduler {
   public void waitSchedule(final TaskUnitInfo taskUnitInfo) {
     LOG.log(Level.INFO, "Wait for schedule. TaskUnitInfo: {0}", taskUnitInfo);
     try {
+      if (taskUnitInfo.getResourceType().equals(TaskUnitInfo.ResourceType.VOID)) {
+        LOG.log(Level.INFO, "TaskUnit ready. TaskUnitInfo: {0}", taskUnitInfo);
+        LOG.log(Level.INFO, "Schedule TaskUnit. TaskUnitInfo: {0}", taskUnitInfo);
+        return;
+      }
+
       final Pair<TaskUnitInfo, CountDownLatch> taskUnitPair = Pair.of(taskUnitInfo, new CountDownLatch(1));
-      switch (taskUnitInfo.getResourceType()) {
+      waitingJobs.put(taskUnitInfo.getTaskletId(), taskUnitPair);
+
+      msgSenderFuture.get().sendTaskUnitWaitMsg(taskUnitInfo.getTaskletId());
+
+      taskUnitPair.getValue().await();
+
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Should be called when a TaskUnit becomes ready.
+   */
+  public void onTaskUnitReady(final String jobId) {
+    final Pair<TaskUnitInfo, CountDownLatch> taskUnitPair = waitingJobs.remove(jobId);
+    LOG.log(Level.INFO, "TaskUnit ready. TaskUnitInfo: {0}", taskUnitPair.getKey());
+    try {
+      switch (taskUnitPair.getKey().getResourceType()) {
       case CPU:
+        // send to wait msg to master
         cpuReadyQueue.put(taskUnitPair);
         break;
       case NET:
         netReadyQueue.put(taskUnitPair);
         break;
-      case VOID:
-        LOG.log(Level.INFO, "Schedule TaskUnit. TaskUnitInfo: {0}", taskUnitPair.getKey());
-        return;
       default:
         throw new RuntimeException();
       }
-      taskUnitPair.getValue().await();
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
