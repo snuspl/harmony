@@ -16,6 +16,7 @@
 package edu.snu.cay.dolphin.mlapps.nmf;
 
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AtomicDouble;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorEntry;
 import edu.snu.cay.common.math.linalg.VectorFactory;
@@ -225,7 +226,7 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
 
     LOG.log(Level.INFO, "Start computing loss value");
     final Map<CharSequence, Double> map = new HashMap<>();
-    map.put("loss", (double) computeLoss(inputData, localModel, model));
+    map.put("loss", computeLoss(inputData, localModel, model));
 
     return map;
   }
@@ -380,23 +381,48 @@ final class NMFTrainer implements Trainer<Integer, NMFData> {
    * @param dataPairs The training data instances to evaluate training loss.
    * @return the loss value, computed by the sum of the errors.
    */
-  private float computeLoss(final Collection<Map.Entry<Integer, NMFData>> dataPairs,
+  private double computeLoss(final Collection<Map.Entry<Integer, NMFData>> dataPairs,
                             final NMFLocalModel nmfLocalModel,
                             final NMFModel model) {
     final Map<Integer, Vector> rMatrix = model.getRMatrix();
     final Map<Integer, Vector> lMatrix = nmfLocalModel.getLMatrix();
 
-    float loss = 0.0f;
-    for (final Map.Entry<Integer, NMFData> dataPair : dataPairs) {
-      final Vector lVec = lMatrix.get(dataPair.getKey()); // L_{i, *} : i-th row of L
-      for (final Pair<Integer, Float> column : dataPair.getValue().getColumns()) { // a pair of column index and value
-        final int colIdx = column.getLeft();
-        final Vector rVec = rMatrix.get(colIdx); // R_{*, j} : j-th column of R
-        final float error = lVec.dot(rVec) - column.getRight(); // e = L_{i, *} * R_{*, j} - D_{i, j}
-        loss += error * error;
-      }
+    final List<Map.Entry<Integer, NMFData>> dataPairList = new ArrayList<>(dataPairs);
+
+    final int numItemsPerThread = dataPairList.size() / numTrainerThreads;
+    final int numRemainders = dataPairList.size() % numTrainerThreads;
+
+    final AtomicDouble loss = new AtomicDouble(0);
+
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+      executor.submit(() -> {
+        final int startIdx = numItemsPerThread * finalThreadIdx;
+        final int endIdx = startIdx + numItemsPerThread + (finalThreadIdx < numRemainders ? 1 : 0);
+
+        for (final Map.Entry<Integer, NMFData> dataPair : dataPairList.subList(startIdx, endIdx)) {
+          final Vector lVec = lMatrix.get(dataPair.getKey()); // L_{i, *} : i-th row of L
+          for (final Pair<Integer, Float> column : dataPair.getValue().getColumns()) {
+            // a pair of column index and value
+            final int colIdx = column.getLeft();
+            final Vector rVec = rMatrix.get(colIdx); // R_{*, j} : j-th column of R
+            final float error = lVec.dot(rVec) - column.getRight(); // e = L_{i, *} * R_{*, j} - D_{i, j}
+            loss.addAndGet(error * error);
+          }
+        }
+        latch.countDown();
+      });
     }
-    return loss;
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    return loss.get();
   }
 
   /**
