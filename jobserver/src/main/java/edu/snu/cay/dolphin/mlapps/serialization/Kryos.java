@@ -18,7 +18,8 @@ package edu.snu.cay.dolphin.mlapps.serialization;
 import com.esotericsoftware.kryo.Kryo;
 
 /**
- * Created by xyzi on 23/03/2018.
+ * A class for providing thread-local Kryo instances.
+ * A Kryo instance is not thread-safe.
  */
 public final class Kryos {
   // configure kryo instance, customize settings
@@ -31,8 +32,7 @@ public final class Kryos {
   }
 
   /**
-   *
-   * @return
+   * @return a thread-local Kryo instance
    */
   public static Kryo get() {
     return KRYOS.get();

@@ -26,7 +26,7 @@ import javax.inject.Inject;
 import java.util.logging.Logger;
 
 /**
- * Created by xyzi on 09/01/2018.
+ * An implementation of Kryo {@link Serializer} for {@link Vector} in a dense form.
  */
 public final class DenseVectorSerializer extends Serializer<Vector> {
   private static final Logger LOG = Logger.getLogger(DenseVectorSerializer.class.getName());
