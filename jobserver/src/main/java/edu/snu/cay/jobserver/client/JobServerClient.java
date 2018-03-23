@@ -23,6 +23,8 @@ import edu.snu.cay.jobserver.driver.DriverSideMsgHandler;
 import edu.snu.cay.jobserver.driver.JobServerDriver;
 import edu.snu.cay.common.reef.DriverStatusManager;
 import edu.snu.cay.services.et.configuration.ETDriverConfiguration;
+import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpCommitPath;
+import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpTempPath;
 import edu.snu.cay.services.et.driver.impl.LoggingMetricReceiver;
 import edu.snu.cay.services.et.metric.configuration.MetricServiceDriverConf;
 import edu.snu.cay.utils.ConfigurationUtils;
@@ -94,8 +96,7 @@ public final class JobServerClient {
       final int timeout = clientParameterInjector.getNamedInstance(Timeout.class);
 
       try (DriverLauncher driverLauncher = DriverLauncher.getLauncher(runTimeConf)) {
-        status = driverLauncher.run(Configurations.merge(driverConf, customDriverConf,
-              driverParamConf), timeout);
+        status = driverLauncher.run(Configurations.merge(driverConf, customDriverConf), timeout);
       }
 
     } catch (final Exception e) {
@@ -125,6 +126,7 @@ public final class JobServerClient {
 
     // parameters for driver (job server)
     final List<Class<? extends Name<?>>> driverParamList = Arrays.asList(DriverMemory.class,
+        ChkpCommitPath.class, ChkpTempPath.class,
         NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class, ExecutorNumTasklets.class,
         HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class,
         SchedulerClass.class);
@@ -171,14 +173,21 @@ public final class JobServerClient {
         .set(DriverConfiguration.ON_CLIENT_MESSAGE, JobServerDriver.ClientMessageHandler.class)
         .build();
 
-    final Configuration jobServerConf = Tang.Factory.getTang().newConfigurationBuilder()
-        .bindSetEntry(DriverIdleSources.class, DriverStatusManager.class)
-        .bindImplementation(JobScheduler.class, (Class<? extends JobScheduler>)
-            Class.forName(driverParamInjector.getNamedInstance(Parameters.SchedulerClass.class)))
-        .build();
+    final Configuration jobServerConf = Configurations.merge(Tang.Factory.getTang().newConfigurationBuilder()
+            .bindSetEntry(DriverIdleSources.class, DriverStatusManager.class)
+            .bindImplementation(JobScheduler.class, (Class<? extends JobScheduler>)
+                Class.forName(driverParamInjector.getNamedInstance(Parameters.SchedulerClass.class)))
+            .build(),
+        ConfigurationUtils.extractParameterConf(
+            Arrays.asList(NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class, ExecutorNumTasklets.class,
+                HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class),
+            driverParamConf)
+    );
 
     final Configuration etMasterConfiguration = ETDriverConfiguration.CONF
         .set(ETDriverConfiguration.TASKLET_CUSTOM_MSG_HANDLER, DriverSideMsgHandler.class)
+        .set(ETDriverConfiguration.CHKP_COMMIT_PATH, driverParamInjector.getNamedInstance(ChkpCommitPath.class))
+        .set(ETDriverConfiguration.CHKP_TEMP_PATH, driverParamInjector.getNamedInstance(ChkpTempPath.class))
         .build();
 
     final Configuration metricServiceConf = MetricServiceDriverConf.CONF

@@ -69,7 +69,7 @@ public final class ChkpManagerMaster {
 
   /**
    * A class that encapsulates the information of a checkpoint.
-   * It know the location of each block.
+   * It knows the location of each block.
    */
   private final class Checkpoint {
     private final String checkpointId; // {tableId}-{timestamp}

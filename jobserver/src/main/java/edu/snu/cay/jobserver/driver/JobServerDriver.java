@@ -16,10 +16,13 @@
 package edu.snu.cay.jobserver.driver;
 
 import edu.snu.cay.common.reef.DriverStatusManager;
+import edu.snu.cay.dolphin.core.master.DolphinMaster;
+import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.ETMaster;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.ConfigurationUtils;
 import edu.snu.cay.utils.StateMachine;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.driver.client.JobMessageObserver;
 import org.apache.reef.driver.context.FailedContext;
 import org.apache.reef.driver.evaluator.FailedEvaluator;
@@ -33,6 +36,8 @@ import org.apache.reef.wake.time.event.StartTime;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -68,6 +73,8 @@ public final class JobServerDriver {
 
   private final ExecutorService submitCommandHandler = CatchableExecutors.newFixedThreadPool(4);
   private final ExecutorService shutdownCommandHandler = CatchableExecutors.newFixedThreadPool(1);
+
+  private final Map<String, Pair<JobMaster, DolphinMaster>> dolphinMastersToEvaluateModel = new ConcurrentHashMap<>();
 
   @Inject
   private JobServerDriver(final ETMaster etMaster,
@@ -151,12 +158,32 @@ public final class JobServerDriver {
   }
 
   /**
+   * Register a pair of {@link JobMaster} and {@link DolphinMaster}
+   * to perform model evaluation later (See {@link #shutdown()}).
+   */
+  public void registerDolphinMasterToEvaluateModel(final String jobId,
+                                                   final Pair<JobMaster, DolphinMaster> masterPair) {
+    dolphinMastersToEvaluateModel.put(jobId, masterPair);
+  }
+
+  /**
    * Showdown JobServer immediately by forcibly closing all executors.
+   * Perform model evaluation before shutdown.
    */
   private synchronized void shutdown() {
     if (stateMachine.getCurrentState() != State.INIT) {
       return;
     }
+
+    sendMessageToClient("Start shutting down JobServer");
+
+    // perform model evaluation
+    final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
+    dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
+      registerJobMaster(jobId, masterPair.getLeft());
+      masterPair.getRight().evaluate(executors, executors);
+      deregisterJobMaster(jobId);
+    });
 
     sendMessageToClient("Shutdown JobServer");
 
