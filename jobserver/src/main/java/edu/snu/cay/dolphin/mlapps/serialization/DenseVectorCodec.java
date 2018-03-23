@@ -15,6 +15,8 @@
  */
 package edu.snu.cay.dolphin.mlapps.serialization;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
 import org.apache.reef.io.network.impl.StreamingCodec;
@@ -30,20 +32,21 @@ import java.util.logging.Logger;
 public final class DenseVectorCodec implements Codec<Vector>, StreamingCodec<Vector> {
   private static final Logger LOG = Logger.getLogger(DenseVectorCodec.class.getName());
   private final VectorFactory vectorFactory;
+  private final DenseVectorSerializer denseVectorSerializer;
 
   @Inject
-  private DenseVectorCodec(final VectorFactory vectorFactory) {
+  private DenseVectorCodec(final VectorFactory vectorFactory,
+                           final DenseVectorSerializer denseVectorSerializer) {
     this.vectorFactory = vectorFactory;
+    this.denseVectorSerializer = denseVectorSerializer;
   }
 
   @Override
   public byte[] encode(final Vector vector) {
-    try (ByteArrayOutputStream baos = new ByteArrayOutputStream(getNumBytes(vector));
-         DataOutputStream daos = new DataOutputStream(baos)) {
-      encodeToStream(vector, daos);
-      return baos.toByteArray();
-    } catch (final IOException e) {
-      throw new RuntimeException(e.getCause());
+    // Kryo requires one additional byte I don't know why
+    try (Output output = new Output(getNumBytes(vector) + 1)) {
+      Kryos.get().writeObject(output, vector, denseVectorSerializer);
+      return output.toBytes();
     }
   }
 
@@ -65,10 +68,8 @@ public final class DenseVectorCodec implements Codec<Vector>, StreamingCodec<Vec
 
   @Override
   public Vector decode(final byte[] bytes) {
-    try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes))) {
-      return decodeFromStream(dis);
-    } catch (final IOException e) {
-      throw new RuntimeException(e.getCause());
+    try (Input input = new Input(bytes)) {
+      return Kryos.get().readObject(input, Vector.class, denseVectorSerializer);
     }
   }
 
