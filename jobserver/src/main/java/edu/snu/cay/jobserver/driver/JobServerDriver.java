@@ -122,7 +122,7 @@ public final class JobServerDriver {
    * @param jobId a job Id
    * @param jobMaster a {@link JobMaster}
    */
-  void registerJobMaster(final String jobId, final JobMaster jobMaster) {
+  synchronized void registerJobMaster(final String jobId, final JobMaster jobMaster) {
     if (jobMasterMap.put(jobId, jobMaster) != null) {
       throw new RuntimeException();
     }
@@ -132,9 +132,14 @@ public final class JobServerDriver {
    * Deregisters a {@link JobMaster} upon job finish.
    * @param jobId a job Id
    */
-  void deregisterJobMaster(final String jobId) {
+  synchronized void deregisterJobMaster(final String jobId) {
     if (jobMasterMap.remove(jobId) == null) {
       throw new RuntimeException();
+    }
+
+    // wake up a thread waiting in a shutdown method
+    if (jobMasterMap.isEmpty()) {
+      notifyAll();
     }
   }
 
@@ -159,7 +164,7 @@ public final class JobServerDriver {
 
   /**
    * Register a pair of {@link JobMaster} and {@link DolphinMaster}
-   * to perform model evaluation later (See {@link #shutdown()}).
+   * to perform model evaluation later (See {@link #shutdown}).
    */
   public void registerDolphinMasterToEvaluateModel(final String jobId,
                                                    final Pair<JobMaster, DolphinMaster> masterPair) {
@@ -170,24 +175,39 @@ public final class JobServerDriver {
    * Showdown JobServer immediately by forcibly closing all executors.
    * Perform model evaluation before shutdown.
    */
-  private synchronized void shutdown() {
+  private synchronized void shutdown(final boolean killRunningJobs) {
     if (stateMachine.getCurrentState() != State.INIT) {
       return;
     }
 
-    sendMessageToClient("Start shutting down JobServer");
+    stateMachine.setState(State.CLOSED);
 
-    // perform model evaluation
-    final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
-    dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
-      registerJobMaster(jobId, masterPair.getLeft());
-      masterPair.getRight().evaluate(executors, executors);
-      deregisterJobMaster(jobId);
-    });
+    // wait until all running jobs finish and evaluate models
+    if (!killRunningJobs) {
+      sendMessageToClient("JobServer will shutdown after waiting for all running jobs finish");
+
+      if (!jobMasterMap.isEmpty()) {
+        try {
+          wait();
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      if (!dolphinMastersToEvaluateModel.isEmpty()) {
+        sendMessageToClient("Start evaluating models");
+
+        // perform model evaluation
+        final List<AllocatedExecutor> executors = new ArrayList<>(resourcePool.getExecutors().values());
+        dolphinMastersToEvaluateModel.forEach((jobId, masterPair) -> {
+          registerJobMaster(jobId, masterPair.getLeft());
+          masterPair.getRight().evaluate(executors, executors);
+          deregisterJobMaster(jobId);
+        });
+      }
+    }
 
     sendMessageToClient("Shutdown JobServer");
-
-    stateMachine.setState(State.CLOSED);
 
     driverStatusManager.finishDriver();
     resourcePool.close();
@@ -236,7 +256,8 @@ public final class JobServerDriver {
         });
         break;
       case SHUTDOWN_COMMAND:
-        shutdownCommandHandler.submit(JobServerDriver.this::shutdown);
+        final boolean killRunningJobs = Boolean.parseBoolean(result[1]);
+        shutdownCommandHandler.submit(() -> shutdown(killRunningJobs));
         break;
       default:
         throw new RuntimeException("There is unexpected command");
