@@ -72,6 +72,12 @@ public final class Parameters {
 
   }
 
+  @NamedParameter(doc = "Whether to kill running jobs and halt job server right now or wait jobs to finish",
+      short_name = "kill")
+  public final class KillRunningJobs implements Name<Boolean> {
+
+  }
+
   @NamedParameter(doc = "An identifier of App.")
   public final class AppIdentifier implements Name<String> {
 

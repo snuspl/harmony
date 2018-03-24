@@ -57,8 +57,8 @@ public final class CommandSender {
    * Sends a shut down command message to {@link JobServerClient}.
    * Client will pass command message to {@link JobServerDriver} to call a method {@code JobServerDriver.shutdown()}.
    */
-  void sendShutdownCommand() throws IOException {
-    final String commandMsg = Parameters.SHUTDOWN_COMMAND + Parameters.COMMAND_DELIMITER;
+  void sendShutdownCommand(final boolean killRunningJobs) throws IOException {
+    final String commandMsg = Parameters.SHUTDOWN_COMMAND + Parameters.COMMAND_DELIMITER + killRunningJobs;
 
     LOG.log(Level.INFO, "Job command : {0}", new Object[]{Parameters.SHUTDOWN_COMMAND});
     sendCommand(commandMsg);

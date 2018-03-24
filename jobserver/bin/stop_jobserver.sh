@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # EXAMPLE USAGE
-# ./stop_jobserver.sh 
+# ./stop_jobserver.sh -kill false
 
 SELF_JAR=`echo ../target/jobserver-*-shaded.jar`
 
