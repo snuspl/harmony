@@ -43,7 +43,6 @@ public final class DolphinJobEntity implements JobEntity {
 
   private final TableConfiguration serverTableConf;
   private final TableConfiguration workerTableConf;
-  private final String inputPath;
 
   private final Optional<TableConfiguration> localModelTableConfOptional;
 
@@ -51,13 +50,11 @@ public final class DolphinJobEntity implements JobEntity {
                            final String jobId,
                            final TableConfiguration serverTableConf,
                            final TableConfiguration workerTableConf,
-                           final String inputPath,
                            final Optional<TableConfiguration> localModelTableConfOptional) {
     this.jobInjector = jobInjector;
     this.jobId = jobId;
     this.serverTableConf = serverTableConf;
     this.workerTableConf = workerTableConf;
-    this.inputPath = inputPath;
     this.localModelTableConfOptional = localModelTableConfOptional;
   }
 
@@ -109,7 +106,6 @@ public final class DolphinJobEntity implements JobEntity {
         // If the input table with the same id already exists, the table is re-used.
       } catch (TableNotExistException e) {
         inputTable = etMaster.createTable(workerTableConf, workers).get();
-        inputTable.load(workers, inputPath).get();
       }
 
       tables.add(modelTable);
@@ -132,7 +128,6 @@ public final class DolphinJobEntity implements JobEntity {
 
     private TableConfiguration serverTableConf;
     private TableConfiguration workerTableConf;
-    private String inputPath;
     private TableConfiguration workerLocalModelTableConf = null; // optional
 
     private Builder() {
@@ -158,11 +153,6 @@ public final class DolphinJobEntity implements JobEntity {
       return this;
     }
 
-    public Builder setInputPath(final String inputPath) {
-      this.inputPath = inputPath;
-      return this;
-    }
-
     public Builder setWorkerLocalModelTableConf(final TableConfiguration workerLocalModelTableConf) {
       this.workerLocalModelTableConf = workerLocalModelTableConf;
       return this;
@@ -170,7 +160,7 @@ public final class DolphinJobEntity implements JobEntity {
 
     @Override
     public DolphinJobEntity build() {
-      return new DolphinJobEntity(jobInjector, jobId, serverTableConf, workerTableConf, inputPath,
+      return new DolphinJobEntity(jobInjector, jobId, serverTableConf, workerTableConf,
           Optional.ofNullable(workerLocalModelTableConf));
     }
   }

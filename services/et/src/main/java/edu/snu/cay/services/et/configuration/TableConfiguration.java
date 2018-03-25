@@ -28,6 +28,8 @@ import org.apache.reef.tang.Configurations;
 import org.apache.reef.tang.Tang;
 import org.apache.reef.util.BuilderUtils;
 
+import java.util.Optional;
+
 /**
  * A configuration required for creating a table.
  */
@@ -41,6 +43,7 @@ public final class TableConfiguration {
   private final boolean isOrderedTable;
   private final int chunkSize;
   private final int numTotalBlocks;
+  private final Optional<String> inputPathOptional;
   private final Class<? extends DataParser> dataParserClass;
   private final Class<? extends BulkDataLoader> bulkDataLoaderClass;
   private final Configuration userParamConf;
@@ -56,6 +59,7 @@ public final class TableConfiguration {
                              final boolean isOrderedTable,
                              final Integer chunkSize,
                              final Integer numTotalBlocks,
+                             final String inputPath,
                              final Class<? extends DataParser> dataParserClass,
                              final Class<? extends BulkDataLoader> bulkDataLoaderClass,
                              final Configuration userParamConf) {
@@ -68,6 +72,7 @@ public final class TableConfiguration {
     this.isOrderedTable = isOrderedTable;
     this.chunkSize = chunkSize;
     this.numTotalBlocks = numTotalBlocks;
+    this.inputPathOptional = Optional.ofNullable(inputPath);
     this.dataParserClass = dataParserClass;
     this.bulkDataLoaderClass = bulkDataLoaderClass;
     this.userParamConf = userParamConf;
@@ -134,6 +139,10 @@ public final class TableConfiguration {
    */
   public int getChunkSize() {
     return chunkSize;
+  }
+
+  public Optional<String> getInputPathOptional() {
+    return inputPathOptional;
   }
 
   /**
@@ -212,6 +221,7 @@ public final class TableConfiguration {
      */
     private Integer chunkSize = Integer.valueOf(ChunkSize.DEFAULT_VALUE_STR);
     private Integer numTotalBlocks = Integer.valueOf(NumTotalBlocks.DEFAULT_VALUE_STR);
+    private String inputPath = null;
     private Class<? extends DataParser> dataParserClass = DefaultDataParser.class;
     private Class<? extends BulkDataLoader> bulkDataLoaderClass = NoneKeyBulkDataLoader.class;
     private Configuration userParamConf = Tang.Factory.getTang().newConfigurationBuilder().build(); // empty conf
@@ -264,6 +274,11 @@ public final class TableConfiguration {
       return this;
     }
 
+    public Builder setInputPath(final String inputPath) {
+      this.inputPath = inputPath;
+      return this;
+    }
+
     public Builder setDataParserClass(final Class<? extends DataParser> dataParserClass) {
       this.dataParserClass = dataParserClass;
       return this;
@@ -290,7 +305,7 @@ public final class TableConfiguration {
       BuilderUtils.notNull(isOrderedTable);
 
       return new TableConfiguration(id, keyCodecClass, valueCodecClass, updateValueCodecClass, updateFunctionClass,
-          isMutableTable, isOrderedTable, chunkSize, numTotalBlocks,
+          isMutableTable, isOrderedTable, chunkSize, numTotalBlocks, inputPath,
           dataParserClass, bulkDataLoaderClass, userParamConf);
     }
   }
