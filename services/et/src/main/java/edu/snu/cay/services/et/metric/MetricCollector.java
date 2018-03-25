@@ -130,7 +130,9 @@ public final class MetricCollector {
 
   private List<ByteBuffer> encodeCustomMetrics(final List<Object> metrics) {
     final List<ByteBuffer> encodedMetrics = new ArrayList<>(metrics.size());
-    metrics.forEach(m -> encodedMetrics.add(ByteBuffer.wrap(customMetricCodec.encode(m))));
+    if (customMetricCodec != null) {
+      metrics.forEach(m -> encodedMetrics.add(ByteBuffer.wrap(customMetricCodec.encode(m))));
+    }
     return encodedMetrics;
   }
 }
