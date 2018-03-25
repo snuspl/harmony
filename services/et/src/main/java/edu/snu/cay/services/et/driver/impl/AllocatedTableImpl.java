@@ -104,11 +104,30 @@ public final class AllocatedTableImpl implements AllocatedTable {
     // partition table into blocks and initialize them in associators
     blockManager.init(executorIds);
 
-    final ListenableFuture<?> initResultFuture =
-        tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus());
+    final ListenableFuture<?> initFuture;
+    if (tableConfiguration.getInputPathOptional().isPresent()) {
+      final String inputPath = tableConfiguration.getInputPathOptional().get();
 
-    initResultFuture.addListener(result -> stateMachine.setState(State.INITIALIZED));
-    return initResultFuture;
+      final ResultFuture<?> resultFuture = new ResultFuture<>();
+      initFuture = resultFuture;
+
+      final ListenableFuture<?> initResultFuture =
+          tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus());
+
+      initResultFuture.addListener(o1 -> {
+        final Set<String> executorIdSet = new HashSet<>(initialAssociators.size());
+        initialAssociators.forEach(executor -> executorIdSet.add(executor.getId()));
+
+        tableControlAgent.load(tableConf.getId(), executorIdSet, inputPath)
+            .addListener(o2 -> resultFuture.onCompleted(null));
+      });
+
+    } else {
+      initFuture = tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus());
+    }
+
+    initFuture.addListener(result -> stateMachine.setState(State.INITIALIZED));
+    return initFuture;
   }
 
   @Override

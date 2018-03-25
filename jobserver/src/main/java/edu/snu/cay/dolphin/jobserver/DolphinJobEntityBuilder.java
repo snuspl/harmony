@@ -91,7 +91,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final String inputTableId = pathSplit[pathSplit.length - 1]; // Use filename for table ID
     jobInjector.bindVolatileParameter(InputTableId.class, inputTableId);
 
-    final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId,
+    final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId, inputPath,
         workerInjector, numWorkerBlocks, userParamConf);
 
     final TableConfiguration localModelTableConf;
@@ -112,12 +112,12 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setJobId(dolphinJobId)
         .setServerTableConf(serverTableConf)
         .setWorkerTableConf(workerTableConf)
-        .setInputPath(inputPath)
         .setWorkerLocalModelTableConf(localModelTableConf)
         .build();
   }
 
   private static TableConfiguration buildWorkerTableConf(final String tableId,
+                                                         final String inputPath,
                                                          final Injector workerInjector,
                                                          final int numTotalBlocks,
                                                          final Configuration userParamConf) throws InjectionException {
@@ -135,6 +135,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
         .setIsOrderedTable(false)
+        .setInputPath(inputPath)
         .setDataParserClass(dataParser.getClass())
         .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
         .setUserParamConf(userParamConf)

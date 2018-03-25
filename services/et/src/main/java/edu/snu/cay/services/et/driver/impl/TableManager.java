@@ -157,7 +157,7 @@ final class TableManager {
    * @return {@link AllocatedTable} whose id is {@code tableId}
    * @throws TableNotExistException
    */
-  AllocatedTable getAllocatedTable(final String tableId) throws TableNotExistException {
+  synchronized AllocatedTable getAllocatedTable(final String tableId) throws TableNotExistException {
     final AllocatedTable table = allocatedTableMap.get(tableId);
     if (table == null) {
       throw new TableNotExistException(tableId + " does not exist.");
