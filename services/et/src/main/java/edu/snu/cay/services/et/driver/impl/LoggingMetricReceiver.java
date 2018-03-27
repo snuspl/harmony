@@ -19,7 +19,6 @@ import edu.snu.cay.services.et.avro.MetricMsg;
 import edu.snu.cay.services.et.driver.api.MetricReceiver;
 
 import javax.inject.Inject;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -34,6 +33,6 @@ public final class LoggingMetricReceiver implements MetricReceiver {
 
   @Override
   public void onMetricMsg(final String srcId, final MetricMsg msg) {
-    LOG.log(Level.INFO, "Received a metric from {0}: {1}", new Object[] {srcId, msg});
+//    LOG.log(Level.INFO, "Received a metric from {0}: {1}", new Object[] {srcId, msg});
   }
 }
