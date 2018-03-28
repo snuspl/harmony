@@ -28,7 +28,7 @@ import javax.inject.Inject;
  * Vectors are initialized with random values
  * between {@link NMFParameters.InitialMin} and {@link NMFParameters.InitialMax} using {@link java.util.Random}.
  */
-public final class NMFETModelUpdateFunction implements UpdateFunction<Integer, Vector, Vector> {
+public final class NMFETModelUpdateFunction implements UpdateFunction<Object, Vector, Vector> {
   private final NMFModelGenerator modelGenerator;
   private final float stepSize;
 
@@ -40,12 +40,12 @@ public final class NMFETModelUpdateFunction implements UpdateFunction<Integer, V
   }
 
   @Override
-  public Vector initValue(final Integer key) {
+  public Vector initValue(final Object key) {
     return modelGenerator.createRandomVector();
   }
 
   @Override
-  public Vector updateValue(final Integer key, final Vector oldValue, final Vector deltaValue) {
+  public Vector updateValue(final Object key, final Vector oldValue, final Vector deltaValue) {
     final Vector newVec = oldValue.axpy(-stepSize, deltaValue);
     // assume that all vectors are dense vectors
     return modelGenerator.getValidVector(newVec);

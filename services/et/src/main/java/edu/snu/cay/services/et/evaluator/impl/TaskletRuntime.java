@@ -20,6 +20,7 @@ import edu.snu.cay.services.et.configuration.parameters.NumTasklets;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 import edu.snu.cay.services.et.evaluator.api.TaskletCustomMsgHandler;
+import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.Injector;
@@ -30,7 +31,6 @@ import javax.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,7 +57,7 @@ public final class TaskletRuntime {
                          @Parameter(NumTasklets.class) final int numTasklets) {
     this.taskletBaseInjector = taskletBaseInjector;
     this.msgSender = msgSender;
-    this.taskletThreadPool = Executors.newFixedThreadPool(numTasklets);
+    this.taskletThreadPool = CatchableExecutors.newFixedThreadPool(numTasklets);
   }
 
   /**
