@@ -27,16 +27,16 @@ final class NMFLocalModel {
    * Row-wise representation of left matrix.
    * The map's key is a row index of matrix and value is a vector representing the row.
    */
-  private final Map<Integer, Vector> lMatrix;
+  private final Map<Long, Vector> lMatrix;
 
-  NMFLocalModel(final Map<Integer, Vector> lMatrix) {
+  NMFLocalModel(final Map<Long, Vector> lMatrix) {
     this.lMatrix = lMatrix;
   }
 
   /**
    * @return the L matrix
    */
-  Map<Integer, Vector> getLMatrix() {
+  Map<Long, Vector> getLMatrix() {
     return lMatrix;
   }
 }

@@ -55,6 +55,7 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
   @Override
   public void encodeToStream(final NMFData nmfData, final DataOutputStream daos) {
     try {
+      daos.write(nmfData.getRowIdx());
       encodeColumns(nmfData.getColumns(), daos);
     } catch (final IOException e) {
       throw new RuntimeException(e);
@@ -64,8 +65,9 @@ final class NMFDataCodec implements Codec<NMFData>, StreamingCodec<NMFData> {
   @Override
   public NMFData decodeFromStream(final DataInputStream dais) {
     try {
+      final int rowIdx = dais.read();
       final List<Pair<Integer, Float>> columns = decodeColumns(dais);
-      return new NMFData(columns);
+      return new NMFData(rowIdx, columns);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }

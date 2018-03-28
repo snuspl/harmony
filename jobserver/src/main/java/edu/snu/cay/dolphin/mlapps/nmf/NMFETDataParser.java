@@ -36,7 +36,7 @@ import java.util.List;
  * </p>
  * In this format, one-based indexing is used.
  */
-final class NMFETDataParser implements DataParser<Pair<Integer, NMFData>> {
+final class NMFETDataParser implements DataParser<NMFData> {
 
   @Inject
   private NMFETDataParser() {
@@ -79,8 +79,8 @@ final class NMFETDataParser implements DataParser<Pair<Integer, NMFData>> {
   }
 
   @Override
-  public List<Pair<Integer, NMFData>> parse(final Collection<String> rawData) {
-    final List<Pair<Integer, NMFData>> result = new LinkedList<>();
+  public List<NMFData> parse(final Collection<String> rawData) {
+    final List<NMFData> result = new LinkedList<>();
 
     for (final String value : rawData) {
       final String line = value.trim();
@@ -100,7 +100,7 @@ final class NMFETDataParser implements DataParser<Pair<Integer, NMFData>> {
         throw new RuntimeException("Failed to parse: invalid indices. It should be greater than zero");
       }
 
-      result.add(Pair.of(rowIndex, new NMFData(parseColumns(split[1].trim()))));
+      result.add(new NMFData(rowIndex, parseColumns(split[1].trim())));
     }
     return result;
   }

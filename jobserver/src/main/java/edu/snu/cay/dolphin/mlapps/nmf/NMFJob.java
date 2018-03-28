@@ -19,6 +19,7 @@ import edu.snu.cay.dolphin.core.client.ETDolphinConfiguration;
 import edu.snu.cay.dolphin.jobserver.DolphinJobLauncher;
 import edu.snu.cay.dolphin.mlapps.serialization.DenseVectorCodec;
 import edu.snu.cay.utils.IntegerCodec;
+import edu.snu.cay.utils.LongCodec;
 
 import static edu.snu.cay.dolphin.mlapps.nmf.NMFParameters.*;
 
@@ -36,7 +37,6 @@ public final class NMFJob {
   public static void main(final String[] args) {
     DolphinJobLauncher.submitJob("NMF", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(NMFTrainer.class)
-        .setHasInputDataKey()
         .setInputParserClass(NMFETDataParser.class)
         .setInputKeyCodecClass(IntegerCodec.class)
         .setInputValueCodecClass(NMFDataCodec.class)
@@ -45,7 +45,7 @@ public final class NMFJob {
         .setModelUpdateValueCodecClass(DenseVectorCodec.class)
         .setModelUpdateFunctionClass(NMFETModelUpdateFunction.class)
         .setHasLocalModelTable()
-        .setLocalModelKeyCodecClass(IntegerCodec.class)
+        .setLocalModelKeyCodecClass(LongCodec.class)
         .setLocalModelValueCodecClass(DenseVectorCodec.class)
         .setLocalModelUpdateValueCodecClass(DenseVectorCodec.class)
         .setLocalModelUpdateFunctionClass(NMFETModelUpdateFunction.class)

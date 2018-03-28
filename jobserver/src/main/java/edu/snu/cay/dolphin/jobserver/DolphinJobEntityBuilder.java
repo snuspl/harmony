@@ -134,7 +134,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setUpdateFunctionClass(VoidUpdateFunction.class)
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(false)
-        .setIsOrderedTable(false)
+        .setIsOrderedTable(true)
         .setInputPath(inputPath)
         .setDataParserClass(dataParser.getClass())
         .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
@@ -160,7 +160,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setUpdateFunctionClass(updateFunction.getClass())
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(true)
-        .setIsOrderedTable(false)
+        .setIsOrderedTable(true)
         .setUserParamConf(userParamConf)
         .build();
   }

@@ -24,10 +24,17 @@ import java.util.List;
  */
 final class NMFData {
 
+  private final int rowIdx;
   private final List<Pair<Integer, Float>> columns;
 
-  NMFData(final List<Pair<Integer, Float>> columns) {
+  NMFData(final int rowIdx,
+          final List<Pair<Integer, Float>> columns) {
+    this.rowIdx = rowIdx;
     this.columns = columns;
+  }
+
+  int getRowIdx() {
+    return rowIdx;
   }
 
   List<Pair<Integer, Float>> getColumns() {
