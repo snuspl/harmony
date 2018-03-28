@@ -55,32 +55,34 @@ public final class NoneKeyBulkDataLoader<V> implements BulkDataLoader {
   }
 
   @Override
-  public void load(final String tableId, final String serializedHdfsSplitInfo)
+  public void load(final String tableId, final List<String> serializedHdfsSplitInfos)
       throws IOException, KeyGenerationException, TableNotExistException {
-    LOG.log(Level.INFO, "Before loading data. Used memory {0} MB", MemoryUtils.getUsedMemoryMB());
-    final HdfsDataSet<?, Text> hdfsDataSet = HdfsDataSet.from(serializedHdfsSplitInfo);
-    final List<String> rawDataList = new LinkedList<>();
-    hdfsDataSet.forEach(pair -> rawDataList.add(pair.getValue().toString()));
+    for (final String serializedHdfsSplitInfo : serializedHdfsSplitInfos) {
+      LOG.log(Level.INFO, "Before loading data. Used memory {0} MB", MemoryUtils.getUsedMemoryMB());
+      final HdfsDataSet<?, Text> hdfsDataSet = HdfsDataSet.from(serializedHdfsSplitInfo);
+      final List<String> rawDataList = new LinkedList<>();
+      hdfsDataSet.forEach(pair -> rawDataList.add(pair.getValue().toString()));
 
-    final List<V> dataList = dataParser.parse(rawDataList);
-    LOG.log(Level.INFO, "{0} data items have been loaded from hdfs. Used memory: {1} MB",
-        new Object[] {dataList.size(), MemoryUtils.getUsedMemoryMB()});
+      final List<V> dataList = dataParser.parse(rawDataList);
+      LOG.log(Level.INFO, "{0} data items have been loaded from hdfs. Used memory: {1} MB",
+          new Object[]{dataList.size(), MemoryUtils.getUsedMemoryMB()});
 
-    final Iterator<V> dataIterator = dataList.iterator();
-    final Map<Integer, List<Long>> blockIdToKeyListMap = localKeyGenerator.getBlockToKeys(dataList.size());
-    final List<Pair<Long, V>> keyValuePairList = new ArrayList<>(dataList.size());
+      final Iterator<V> dataIterator = dataList.iterator();
+      final Map<Integer, List<Long>> blockIdToKeyListMap = localKeyGenerator.getBlockToKeys(dataList.size());
+      final List<Pair<Long, V>> keyValuePairList = new ArrayList<>(dataList.size());
 
-    blockIdToKeyListMap.values().forEach(list -> list.forEach(key ->
-        keyValuePairList.add(Pair.of(key, dataIterator.next()))));
+      blockIdToKeyListMap.values().forEach(list -> list.forEach(key ->
+          keyValuePairList.add(Pair.of(key, dataIterator.next()))));
 
-    LOG.log(Level.INFO, "{0} data items are assigned to {1} blocks. Used memory: {2} MB",
-        new Object[]{dataList.size(), blockIdToKeyListMap.size(), MemoryUtils.getUsedMemoryMB()});
+      LOG.log(Level.INFO, "{0} data items are assigned to {1} blocks. Used memory: {2} MB",
+          new Object[]{dataList.size(), blockIdToKeyListMap.size(), MemoryUtils.getUsedMemoryMB()});
 
-    try {
-      final Table<Long, V, ?> loadTable = tablesFuture.get().getTable(tableId);
-      loadTable.multiPut(keyValuePairList).get();
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
+      try {
+        final Table<Long, V, ?> loadTable = tablesFuture.get().getTable(tableId);
+        loadTable.multiPut(keyValuePairList).get();
+      } catch (InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }
