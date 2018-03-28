@@ -51,22 +51,24 @@ public final class ExistKeyBulkDataLoader<K, V> implements BulkDataLoader {
   }
 
   @Override
-  public void load(final String tableId, final String serializedHdfsSplitInfo)
+  public void load(final String tableId, final List<String> serializedHdfsSplitInfos)
       throws IOException, KeyGenerationException, TableNotExistException {
-    LOG.log(Level.INFO, "Before loading data. Used memory {0} MB", MemoryUtils.getUsedMemoryMB());
-    final HdfsDataSet<?, Text> hdfsDataSet = HdfsDataSet.from(serializedHdfsSplitInfo);
-    final List<String> rawDataList = new LinkedList<>();
-    hdfsDataSet.forEach(pair -> rawDataList.add(pair.getValue().toString()));
+    for (final String serializedHdfsSplitInfo : serializedHdfsSplitInfos) {
+      LOG.log(Level.INFO, "Before loading data. Used memory {0} MB", MemoryUtils.getUsedMemoryMB());
+      final HdfsDataSet<?, Text> hdfsDataSet = HdfsDataSet.from(serializedHdfsSplitInfo);
+      final List<String> rawDataList = new LinkedList<>();
+      hdfsDataSet.forEach(pair -> rawDataList.add(pair.getValue().toString()));
 
-    final List<Pair<K, V>> dataList = dataParser.parse(rawDataList);
-    LOG.log(Level.INFO, "{0} data items have been loaded from hdfs. Used memory: {1} MB",
-        new Object[] {dataList.size(), MemoryUtils.getUsedMemoryMB()});
+      final List<Pair<K, V>> dataList = dataParser.parse(rawDataList);
+      LOG.log(Level.INFO, "{0} data items have been loaded from hdfs. Used memory: {1} MB",
+          new Object[]{dataList.size(), MemoryUtils.getUsedMemoryMB()});
 
-    final Table<K, V, ?> loadTable = tablesFuture.get().getTable(tableId);
-    try {
-      loadTable.multiPut(dataList).get();
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
+      final Table<K, V, ?> loadTable = tablesFuture.get().getTable(tableId);
+      try {
+        loadTable.multiPut(dataList).get();
+      } catch (InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }

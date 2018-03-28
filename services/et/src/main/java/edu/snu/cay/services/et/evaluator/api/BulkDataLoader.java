@@ -21,6 +21,7 @@ import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.reef.tang.annotations.DefaultImplementation;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * An interface that loads data into table from a file.
@@ -30,11 +31,11 @@ public interface BulkDataLoader {
 
   /**
    * Loads a data for table from a file specified by {@code serializedHdfsSplitInfo}.
-   * @param serializedHdfsSplitInfo a serialized hdfs split info
+   * @param serializedHdfsSplitInfos a list of serialized hdfs split info
    * @throws IOException when fail to create HdfsDataSet from {@code serializedSplitInfo}
    * @throws KeyGenerationException when fail to generate keys for data without key
    * @throws TableNotExistException when there's no initialized table with {@code tableId}
    */
-  void load(String tableId, String serializedHdfsSplitInfo)
+  void load(String tableId, List<String> serializedHdfsSplitInfos)
       throws IOException, KeyGenerationException, TableNotExistException;
 }

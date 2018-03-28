@@ -40,7 +40,7 @@ import java.util.logging.Logger;
 @DriverSide
 final class TableControlAgent {
   private static final Logger LOG = Logger.getLogger(TableControlAgent.class.getName());
-  private static final int NUM_SPLIT_PER_EXECUTOR = 1;
+  private static final int NUM_SPLIT_PER_EXECUTOR = 32;
 
   private final AtomicLong operationIdCounter = new AtomicLong(0);
 

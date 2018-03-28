@@ -20,6 +20,8 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A class that generates keys for local blocks. It works only for ordered tables whose key type is {@link Long}.
@@ -29,6 +31,8 @@ import java.util.*;
 final class LocalKeyGenerator {
   private final OwnershipCache ownershipCache;
   private final OrderingBasedBlockPartitioner orderingBasedBlockPartitioner;
+
+  private final Map<Integer, AtomicLong> blockKeyCounters = new ConcurrentHashMap<>();
 
   @Inject
   private LocalKeyGenerator(final OwnershipCache ownershipCache,
@@ -77,13 +81,18 @@ final class LocalKeyGenerator {
         numKeysToAllocate = numKeysPerBlock;
       }
 
+      blockKeyCounters.putIfAbsent(blockId, new AtomicLong());
+
+      final long numUsedKeys = blockKeyCounters.get(blockId).getAndAdd(numKeysToAllocate);
+
       // though we may delegate an overflow to other blocks that have space, let's just throw exception
-      if (maxKey - minKey + 1 < numKeysToAllocate) {
+      if (maxKey - minKey + 1 < numKeysToAllocate - numUsedKeys) {
         throw new KeyGenerationException("The number of keys in one block has exceeded its limit.");
       }
 
+      final long startKey = minKey + numUsedKeys;
       // simply start from minKey
-      for (long key = minKey; key < minKey + numKeysToAllocate; key++) {
+      for (long key = startKey; key < startKey + numKeysToAllocate; key++) {
         keys.add(key);
       }
     }

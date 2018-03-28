@@ -42,7 +42,6 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -218,24 +217,20 @@ public final class MessageHandlerImpl implements MessageHandler {
       final String tableId = msg.getTableId();
       final BulkDataLoader bulkDataLoader = tablesFuture.get().getTableComponents(tableId).getBulkDataLoader();
 
-      final AtomicInteger numSplitsToLoad = new AtomicInteger(serializedHdfsSplitInfos.size());
-      serializedHdfsSplitInfos.forEach(serializedHdfsSplitInfo ->
-          dataLoadExecutor.submit(() -> {
-            try {
-              bulkDataLoader.load(tableId, serializedHdfsSplitInfo);
-            } catch (IOException | KeyGenerationException | TableNotExistException e) {
-              throw new RuntimeException("Exception while loading data", e);
-            }
+      dataLoadExecutor.submit(() -> {
+        try {
+          bulkDataLoader.load(tableId, serializedHdfsSplitInfos);
+        } catch (IOException | KeyGenerationException | TableNotExistException e) {
+          throw new RuntimeException("Exception while loading data", e);
+        }
 
-            if (numSplitsToLoad.decrementAndGet() == 0) {
-              LOG.log(Level.INFO, "Bulk-loading for Table {0} has been done. opId: {1}", new Object[]{tableId, opId});
-              try {
-                msgSenderFuture.get().sendTableLoadAckMsg(opId, tableId);
-              } catch (NetworkException e) {
-                throw new RuntimeException(e);
-              }
-            }
-          }));
+        LOG.log(Level.INFO, "Bulk-loading for Table {0} has been done. opId: {1}", new Object[]{tableId, opId});
+        try {
+          msgSenderFuture.get().sendTableLoadAckMsg(opId, tableId);
+        } catch (NetworkException e) {
+          throw new RuntimeException(e);
+        }
+      });
 
     } catch (TableNotExistException e) {
       throw new RuntimeException(e);
