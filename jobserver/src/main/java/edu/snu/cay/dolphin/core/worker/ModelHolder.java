@@ -25,7 +25,7 @@ import java.util.Optional;
  * Trainer threads access the model through {@link #getModel()}.
  * @param <M> Type of the app-specific model.
  */
-@DefaultImplementation(ThreadLocalModelHolder.class)
+@DefaultImplementation(ModelCopyHolder.class)
 public interface ModelHolder<M extends Copyable<M>> {
 
   /**
@@ -37,5 +37,5 @@ public interface ModelHolder<M extends Copyable<M>> {
   /**
    * @return the up-to-date model if set through {@link #resetModel}. Otherwise {@link Optional#empty()} is returned.
    */
-  Optional<M> getModel();
+  M getModel();
 }

@@ -140,6 +140,7 @@ final class LDATrainer implements Trainer<Long, Document> {
   public void localCompute() {
     final List<TopicChanges> results = sampler.sample(miniBatchTrainingData);
 
+    modelHolder.resetModel(null);
     aggregatedMiniBatchResult = aggregateChanges(results);
   }
 
