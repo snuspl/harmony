@@ -231,7 +231,9 @@ final class ExecutorManager {
 
       final JVMProcess jvmProcess = jvmProcessFactory.newEvaluatorProcess()
           .setMemory((int)(memSizeInMB * (1 - jvmHeapSlack)))
-          .addOption("-XX:+UseG1GC");
+          .addOption("-XX:+UseG1GC")
+          .addOption("-XX:+PrintGCApplicationConcurrentTime")
+          .addOption("-XX:+PrintGCApplicationStoppedTime");
 
       allocatedEvaluator.setProcess(jvmProcess);
 
