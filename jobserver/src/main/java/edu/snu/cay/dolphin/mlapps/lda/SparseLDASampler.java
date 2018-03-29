@@ -102,8 +102,7 @@ final class SparseLDASampler {
       for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
         final Future<TopicChanges> future = executor.submit(() -> {
           final List<Map.Entry<Long, Document>> drainedInstances = new ArrayList<>(drainSize);
-          final LDAModel model = modelHolder.getModel()
-              .orElseThrow(() -> new RuntimeException(MSG_GET_MODEL_FAILED));
+          final LDAModel model = modelHolder.getModel();
 
           int count = 0;
           while (true) {

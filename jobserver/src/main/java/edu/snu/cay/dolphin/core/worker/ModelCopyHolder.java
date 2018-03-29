@@ -19,31 +19,25 @@ import edu.snu.cay.utils.Copyable;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
-import java.util.Optional;
 
 /**
  * ModelHolder that provides model assigned to Trainer threads locally.
  */
 @ThreadSafe
-public final class ThreadLocalModelHolder<M extends Copyable<M>> implements ModelHolder<M> {
-  private ThreadLocal<M> model;
+public final class ModelCopyHolder<M extends Copyable<M>> implements ModelHolder<M> {
+  private M model;
 
   @Inject
-  private ThreadLocalModelHolder() {
+  private ModelCopyHolder() {
   }
 
   @Override
   public void resetModel(final M newModel) {
-    final M copied = newModel.copyOf(); // we keep the model's copy to discard the changes made outside.
-    model = ThreadLocal.withInitial(copied::copyOf);
+    this.model = newModel;
   }
 
   @Override
-  public Optional<M> getModel() {
-    if (model == null) {
-      return Optional.empty();
-    } else {
-      return Optional.ofNullable(model.get());
-    }
+  public M getModel() {
+    return model.copyOf();
   }
 }
