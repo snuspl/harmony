@@ -62,7 +62,6 @@ public abstract class ExactNumSplitFileInputFormat<K, V> extends FileInputFormat
       }
       totalSize += file.getLen();
     }
-    final long splitSize = totalSize / (numSplits == 0 ? 1 : numSplits); // modified
 
     // generate splits
     final ArrayList<FileSplit> splits = new ArrayList<>(numSplits);
@@ -83,20 +82,18 @@ public abstract class ExactNumSplitFileInputFormat<K, V> extends FileInputFormat
         // split if possible
         if (isSplitable(fs, path)) {
           long bytesRemaining = length;
-          while (((double) bytesRemaining) / splitSize > SPLIT_SLOP) {
+          for (int splitIdx = 0; splitIdx < numSplits; splitIdx++) {
+            final long splitSize = bytesRemaining / (numSplits - splitIdx);
+
             final String[][] splitHosts = getSplitHostsAndCachedHosts(blkLocations,
                 length - bytesRemaining, splitSize, clusterMap);
-            splits.add(makeSplit(path, length - bytesRemaining, splitSize,
-                splitHosts[0], splitHosts[1]));
-            bytesRemaining -= splitSize;
+            final FileSplit split = makeSplit(path, length - bytesRemaining, splitSize,
+                splitHosts[0], splitHosts[1]);
+            splits.add(split);
+            bytesRemaining -= split.getLength();
           }
 
-          if (bytesRemaining != 0) {
-            final String[][] splitHosts = getSplitHostsAndCachedHosts(blkLocations,
-                length - bytesRemaining, bytesRemaining, clusterMap);
-            splits.add(makeSplit(path, length - bytesRemaining, bytesRemaining,
-                splitHosts[0], splitHosts[1]));
-          }
+          // ignore even if bytesRemaining is not zero
         } else {
           final String[][] splitHosts = getSplitHostsAndCachedHosts(blkLocations,
               0, length, clusterMap);
@@ -107,6 +104,9 @@ public abstract class ExactNumSplitFileInputFormat<K, V> extends FileInputFormat
         splits.add(makeSplit(path, 0, length, new String[0]));
       }
     }
+
+    Collections.shuffle(splits);
+
     return splits.toArray(new FileSplit[splits.size()]);
   }
 
