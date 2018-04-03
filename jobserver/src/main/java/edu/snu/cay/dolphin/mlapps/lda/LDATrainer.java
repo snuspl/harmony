@@ -68,6 +68,8 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   private final String taskletId;
 
+  private final ExecutorService executor;
+
   @Inject
   private LDATrainer(final SparseLDASampler sampler,
                      final LDAStatCalculator statCalculator,
@@ -98,6 +100,10 @@ final class LDATrainer implements Trainer<Long, Document> {
 
     this.modelHolder = modelHolder;
 
+    this.executor = CatchableExecutors.newFixedThreadPool(numTrainerThreads);
+
+    this.gradientsToPush = Collections.synchronizedList(new ArrayList<>(numTrainerThreads));
+
     LOG.log(Level.INFO, "Number of total mini-batches in an epoch = {0}", numTotalMiniBatches);
     LOG.log(Level.INFO, "All random topic assignments are updated");
   }
@@ -107,7 +113,6 @@ final class LDATrainer implements Trainer<Long, Document> {
     // In LDA, topic counts should be initialized by pushing values before running.
     final List<Map.Entry<Long, Document>> epochData = new ArrayList<>(trainingDataProvider.getEpochData());
 
-    final ExecutorService executor = CatchableExecutors.newFixedThreadPool(numTrainerThreads);
     final CyclicBarrier barrier = new CyclicBarrier(numTrainerThreads);
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
@@ -182,7 +187,7 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
 
-  private volatile Map<Integer, int[]> gradientsToPush;
+  private final List<Map<Integer, int[]>> gradientsToPush;
 
   private List<Integer> words;
 
@@ -226,18 +231,46 @@ final class LDATrainer implements Trainer<Long, Document> {
 
     // perform sampling
     final List<TopicChanges> results = sampler.sample(miniBatchTrainingData);
-    miniBatchTrainingData = null;
 
+    miniBatchTrainingData = null;
     modelHolder.resetModel(null);
 
-    gradientsToPush = getGradientsToPush(aggregateChanges(results));
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+      executor.submit(() -> {
+        final TopicChanges topicChanges = results.get(finalThreadIdx);
+        gradientsToPush.add(getGradientsToPush(topicChanges));
+        latch.countDown();
+      });
+    }
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
   public void pushUpdate() {
-    modelAccessor.push(gradientsToPush);
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+    for (final Map<Integer, int[]> gradients : gradientsToPush) {
+      executor.submit(() -> {
+        modelAccessor.push(gradients);
+        gradients.clear();
+        latch.countDown();
+      });
+    }
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
     gradientsToPush.clear();
-    gradientsToPush = null;
   }
 
   @Override
@@ -288,27 +321,6 @@ final class LDATrainer implements Trainer<Long, Document> {
     }
 
     return sparseArray;
-  }
-
-  /**
-   * Aggregates the changed topics computed by each thread.
-   * @param results a list of the number of changes per topic.
-   * @return Sum of the number of changes per topic.
-   */
-  private TopicChanges aggregateChanges(final List<TopicChanges> results) {
-    final TopicChanges aggregated = new TopicChanges();
-    results.forEach(
-        result -> {
-          final Table<Integer, Integer, Integer> changedTopicCounts = result.getTable();
-          changedTopicCounts.cellSet().forEach(
-              cell -> {
-                if (cell.getValue() != 0) {
-                  aggregated.increment(cell.getRowKey(), cell.getColumnKey(), cell.getValue());
-                }
-              }
-          );
-        });
-    return aggregated;
   }
 
   private Map<Integer, int[]> getGradientsToPush(final TopicChanges topicChanges) {

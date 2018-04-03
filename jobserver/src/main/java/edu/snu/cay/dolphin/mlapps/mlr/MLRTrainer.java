@@ -22,7 +22,6 @@ import edu.snu.cay.common.param.Parameters;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
-import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.utils.CatchableExecutors;
@@ -177,7 +176,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   private volatile Collection<Map.Entry<Long, MLRData>> miniBatchTrainingData;
 
-  private volatile List<Vector> partitions;
+  private volatile List<Vector> miniBatchModelPartitions;
 
   private final Map<Integer, Vector> keyToGradientMap;
 
@@ -188,7 +187,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   @Override
   public void pullModel() {
-    this.partitions = modelAccessor.pull(classPartitionIndices);
+    this.miniBatchModelPartitions = modelAccessor.pull(classPartitionIndices);
   }
 
   @Override
@@ -226,8 +225,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
             // 0 ~ (numPartitionsPerClass - 1) is for class 0
             // numPartitionsPerClass ~ (2 * numPartitionsPerClass - 1) is for class 1
             // and so on
-            final List<Vector> partialModelsForThisClass =
-                partitions.subList(classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
+            final List<Vector> partialModelsForThisClass = miniBatchModelPartitions.subList(
+                classIndex * numPartitionsPerClass, (classIndex + 1) * numPartitionsPerClass);
 
             // concat partitions into one long vector
             params[classIndex] = vectorFactory.concatDense(partialModelsForThisClass);
@@ -295,8 +294,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
       }
       latch.await();
 
-      partitions.clear();
-      partitions = null;
+      miniBatchModelPartitions.clear();
+      miniBatchModelPartitions = null;
 
     } catch (final InterruptedException e) {
       LOG.log(Level.SEVERE, "Exception occurred.", e);
