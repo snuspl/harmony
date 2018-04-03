@@ -22,7 +22,10 @@ import edu.snu.cay.dolphin.mlapps.lda.LDAParameters.*;
 import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.core.worker.TrainingDataProvider;
+import edu.snu.cay.services.et.configuration.parameters.TaskletIdentifier;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
+import edu.snu.cay.services.et.evaluator.impl.LocalTaskUnitScheduler;
+import edu.snu.cay.services.et.evaluator.impl.TaskUnitInfo;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -63,6 +66,10 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   private final int numTrainerThreads;
 
+  private final LocalTaskUnitScheduler localTaskUnitScheduler;
+
+  private final String taskletId;
+
   @Inject
   private LDATrainer(final SparseLDASampler sampler,
                      final LDAStatCalculator statCalculator,
@@ -72,6 +79,8 @@ final class LDATrainer implements Trainer<Long, Document> {
                      final ModelAccessor<Integer, int[], int[]> modelAccessor,
                      final ModelHolder<LDAModel> modelHolder,
                      @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
+                     final LocalTaskUnitScheduler localTaskUnitScheduler,
+                     @Parameter(TaskletIdentifier.class) final String taskletId,
                      @Parameter(NumVocabs.class) final int numVocabs,
                      @Parameter(NumTopics.class) final int numTopics,
                      @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches)
@@ -83,6 +92,9 @@ final class LDATrainer implements Trainer<Long, Document> {
     this.trainingDataProvider = trainingDataProvider;
     this.modelAccessor = modelAccessor;
     this.numVocabs = numVocabs;
+
+    this.taskletId = taskletId;
+    this.localTaskUnitScheduler = localTaskUnitScheduler;
 
     // key numVocabs is a summary vector of word-topic distribution, in a form of numTopics-dimensional vector
     this.vocabList = new ArrayList<>(numVocabs + 1);
@@ -109,14 +121,19 @@ final class LDATrainer implements Trainer<Long, Document> {
     final int numDataPerThread = epochData.size() / numTrainerThreads;
     final int numRemainders = epochData.size() % numTrainerThreads;
 
-    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
-      final int startIdx = numDataPerThread * threadIdx;
-      final int endIdx = startIdx + numDataPerThread + (threadIdx == numTrainerThreads - 1 ? numRemainders : 0);
+    final TaskUnitInfo initCompTask = new TaskUnitInfo(taskletId, "INIT-COMP", TaskUnitInfo.ResourceType.CPU);
+    final TaskUnitInfo initCommTask = new TaskUnitInfo(taskletId, "INIT-COMM", TaskUnitInfo.ResourceType.NET);
 
+    localTaskUnitScheduler.waitSchedule(initCompTask);
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
       executor.submit(() -> {
         final TopicChanges topicChanges = new TopicChanges();
 
         final List<Pair<Long, LDALocalModel>> localModels = new ArrayList<>(epochData.size());
+
+        final int startIdx = numDataPerThread * finalThreadIdx;
+        final int endIdx = startIdx + numDataPerThread + (finalThreadIdx == numTrainerThreads - 1 ? numRemainders : 0);
 
         for (final Map.Entry<Long, Document> documentPair : epochData.subList(startIdx, endIdx)) {
           final long documentId = documentPair.getKey();
@@ -148,6 +165,10 @@ final class LDATrainer implements Trainer<Long, Document> {
         } catch (InterruptedException | BrokenBarrierException e) {
           throw new RuntimeException(e);
         }
+        if (finalThreadIdx == 0) {
+          localTaskUnitScheduler.onTaskUnitFinished(initCompTask);
+          localTaskUnitScheduler.waitSchedule(initCommTask);
+        }
 
         pushAndResetGradients(topicChanges);
 
@@ -161,6 +182,8 @@ final class LDATrainer implements Trainer<Long, Document> {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+
+    localTaskUnitScheduler.onTaskUnitFinished(initCommTask);
   }
 
   private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
