@@ -112,12 +112,19 @@ final class LDATrainer implements Trainer<Long, Document> {
         topicChanges.increment(numVocabs, localModel.getAssignment(i), 1);
       }
     }
+
+    LOG.log(Level.INFO, "Model init done");
+
     try {
       localModelTable.multiPut(localModels).get();
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
+
+    LOG.log(Level.INFO, "Local model put done");
     pushAndResetGradients(topicChanges);
+
+    LOG.log(Level.INFO, "Init Push done");
   }
 
   private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
