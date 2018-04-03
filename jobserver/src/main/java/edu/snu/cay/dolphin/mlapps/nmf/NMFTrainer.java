@@ -130,30 +130,31 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
   }
 
   private volatile Collection<Map.Entry<Long, NMFData>> miniBatchTrainingData;
-  private volatile Pair<List<Long>, List<Integer>> inputRowColumnKeys;
+  private volatile Pair<List<Long>, List<Integer>> miniBatchInputRowColumnKeys;
 
   private volatile NMFModel modelForMiniBatch;
   private volatile NMFLocalModel localModelForMiniBatch;
 
+  // gradient vectors indexed by column indices each of which is gradient of a column of R matrix.
   private volatile Map<Integer, Vector> aggregatedGradients;
 
   @Override
   public void setMiniBatchData(final Collection<Map.Entry<Long, NMFData>> newMiniBatchTrainingData) {
     this.miniBatchTrainingData = newMiniBatchTrainingData;
-    inputRowColumnKeys = getInputColumnKeys(miniBatchTrainingData);
+    miniBatchInputRowColumnKeys = getInputColumnKeys(miniBatchTrainingData);
   }
 
   @Override
   public void pullModel() {
     // pull data when mini-batch is started
-    modelForMiniBatch = pullModels(inputRowColumnKeys.getRight());
+    modelForMiniBatch = pullModels(miniBatchInputRowColumnKeys.getRight());
   }
 
   @Override
   public void localCompute() {
     // initialize local LMatrix
-    localModelForMiniBatch = getLocalModel(inputRowColumnKeys.getLeft());
-    inputRowColumnKeys = null;
+    localModelForMiniBatch = getLocalModel(miniBatchInputRowColumnKeys.getLeft());
+    miniBatchInputRowColumnKeys = null;
 
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
@@ -208,7 +209,8 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
 
   @Override
   public void pushUpdate() {
-    pushAndResetGradients(aggregatedGradients);
+    modelAccessor.push(aggregatedGradients);
+    aggregatedGradients.clear();
     aggregatedGradients = null;
   }
 
@@ -366,27 +368,36 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
    * @return aggregated gradient matrix
    */
   private Map<Integer, Vector> aggregateGradient(final List<Map<Integer, Vector>> totalRGradients) {
-    final Map<Integer, Vector> aggregated = new HashMap<>();
-    totalRGradients.forEach(threadRGradient -> threadRGradient.forEach((k, v) -> {
-      if (aggregated.containsKey(k)) {
-        aggregated.get(k).addi(v);
-      } else {
-        aggregated.put(k, v);
-      }
-    }));
+    final Map<Integer, Vector> aggregated = new ConcurrentHashMap<>();
+
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+    final int numItemsPerThread = totalRGradients.size() / numTrainerThreads;
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int startIdx = numItemsPerThread * threadIdx;
+      final int endIdx = threadIdx == numTrainerThreads - 1 ? totalRGradients.size() : startIdx + numItemsPerThread;
+
+      executor.submit(() -> {
+        totalRGradients.subList(startIdx, endIdx).forEach(threadRGradient -> threadRGradient.forEach((k, v) -> {
+          aggregated.compute(k, (integer, vector) -> {
+            if (vector == null) {
+              return v;
+            } else {
+              return vector.addi(v);
+            }
+          });
+        }));
+        latch.countDown();
+      });
+    }
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
     return aggregated;
-  }
-
-  /**
-   * Push the gradients to parameter server.
-   * @param gradients vectors indexed by column indices each of which is gradient of a column of R matrix.
-   */
-  private void pushAndResetGradients(final Map<Integer, Vector> gradients) {
-    // push gradients
-    modelAccessor.push(gradients);
-
-    // clear gradients
-    gradients.clear();
   }
 
   /**
