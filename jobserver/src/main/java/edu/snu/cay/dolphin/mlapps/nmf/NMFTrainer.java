@@ -130,6 +130,7 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
   }
 
   private volatile Collection<Map.Entry<Long, NMFData>> miniBatchTrainingData;
+  private volatile Pair<List<Long>, List<Integer>> inputRowColumnKeys;
 
   private volatile NMFModel modelForMiniBatch;
   private volatile NMFLocalModel localModelForMiniBatch;
@@ -139,25 +140,26 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
   @Override
   public void setMiniBatchData(final Collection<Map.Entry<Long, NMFData>> newMiniBatchTrainingData) {
     this.miniBatchTrainingData = newMiniBatchTrainingData;
+    inputRowColumnKeys = getInputColumnKeys(miniBatchTrainingData);
   }
 
   @Override
   public void pullModel() {
-    final Pair<List<Long>, List<Integer>> inputRowColumnKeys = getInputColumnKeys(miniBatchTrainingData);
-
     // pull data when mini-batch is started
     modelForMiniBatch = pullModels(inputRowColumnKeys.getRight());
-
-    // initialize local LMatrix
-    localModelForMiniBatch = getLocalModel(inputRowColumnKeys.getLeft());
   }
 
   @Override
   public void localCompute() {
+    // initialize local LMatrix
+    localModelForMiniBatch = getLocalModel(inputRowColumnKeys.getLeft());
+    inputRowColumnKeys = null;
+
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
     final BlockingQueue<Map.Entry<Long, NMFData>> instances = new ArrayBlockingQueue<>(miniBatchTrainingData.size());
     instances.addAll(miniBatchTrainingData);
+    miniBatchTrainingData = null;
 
     // collect gradients computed in each thread
     final List<Future<Map<Integer, Vector>>> futures = new ArrayList<>(numTrainerThreads);
@@ -197,6 +199,9 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
       throw new RuntimeException(e);
     }
 
+    modelForMiniBatch = null;
+    localModelForMiniBatch = null;
+
     final List<Map<Integer, Vector>> totalRGradients = ThreadUtils.retrieveResults(futures);
     aggregatedGradients = aggregateGradient(totalRGradients);
   }
@@ -204,6 +209,7 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
   @Override
   public void pushUpdate() {
     pushAndResetGradients(aggregatedGradients);
+    aggregatedGradients = null;
   }
 
   @Override

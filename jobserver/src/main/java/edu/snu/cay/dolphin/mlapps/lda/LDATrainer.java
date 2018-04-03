@@ -51,8 +51,6 @@ final class LDATrainer implements Trainer<Long, Document> {
   private final int numVocabs;
   private final int numTopics;
 
-  private final List<Integer> vocabList;
-
   private final TrainingDataProvider<Long, Document> trainingDataProvider;
 
   private final ModelAccessor<Integer, int[], int[]> modelAccessor;
@@ -96,11 +94,6 @@ final class LDATrainer implements Trainer<Long, Document> {
     this.taskletId = taskletId;
     this.localTaskUnitScheduler = localTaskUnitScheduler;
 
-    // key numVocabs is a summary vector of word-topic distribution, in a form of numTopics-dimensional vector
-    this.vocabList = new ArrayList<>(numVocabs + 1);
-    for (int i = 0; i < numVocabs + 1; i++) {
-      vocabList.add(i);
-    }
     this.numTopics = numTopics;
 
     this.modelHolder = modelHolder;
@@ -170,7 +163,8 @@ final class LDATrainer implements Trainer<Long, Document> {
           localTaskUnitScheduler.waitSchedule(initCommTask);
         }
 
-        pushAndResetGradients(topicChanges);
+        final Map<Integer, int[]> gradients = getGradientsToPush(topicChanges);
+        modelAccessor.push(gradients);
 
         LOG.log(Level.INFO, "Init Push done");
         latch.countDown();
@@ -188,7 +182,11 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
 
-  private volatile TopicChanges aggregatedMiniBatchResult;
+  private volatile Map<Integer, int[]> gradientsToPush;
+
+  private List<Integer> words;
+
+  private List<int[]> denseTopicVectors;
 
   @Override
   public void setMiniBatchData(final Collection<Map.Entry<Long, Document>> newMiniBatchTrainingData) {
@@ -197,50 +195,13 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   @Override
   public void pullModel() {
-    final List<Integer> words = getKeys(miniBatchTrainingData);
-
-    pullModels(words);
+    words = getKeys(miniBatchTrainingData);
+    denseTopicVectors = modelAccessor.pull(words);
   }
 
   @Override
   public void localCompute() {
-    final List<TopicChanges> results = sampler.sample(miniBatchTrainingData);
-
-    modelHolder.resetModel(null);
-    aggregatedMiniBatchResult = aggregateChanges(results);
-  }
-
-  @Override
-  public void pushUpdate() {
-    pushAndResetGradients(aggregatedMiniBatchResult);
-  }
-
-  @Override
-  public void onEpochFinished(final int epochIdx) {
-
-  }
-
-  @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, Document>> inputData,
-                                                 final Collection<Document> testData,
-                                                 final edu.snu.cay.services.et.evaluator.api.Table modelTable) {
-
-    LOG.log(Level.INFO, "Pull model to compute log likelihood");
-    final List<int[]> wordTopicCounts = modelAccessor.pull(vocabList, modelTable);
-    final int[] wordTopicCountsSummary = wordTopicCounts.remove(numVocabs);
-
-    LOG.log(Level.INFO, "Start computing log likelihood");
-    final Map<CharSequence, Double> map = new HashMap<>();
-    map.put("docLLH", statCalculator.computeDocLLH(inputData));
-    map.put("wordLLH", statCalculator.computeWordLLH(wordTopicCounts, wordTopicCountsSummary));
-
-    return map;
-  }
-
-  private void pullModels(final List<Integer> words) {
-    // pull model and use it after translating it into sparse form
-    final List<int[]> denseTopicVectors = modelAccessor.pull(words);
-
+    // initialize LDAModel after translating the pulled model into sparse form
     final int[] sparseTopicSummaryVector = denseToSparse(denseTopicVectors.remove(words.size() - 1));
     // i-th element of topicSummaryVector represents total number of assignments of i-th topic
     final int[] topicSummaryVector = new int[numTopics];
@@ -256,8 +217,54 @@ final class LDATrainer implements Trainer<Long, Document> {
       final int[] sparseTopicVector = denseToSparse(denseTopicVectors.remove(0));
       wordTopicVectors.put(words.get(i), sparseTopicVector);
     }
-
+    words.clear();
+    words = null;
     modelHolder.resetModel(new LDAModel(topicSummaryVector, wordTopicVectors));
+
+    denseTopicVectors.clear();
+    denseTopicVectors = null;
+
+    // perform sampling
+    final List<TopicChanges> results = sampler.sample(miniBatchTrainingData);
+    miniBatchTrainingData = null;
+
+    modelHolder.resetModel(null);
+
+    gradientsToPush = getGradientsToPush(aggregateChanges(results));
+  }
+
+  @Override
+  public void pushUpdate() {
+    modelAccessor.push(gradientsToPush);
+    gradientsToPush.clear();
+    gradientsToPush = null;
+  }
+
+  @Override
+  public void onEpochFinished(final int epochIdx) {
+
+  }
+
+  @Override
+  public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, Document>> inputData,
+                                                 final Collection<Document> testData,
+                                                 final edu.snu.cay.services.et.evaluator.api.Table modelTable) {
+    // key numVocabs is a summary vector of word-topic distribution, in a form of numTopics-dimensional vector
+    final List<Integer> vocabList = new ArrayList<>(numVocabs + 1);
+    for (int i = 0; i < numVocabs + 1; i++) {
+      vocabList.add(i);
+    }
+
+    LOG.log(Level.INFO, "Pull model to compute log likelihood");
+    final List<int[]> wordTopicCounts = modelAccessor.pull(vocabList, modelTable);
+    final int[] wordTopicCountsSummary = wordTopicCounts.remove(numVocabs);
+
+    LOG.log(Level.INFO, "Start computing log likelihood");
+    final Map<CharSequence, Double> map = new HashMap<>();
+    map.put("docLLH", statCalculator.computeDocLLH(inputData));
+    map.put("wordLLH", statCalculator.computeWordLLH(wordTopicCounts, wordTopicCountsSummary));
+
+    return map;
   }
 
   /**
@@ -304,7 +311,7 @@ final class LDATrainer implements Trainer<Long, Document> {
     return aggregated;
   }
 
-  private void pushAndResetGradients(final TopicChanges topicChanges) {
+  private Map<Integer, int[]> getGradientsToPush(final TopicChanges topicChanges) {
     final Table<Integer, Integer, Integer> changedTopicCount = topicChanges.getTable();
 
     final Map<Integer, int[]> keyToChangesMap = new HashMap<>(changedTopicCount.rowKeySet().size());
@@ -326,8 +333,8 @@ final class LDATrainer implements Trainer<Long, Document> {
       keyToChangesMap.put(changedWord, parameters);
     }
 
-    modelAccessor.push(keyToChangesMap);
     changedTopicCount.clear();
+    return keyToChangesMap;
   }
 
   @Override
