@@ -24,12 +24,13 @@ import edu.snu.cay.dolphin.core.worker.ModelHolder;
 import edu.snu.cay.dolphin.core.worker.TrainingDataProvider;
 import edu.snu.cay.services.et.evaluator.api.TableAccessor;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
+import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,6 +61,8 @@ final class LDATrainer implements Trainer<Long, Document> {
    */
   private final ModelHolder<LDAModel> modelHolder;
 
+  private final int numTrainerThreads;
+
   @Inject
   private LDATrainer(final SparseLDASampler sampler,
                      final LDAStatCalculator statCalculator,
@@ -68,10 +71,12 @@ final class LDATrainer implements Trainer<Long, Document> {
                      final TrainingDataProvider<Long, Document> trainingDataProvider,
                      final ModelAccessor<Integer, int[], int[]> modelAccessor,
                      final ModelHolder<LDAModel> modelHolder,
+                     @Parameter(DolphinParameters.NumTrainerThreads.class) final int numTrainerThreads,
                      @Parameter(NumVocabs.class) final int numVocabs,
                      @Parameter(NumTopics.class) final int numTopics,
                      @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches)
       throws TableNotExistException {
+    this.numTrainerThreads = numTrainerThreads;
     this.sampler = sampler;
     this.statCalculator = statCalculator;
     this.localModelTable = tableAccessor.getTable(localModelTableId);
@@ -95,36 +100,67 @@ final class LDATrainer implements Trainer<Long, Document> {
   @Override
   public void initGlobalSettings() {
     // In LDA, topic counts should be initialized by pushing values before running.
-    final TopicChanges topicChanges = new TopicChanges();
-    final Collection<Map.Entry<Long, Document>> epochData = trainingDataProvider.getEpochData();
-    final List<Pair<Long, LDALocalModel>> localModels = new ArrayList<>(epochData.size());
-    for (final Map.Entry<Long, Document> documentPair : epochData) {
-      final long documentId = documentPair.getKey();
-      final Document document = documentPair.getValue();
+    final List<Map.Entry<Long, Document>> epochData = new ArrayList<>(trainingDataProvider.getEpochData());
 
-      final LDALocalModel localModel = new LDALocalModel(document.size(), numTopics);
-      localModels.add(Pair.of(documentId, localModel));
+    final ExecutorService executor = CatchableExecutors.newFixedThreadPool(numTrainerThreads);
+    final CyclicBarrier barrier = new CyclicBarrier(numTrainerThreads);
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
 
-      for (int i = 0; i < document.size(); i++) {
-        final int word = document.getWord(i);
-        topicChanges.increment(word, localModel.getAssignment(i), 1);
-        // numVocabs-th row represents the total word-topic assignment count vector
-        topicChanges.increment(numVocabs, localModel.getAssignment(i), 1);
-      }
+    final int numDataPerThread = epochData.size() / numTrainerThreads;
+    final int numRemainders = epochData.size() % numTrainerThreads;
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int startIdx = numDataPerThread * threadIdx;
+      final int endIdx = startIdx + numDataPerThread + (threadIdx == numTrainerThreads - 1 ? numRemainders : 0);
+
+      executor.submit(() -> {
+        final TopicChanges topicChanges = new TopicChanges();
+
+        final List<Pair<Long, LDALocalModel>> localModels = new ArrayList<>(epochData.size());
+
+        for (final Map.Entry<Long, Document> documentPair : epochData.subList(startIdx, endIdx)) {
+          final long documentId = documentPair.getKey();
+          final Document document = documentPair.getValue();
+
+          final LDALocalModel localModel = new LDALocalModel(document.size(), numTopics);
+          localModels.add(Pair.of(documentId, localModel));
+
+          for (int i = 0; i < document.size(); i++) {
+            final int word = document.getWord(i);
+            topicChanges.increment(word, localModel.getAssignment(i), 1);
+            // numVocabs-th row represents the total word-topic assignment count vector
+            topicChanges.increment(numVocabs, localModel.getAssignment(i), 1);
+          }
+        }
+
+        LOG.log(Level.INFO, "Model init done");
+
+        try {
+          localModelTable.multiPut(localModels).get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+
+        LOG.log(Level.INFO, "Local model put done");
+
+        try {
+          barrier.await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+          throw new RuntimeException(e);
+        }
+
+        pushAndResetGradients(topicChanges);
+
+        LOG.log(Level.INFO, "Init Push done");
+        latch.countDown();
+      });
     }
-
-    LOG.log(Level.INFO, "Model init done");
 
     try {
-      localModelTable.multiPut(localModels).get();
-    } catch (InterruptedException | ExecutionException e) {
+      latch.await();
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-
-    LOG.log(Level.INFO, "Local model put done");
-    pushAndResetGradients(topicChanges);
-
-    LOG.log(Level.INFO, "Init Push done");
   }
 
   private volatile Collection<Map.Entry<Long, Document>> miniBatchTrainingData;
