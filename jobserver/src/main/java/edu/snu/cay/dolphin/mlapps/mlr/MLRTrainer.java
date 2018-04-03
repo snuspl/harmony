@@ -397,11 +397,10 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
    * @return an array of vectors each of which is gradient in a class.
    */
   private Vector[] aggregateGradient(final List<Vector[]> threadGradients) {
-    final Vector[] gradients = new Vector[numClasses];
+    final Vector[] gradients = threadGradients.get(0);
 
     for (int classIdx = 0; classIdx < numClasses; classIdx++) {
-      gradients[classIdx] = vectorFactory.createDenseZeros(numFeatures);
-      for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      for (int threadIdx = 1; threadIdx < numTrainerThreads; threadIdx++) {
         gradients[classIdx].addi(threadGradients.get(threadIdx)[classIdx]);
       }
     }
