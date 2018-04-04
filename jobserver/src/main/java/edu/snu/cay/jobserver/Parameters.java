@@ -87,6 +87,11 @@ public final class Parameters {
   public final class JobId implements Name<String> {
   }
 
+  @NamedParameter(doc = "The number of workers for a job", short_name = "num_job_executors")
+  public final class NumJobExecutors implements Name<Integer> {
+
+  }
+
   @NamedParameter(doc = "A class of the scheduler",
       short_name = "scheduler",
       default_value = "edu.snu.cay.jobserver.driver.SchedulerImpl")

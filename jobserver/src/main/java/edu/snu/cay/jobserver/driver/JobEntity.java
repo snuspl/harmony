@@ -56,6 +56,12 @@ public interface JobEntity {
   JobMaster getJobMaster();
 
   /**
+   *
+   * @return
+   */
+  int getNumExecutorsToUse();
+
+  /**
    * Setup executor groups and tables for {@link JobMaster#start}.
    * @param executors executors to use
    * @return a pair of executor groups and tables

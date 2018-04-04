@@ -16,6 +16,7 @@
 package edu.snu.cay.dolphin.jobserver;
 
 import edu.snu.cay.dolphin.DolphinParameters;
+import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 
 import java.util.Arrays;
@@ -62,6 +63,15 @@ public final class DolphinJobEntity implements JobEntity {
   public JobMaster getJobMaster() {
     try {
       return jobInjector.getInstance(JobMaster.class);
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public int getNumExecutorsToUse() {
+    try {
+      return jobInjector.getNamedInstance(Parameters.NumJobExecutors.class);
     } catch (InjectionException e) {
       throw new RuntimeException(e);
     }

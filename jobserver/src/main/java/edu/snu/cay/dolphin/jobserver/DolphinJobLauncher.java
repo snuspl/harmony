@@ -144,6 +144,7 @@ public final class DolphinJobLauncher {
 
     // parameters for master
     final List<Class<? extends Name<?>>> masterParamList = Arrays.asList(
+        NumJobExecutors.class,
         MaxNumEpochs.class, NumTotalMiniBatches.class, ClockSlack.class,
         ServerMetricFlushPeriodMs.class, OfflineModelEvaluation.class
     );

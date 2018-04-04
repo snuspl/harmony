@@ -68,6 +68,11 @@ public final class PregelJobEntity implements JobEntity {
   }
 
   @Override
+  public int getNumExecutorsToUse() {
+    return 0;
+  }
+
+  @Override
   public String getJobId() {
     return jobId;
   }
