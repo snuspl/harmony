@@ -15,6 +15,9 @@
  */
 package edu.snu.cay.dolphin.mlapps.lda;
 
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import edu.snu.cay.dolphin.mlapps.serialization.Kryos;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
 
@@ -27,18 +30,19 @@ import java.io.*;
  * When decoding, it restores the array back to dense form.
  */
 final class SparseArrayCodec implements Codec<int[]>, StreamingCodec<int[]> {
+
+  private final SparseArraySerializer sparseArraySerializer;
+
   @Inject
-  private SparseArrayCodec() {
+  private SparseArrayCodec(final SparseArraySerializer sparseArraySerializer) {
+    this.sparseArraySerializer = sparseArraySerializer;
   }
 
   @Override
   public byte[] encode(final int[] array) {
-    try (ByteArrayOutputStream baos = new ByteArrayOutputStream(getNumBytes(array));
-         DataOutputStream dos = new DataOutputStream(baos)) {
-      encodeToStream(array, dos);
-      return baos.toByteArray();
-    } catch (final IOException e) {
-      throw new RuntimeException(e);
+    try (Output output = new Output(getNumBytes(array) + Integer.BYTES + 1)) {
+      Kryos.get().writeObject(output, array, sparseArraySerializer);
+      return output.toBytes();
     }
   }
 
@@ -68,10 +72,8 @@ final class SparseArrayCodec implements Codec<int[]>, StreamingCodec<int[]> {
 
   @Override
   public int[] decode(final byte[] bytes) {
-    try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes))) {
-      return decodeFromStream(dis);
-    } catch (final IOException e) {
-      throw new RuntimeException(e);
+    try (Input input = new Input(bytes)) {
+      return Kryos.get().readObject(input, int[].class, sparseArraySerializer);
     }
   }
 
