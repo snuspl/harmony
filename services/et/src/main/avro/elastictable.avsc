@@ -656,7 +656,8 @@
   [
     {"name": "type", "type": {"type": "enum", "name": "ETMsgType",
         "symbols": ["TableAccessMsg", "TableControlMsg", "TableChkpMsg", "MigrationMsg", "MetricMsg", "TaskletMsg"]}},
-    {"name": "innerMsg", "type": "bytes"}
+    {"name": "tableAccessMsg", "type": ["null", "TableAccessMsg"], "default": null},
+    {"name": "innerMsg", "type": ["null", "bytes"], "default": null}
   ]
 }
 ]

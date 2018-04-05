@@ -109,7 +109,7 @@ public final class MessageHandlerImpl implements MessageHandler {
     final ETMsg etMsg = SingleMessageExtractor.extract(msg);
     switch (etMsg.getType()) {
     case TableAccessMsg:
-      onTableAccessMsg(AvroUtils.fromBytes(etMsg.getInnerMsg().array(), TableAccessMsg.class));
+      onTableAccessMsg(etMsg.getTableAccessMsg());
       break;
 
     case TableControlMsg:
