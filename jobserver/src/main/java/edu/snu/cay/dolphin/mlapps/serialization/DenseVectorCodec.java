@@ -19,6 +19,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.common.math.linalg.VectorFactory;
+import edu.snu.cay.utils.Buffers;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
 
@@ -44,7 +45,7 @@ public final class DenseVectorCodec implements Codec<Vector>, StreamingCodec<Vec
   @Override
   public byte[] encode(final Vector vector) {
     // Kryo requires one additional byte I don't know why
-    try (Output output = new Output(getNumBytes(vector) + 1)) {
+    try (Output output = new Output(Buffers.get())) {
       Kryos.get().writeObject(output, vector, denseVectorSerializer);
       return output.toBytes();
     }
