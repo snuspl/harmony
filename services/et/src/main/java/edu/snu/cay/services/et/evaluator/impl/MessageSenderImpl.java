@@ -62,7 +62,7 @@ public final class MessageSenderImpl implements MessageSender {
                                     final OpType opType, final boolean replyRequired,
                                     final DataKey dataKey, @Nullable final DataValue dataValue)
       throws NetworkException {
-    final byte[] innerMsg = AvroUtils.toBytes(
+    final TableAccessMsg tableAccessMsg =
         TableAccessMsg.newBuilder()
             .setType(TableAccessMsgType.TableAccessReqMsg)
             .setOperationId(opId)
@@ -75,11 +75,11 @@ public final class MessageSenderImpl implements MessageSender {
                     .setDataKey(dataKey)
                     .setDataValue(dataValue)
                     .build())
-            .build(), TableAccessMsg.class);
+            .build();
 
     final ETMsg msg = ETMsg.newBuilder()
         .setType(ETMsgType.TableAccessMsg)
-        .setInnerMsg(ByteBuffer.wrap(innerMsg))
+        .setTableAccessMsg(tableAccessMsg)
         .build();
 
     networkConnection.send(destId, msg);
@@ -91,7 +91,7 @@ public final class MessageSenderImpl implements MessageSender {
                                     final OpType opType, final boolean replyRequired,
                                     final DataKeys dataKeys, @Nullable final DataValues dataValues)
       throws NetworkException {
-    final byte[] innerMsg = AvroUtils.toBytes(
+    final TableAccessMsg tableAccessMsg =
         TableAccessMsg.newBuilder()
             .setType(TableAccessMsgType.TableAccessReqMsg)
             .setOperationId(opId)
@@ -105,11 +105,11 @@ public final class MessageSenderImpl implements MessageSender {
                     .setDataKeys(dataKeys)
                     .setDataValues(dataValues)
                     .build())
-            .build(), TableAccessMsg.class);
+            .build();
 
     final ETMsg msg = ETMsg.newBuilder()
         .setType(ETMsgType.TableAccessMsg)
-        .setInnerMsg(ByteBuffer.wrap(innerMsg))
+        .setTableAccessMsg(tableAccessMsg)
         .build();
 
     networkConnection.send(destId, msg);
@@ -120,7 +120,7 @@ public final class MessageSenderImpl implements MessageSender {
   public void sendTableAccessResMsg(final String destId, final long opId, final String tableId,
                                     @Nullable final DataValue dataValue, final boolean isSuccess)
       throws NetworkException {
-    final byte[] innerMsg = AvroUtils.toBytes(
+    final TableAccessMsg tableAccessMsg =
         TableAccessMsg.newBuilder()
             .setType(TableAccessMsgType.TableAccessResMsg)
             .setOperationId(opId)
@@ -130,11 +130,11 @@ public final class MessageSenderImpl implements MessageSender {
                     .setTableId(tableId)
                     .setDataValue(dataValue)
                     .build())
-            .build(), TableAccessMsg.class);
+            .build();
 
     final ETMsg msg = ETMsg.newBuilder()
         .setType(ETMsgType.TableAccessMsg)
-        .setInnerMsg(ByteBuffer.wrap(innerMsg))
+        .setTableAccessMsg(tableAccessMsg)
         .build();
 
     networkConnection.send(destId, msg);
@@ -144,7 +144,7 @@ public final class MessageSenderImpl implements MessageSender {
   public void sendTableAccessResMsg(final String destId, final long opId, final String tableId,
                                     final DataKeys dataKeys, final DataValues dataValues, final boolean isSuccess)
       throws NetworkException {
-    final byte[] innerMsg = AvroUtils.toBytes(
+    final TableAccessMsg tableAccessMsg =
         TableAccessMsg.newBuilder()
             .setType(TableAccessMsgType.TableAccessResMsg)
             .setOperationId(opId)
@@ -155,16 +155,15 @@ public final class MessageSenderImpl implements MessageSender {
                     .setDataValues(dataValues)
                     .setTableId(tableId)
                     .build())
-            .build(), TableAccessMsg.class);
+            .build();
 
     final ETMsg msg = ETMsg.newBuilder()
         .setType(ETMsgType.TableAccessMsg)
-        .setInnerMsg(ByteBuffer.wrap(innerMsg))
+        .setTableAccessMsg(tableAccessMsg)
         .build();
 
     networkConnection.send(destId, msg);
   }
-
 
   @Override
   public void sendTableInitAckMsg(final long opId, final String tableId) throws NetworkException {
