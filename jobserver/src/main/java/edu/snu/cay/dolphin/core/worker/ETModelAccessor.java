@@ -25,7 +25,6 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.inject.Inject;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +42,8 @@ import java.util.logging.Logger;
 public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   private static final Logger LOG = Logger.getLogger(ETModelAccessor.class.getName());
 
-  private final Table<K, V, P> modelTable;
+  private final String modelTableId;
+  private final TableAccessor tableAccessor;
 
   private final Tracer pushTracer = new Tracer();
   private final Tracer pullTracer = new Tracer();
@@ -51,12 +51,20 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   @Inject
   private ETModelAccessor(@Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
                           final TableAccessor tableAccessor) throws TableNotExistException {
-    this.modelTable = tableAccessor.getTable(modelTableId);
+    this.modelTableId = modelTableId;
+    this.tableAccessor = tableAccessor;
   }
 
   @Override
   public void push(final K key, final P deltaValue) {
     pushTracer.startTimer();
+    final Table<K, V, P> modelTable;
+    try {
+      modelTable = tableAccessor.getTable(modelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     modelTable.updateNoReply(key, deltaValue);
     pushTracer.recordTime(1);
   }
@@ -64,7 +72,15 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   @Override
   public void push(final Map<K, P> keyToDeltaValueMap) {
     pushTracer.startTimer();
+
     try {
+      final Table<K, V, P> modelTable;
+      try {
+        modelTable = tableAccessor.getTable(modelTableId);
+      } catch (TableNotExistException e) {
+        throw new RuntimeException(e);
+      }
+
       modelTable.multiUpdate(keyToDeltaValueMap).get();
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
@@ -75,6 +91,13 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   @Override
   public V pull(final K key) {
     pullTracer.startTimer();
+
+    final Table<K, V, P> modelTable;
+    try {
+      modelTable = tableAccessor.getTable(modelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
 
     final Future<V> future = modelTable.getOrInit(key, true);
     V result;
@@ -97,27 +120,19 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
   public List<V> pull(final List<K> keys) {
     pullTracer.startTimer();
 
-    final List<V> resultValues = pull(keys, modelTable);
+    final Table<K, V, P> modelTable;
+    try {
+      modelTable = tableAccessor.getTable(modelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
+    final List<V> resultValues = ModelAccessor.pull(keys, modelTable);
 
     pullTracer.recordTime(keys.size());
     LOG.log(Level.INFO, "{0} keys have been pulled. Used memory: {1} MB",
         new Object[] {keys.size(), MemoryUtils.getUsedMemoryMB()});
     return resultValues;
-  }
-
-  @Override
-  public List<V> pull(final List<K> keys, final Table<K, V, P> aModelTable) {
-    try {
-      final Map<K, V> result = aModelTable.multiGetOrInit(keys, true).get();
-
-      final List<V> valueList = new ArrayList<>(keys.size());
-      keys.forEach(key -> valueList.add(result.get(key)));
-
-      return valueList;
-
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   @Override
