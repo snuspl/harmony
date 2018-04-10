@@ -777,7 +777,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
       keys.add(label * numKeys + i);
     }
 
-    return  modelAccessor.pull(keys, modelTable);
+    return ModelAccessor.pull(keys, modelTable);
   }
 
   /**

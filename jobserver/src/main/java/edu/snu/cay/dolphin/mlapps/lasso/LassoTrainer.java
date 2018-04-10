@@ -247,7 +247,7 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
    * Pull up-to-date model parameters from server.
    */
   private void pullModels(final Table modelTable) {
-    final List<Vector> partialModels = modelAccessor.pull(modelPartitionIndices, modelTable);
+    final List<Vector> partialModels = ModelAccessor.pull(modelPartitionIndices, modelTable);
     oldModel = vectorFactory.concatDense(partialModels);
     newModel = oldModel.copy();
   }

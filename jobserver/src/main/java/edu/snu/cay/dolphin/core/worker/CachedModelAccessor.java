@@ -39,7 +39,8 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
 
   private final LoadingCache<K, V> modelLoadingCache;
 
-  private final Table<K, V, P> modelTable;
+  private final String modelTableId;
+  private final TableAccessor tableAccessor;
   private final UpdateFunction<K, V, P> modelUpdateFunction;
 
   private final ScheduledExecutorService refreshExecutor;
@@ -51,7 +52,8 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
   private CachedModelAccessor(@Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
                               final TableAccessor tableAccessor,
                               final UpdateFunction<K, V, P> modelUpdateFunction) throws TableNotExistException {
-    this.modelTable = tableAccessor.getTable(modelTableId);
+    this.modelTableId = modelTableId;
+    this.tableAccessor = tableAccessor;
     this.modelUpdateFunction = modelUpdateFunction;
 
     this.modelLoadingCache = initCache();
@@ -64,6 +66,12 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
         final List<K> keyList = new ArrayList<>(keys.size());
         try {
           pullTracer.startTimer();
+          final Table<K, V, P> modelTable;
+          try {
+            modelTable = tableAccessor.getTable(modelTableId);
+          } catch (TableNotExistException e) {
+            throw new RuntimeException(e);
+          }
           final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList, true).get();
           pullTracer.recordTime(keys.size());
 
@@ -87,6 +95,13 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
           @Override
           public V load(final K key) throws Exception {
             pullTracer.startTimer();
+            final Table<K, V, P> modelTable;
+            try {
+              modelTable = tableAccessor.getTable(modelTableId);
+            } catch (TableNotExistException e) {
+              throw new RuntimeException(e);
+            }
+
             final Future<V> pullFuture = modelTable.getOrInit(key, true);
             final V value = pullFuture.get();
             pullTracer.recordTime(1);
@@ -99,6 +114,13 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
             keys.forEach(keyList::add);
 
             pullTracer.startTimer();
+            final Table<K, V, P> modelTable;
+            try {
+              modelTable = tableAccessor.getTable(modelTableId);
+            } catch (TableNotExistException e) {
+              throw new RuntimeException(e);
+            }
+
             final Map<K, V> kvMap = modelTable.multiGetOrInit(keyList, true).get();
             pullTracer.recordTime(kvMap.size());
 
@@ -113,6 +135,13 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
   @Override
   public void push(final K key, final P deltaValue) {
     pushTracer.startTimer();
+    final Table<K, V, P> modelTable;
+    try {
+      modelTable = tableAccessor.getTable(modelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     modelTable.updateNoReply(key, deltaValue);
     pushTracer.recordTime(1);
 
@@ -124,6 +153,13 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
   @Override
   public void push(final Map<K, P> keyToDeltaValueMap) {
     pushTracer.startTimer();
+    final Table<K, V, P> modelTable;
+    try {
+      modelTable = tableAccessor.getTable(modelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     modelTable.multiUpdateNoReply(keyToDeltaValueMap);
     pushTracer.recordTime(keyToDeltaValueMap.size());
 
@@ -158,24 +194,6 @@ public final class CachedModelAccessor<K, P, V> implements ModelAccessor<K, P, V
 
       return valueList;
     } catch (ExecutionException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * This method does not care about cache.
-   */
-  @Override
-  public List<V> pull(final List<K> keys, final Table<K, V, P> aModelTable) {
-    try {
-      final Map<K, V> result = aModelTable.multiGetOrInit(keys, true).get();
-
-      final List<V> valueList = new ArrayList<>(keys.size());
-      keys.forEach(key -> valueList.add(result.get(key)));
-
-      return valueList;
-
-    } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
   }
