@@ -135,7 +135,9 @@ final class ModelChkpManager {
       final Future future1 = etMasterFuture.get().getTable(modelTableId).drop();
       future0.get();
       future1.get();
-    } catch (TableNotExistException | InterruptedException | ExecutionException e) {
+    } catch (TableNotExistException e) {
+      // skip if table does not exist
+    } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
 

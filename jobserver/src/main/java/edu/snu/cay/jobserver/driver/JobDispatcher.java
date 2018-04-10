@@ -25,6 +25,7 @@ import org.apache.reef.tang.InjectionFuture;
 
 import javax.inject.Inject;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,6 +72,13 @@ final class JobDispatcher {
 
       } finally {
         sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
+        executorGroupsToTables.getRight().forEach(table -> {
+          try {
+            table.drop().get();
+          } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+          }
+        });
         globalTaskUnitSchedulerFuture.get().onJobFinish(jobEntity.getJobId());
         jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
         jobSchedulerFuture.get().onJobFinish(jobEntity);

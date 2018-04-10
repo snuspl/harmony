@@ -180,6 +180,7 @@ public final class DolphinMaster {
       checkTaskResults(taskletResults);
 
       workers.forEach(worker -> metricManager.stopMetricCollection(worker.getId()));
+      modelChkpManager.waitChkpsToBeDone();
     } catch (Exception e) {
       throw new RuntimeException("Dolphin job has been failed", e);
     }
@@ -192,7 +193,6 @@ public final class DolphinMaster {
   public void evaluate(final List<AllocatedExecutor> servers, final List<AllocatedExecutor> workers) {
     workers.forEach(worker -> metricManager.startMetricCollection(worker.getId(), getWorkerMetricConf()));
 
-    modelChkpManager.waitChkpsToBeDone();
     modelChkpManager.setExecutors(servers, workers);
 
     final List<Future<RunningTasklet>> taskFutures = new ArrayList<>(workers.size());
