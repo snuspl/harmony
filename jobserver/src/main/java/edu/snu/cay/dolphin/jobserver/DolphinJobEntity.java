@@ -105,9 +105,9 @@ public final class DolphinJobEntity implements JobEntity {
       final List<AllocatedExecutor> workers = executorGroups.get(1);
 
       final AllocatedTable modelTable = etMaster.createTable(serverTableConf, servers).get();
-      if (localModelTableConfOptional.isPresent()) {
-        etMaster.createTable(localModelTableConfOptional.get(), workers).get();
-      }
+
+      final AllocatedTable localModelTable = localModelTableConfOptional.isPresent() ?
+          etMaster.createTable(localModelTableConfOptional.get(), workers).get() : null;
 
       AllocatedTable inputTable;
 
@@ -120,6 +120,9 @@ public final class DolphinJobEntity implements JobEntity {
 
       tables.add(modelTable);
       tables.add(inputTable);
+      if (localModelTable != null) {
+        tables.add(localModelTable);
+      }
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }

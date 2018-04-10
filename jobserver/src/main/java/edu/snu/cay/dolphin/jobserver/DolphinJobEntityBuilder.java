@@ -88,7 +88,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
 
     final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
     final String[] pathSplit = inputPath.split("/");
-    final String inputTableId = pathSplit[pathSplit.length - 1]; // Use filename for table ID
+    final String inputTableId = pathSplit[pathSplit.length - 1] + jobCount; // Use filename for table ID
     jobInjector.bindVolatileParameter(InputTableId.class, inputTableId);
 
     final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId, inputPath,
