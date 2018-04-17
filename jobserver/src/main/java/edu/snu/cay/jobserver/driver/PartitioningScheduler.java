@@ -15,10 +15,14 @@
  */
 package edu.snu.cay.jobserver.driver;
 
+import com.google.common.collect.Lists;
+import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by xyzi on 29/03/2018.
@@ -27,44 +31,61 @@ public final class PartitioningScheduler implements JobScheduler {
   private final ResourcePool resourcePool;
   private final JobDispatcher jobDispatcher;
 
-  // allocated resources
-  private final Set<AllocatedExecutor> allocatedExecutors = new HashSet<>();
+  private final int numPartitions;
+
+  private final AtomicBoolean initialized = new AtomicBoolean(false);
+
+  private final Queue<List<AllocatedExecutor>> partitions;
+
   private final Map<String, List<AllocatedExecutor>> jobIdToExecutors = new HashMap<>();
 
+  private final Queue<JobEntity> waitingJobs = new LinkedList<>();
+
   @Inject
-  private PartitioningScheduler(final ResourcePool resourcePool,
+  private PartitioningScheduler(@Parameter(Parameters.DegreeOfParallelism.class) final int numPartitions,
+                                final ResourcePool resourcePool,
                                 final JobDispatcher jobDispatcher) {
+    this.numPartitions = numPartitions;
+    this.partitions = new LinkedList<>();
     this.resourcePool = resourcePool;
     this.jobDispatcher = jobDispatcher;
   }
 
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
-    final Set<AllocatedExecutor> availableExecutors = new HashSet<>(resourcePool.getExecutors().values());
-    availableExecutors.removeAll(allocatedExecutors);
-    final int numExecutorsToUse = jobEntity.getNumExecutorsToUse();
-    if (availableExecutors.size() < numExecutorsToUse) {
-      return false;
+    if (!initialized.get()) {
+      final List<AllocatedExecutor> executorList = new ArrayList<>(resourcePool.getExecutors().values());
+
+      if (executorList.size() < numPartitions) {
+        throw new RuntimeException();
+      }
+
+      partitions.addAll(Lists.partition(executorList, executorList.size() / numPartitions));
     }
 
-    final Iterator<AllocatedExecutor> executorIterator = availableExecutors.iterator();
-
-    final List<AllocatedExecutor> executorsToUse = new ArrayList<>(numExecutorsToUse);
-    for (int i = 0; i < numExecutorsToUse; i++) {
-      executorsToUse.add(executorIterator.next());
+    if (partitions.isEmpty()) {
+      waitingJobs.add(jobEntity);
+      return true;
     }
 
-    allocatedExecutors.addAll(executorsToUse);
-    jobIdToExecutors.put(jobEntity.getJobId(), executorsToUse);
+    final List<AllocatedExecutor> partition = partitions.poll();
+    jobIdToExecutors.put(jobEntity.getJobId(), partition);
 
-    jobDispatcher.executeJob(jobEntity, executorsToUse);
+    jobDispatcher.executeJob(jobEntity, partition);
     return true;
   }
 
   @Override
   public synchronized void onJobFinish(final JobEntity jobEntity) {
-    final List<AllocatedExecutor> releasedExecutors = jobIdToExecutors.remove(jobEntity.getJobId());
-    allocatedExecutors.removeAll(releasedExecutors);
+    final List<AllocatedExecutor> releasedPartition = jobIdToExecutors.remove(jobEntity.getJobId());
+    partitions.add(releasedPartition);
+
+    if (!waitingJobs.isEmpty()) {
+      final JobEntity nextJob = waitingJobs.poll();
+      jobIdToExecutors.put(jobEntity.getJobId(), releasedPartition);
+
+      jobDispatcher.executeJob(nextJob, releasedPartition);
+    }
   }
 
   @Override

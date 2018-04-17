@@ -87,6 +87,11 @@ public final class Parameters {
   public final class JobId implements Name<String> {
   }
 
+  @NamedParameter(doc = "The number of jobs to run concurrently", short_name = "dop")
+  public final class DegreeOfParallelism implements Name<Integer> {
+
+  }
+
   @NamedParameter(doc = "The number of workers for a job", short_name = "num_job_executors")
   public final class NumJobExecutors implements Name<Integer> {
 

@@ -15,23 +15,31 @@
  */
 package edu.snu.cay.jobserver.driver;
 
+import edu.snu.cay.jobserver.Parameters;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A simple implementation of job scheduler that immediately launches job on arrival using all executors for each job.
  */
-public final class SchedulerImpl implements JobScheduler {
+public final class SharingScheduler implements JobScheduler {
   private final ResourcePool resourcePool;
   private final JobDispatcher jobDispatcher;
 
+  private final int concurrency;
+
+  private final Set<JobEntity> runningJobs = new HashSet<>();
+
+  private final Queue<JobEntity> waitingJobs = new LinkedList<>();
+
   @Inject
-  private SchedulerImpl(final ResourcePool resourcePool,
-                        final JobDispatcher jobDispatcher) {
+  private SharingScheduler(@Parameter(Parameters.DegreeOfParallelism.class) final int concurrency,
+                           final ResourcePool resourcePool,
+                           final JobDispatcher jobDispatcher) {
+    this.concurrency = concurrency;
     this.resourcePool = resourcePool;
     this.jobDispatcher = jobDispatcher;
   }
@@ -41,9 +49,13 @@ public final class SchedulerImpl implements JobScheduler {
    */
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
-    final List<AllocatedExecutor> executorsToUse = pickExecutorsToUse(resourcePool.getExecutors(), jobEntity);
+    if (runningJobs.size() == concurrency) {
+      waitingJobs.add(jobEntity);
+      return true;
+    }
 
-    jobDispatcher.executeJob(jobEntity, executorsToUse);
+    runningJobs.add(jobEntity);
+    jobDispatcher.executeJob(jobEntity, pickExecutorsToUse(resourcePool.getExecutors(), jobEntity));
     return true;
   }
 
@@ -57,7 +69,14 @@ public final class SchedulerImpl implements JobScheduler {
 
   @Override
   public synchronized void onJobFinish(final JobEntity jobEntity) {
-    // do nothing
+    runningJobs.remove(jobEntity);
+
+    if (!waitingJobs.isEmpty()) {
+      final JobEntity nextJob = waitingJobs.poll();
+
+      runningJobs.add(nextJob);
+      jobDispatcher.executeJob(nextJob, pickExecutorsToUse(resourcePool.getExecutors(), nextJob));
+    }
   }
 
   @Override

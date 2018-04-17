@@ -129,7 +129,7 @@ public final class JobServerClient {
         ChkpCommitPath.class, ChkpTempPath.class,
         NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class, ExecutorNumTasklets.class,
         HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class,
-        SchedulerClass.class);
+        SchedulerClass.class, DegreeOfParallelism.class);
 
     final CommandLine cl = new CommandLine();
     clientParamList.forEach(cl::registerShortNameOfClass);
@@ -180,7 +180,8 @@ public final class JobServerClient {
             .build(),
         ConfigurationUtils.extractParameterConf(
             Arrays.asList(NumExecutors.class, ExecutorMemSize.class, ExecutorNumCores.class, ExecutorNumTasklets.class,
-                HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class),
+                HandlerQueueSize.class, SenderQueueSize.class, HandlerNumThreads.class, SenderNumThreads.class,
+                DegreeOfParallelism.class),
             driverParamConf)
     );
 
