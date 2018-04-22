@@ -45,8 +45,10 @@ import java.util.logging.Level;
 final class ModelChkpManager {
   private final JobLogger jobLogger;
 
-  private final LinkedList<Future<String>[]> checkpointIdFutures = new LinkedList<>();
+  private final LinkedList<List<Future<String>>> checkpointIdFutures = new LinkedList<>();
 
+  private final boolean hasLocalModel;
+  private final String localModelTableId;
   private final String modelTableId;
   private final String inputTableId;
 
@@ -70,12 +72,17 @@ final class ModelChkpManager {
                            final InjectionFuture<ETMaster> etMasterFuture,
                            final InjectionFuture<MasterSideMsgSender> msgSender,
                            final InjectionFuture<JobMessageObserver> jobMessageObserverFuture,
+                           @Parameter(DolphinParameters.HasLocalModelTable.class) final boolean hasLocalTable,
+                           @Parameter(DolphinParameters.LocalModelTableId.class) final String localModelTableId,
                            @Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
                            @Parameter(DolphinParameters.InputTableId.class) final String inputTableId) {
     this.jobLogger = jobLogger;
     this.etMasterFuture = etMasterFuture;
     this.jobMessageObserverFuture = jobMessageObserverFuture;
     this.msgSender = msgSender;
+
+    this.hasLocalModel = hasLocalTable;
+    this.localModelTableId = localModelTableId;
     this.modelTableId = modelTableId;
     this.inputTableId = inputTableId;
   }
@@ -133,6 +140,9 @@ final class ModelChkpManager {
     try {
       final Future future0 = etMasterFuture.get().getTable(inputTableId).drop();
       final Future future1 = etMasterFuture.get().getTable(modelTableId).drop();
+      if (hasLocalModel) {
+        etMasterFuture.get().getTable(localModelTableId).drop().get();
+      }
       future0.get();
       future1.get();
     } catch (TableNotExistException e) {
@@ -150,19 +160,28 @@ final class ModelChkpManager {
 
     // restore a model to evaluate from a checkpoint
     try {
-      final Future<String>[] chkpIdFutures = checkpointIdFutures.pop();
+      final List<Future<String>> chkpIdFutures = checkpointIdFutures.pop();
 
-      final String inputChkpId = chkpIdFutures[0].get();
-      final String modelChkpId = chkpIdFutures[1].get();
-
+      final String inputChkpId = chkpIdFutures.get(0).get();
+      final String modelChkpId = chkpIdFutures.get(1).get();
       final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
       final Future<AllocatedTable> modelTableFuture = etMasterFuture.get().createTable(modelChkpId, runningServers);
+
+      if (hasLocalModel) {
+        final String localModelChkpId = chkpIdFutures.get(2).get();
+        final Future<AllocatedTable> localModelTableFuture = etMasterFuture.get()
+            .createTable(localModelChkpId, runningWorkers);
+        final AllocatedTable restoredInputTable = localModelTableFuture.get();
+
+        jobLogger.log(Level.INFO, "Local model table [{0}] has been restored from checkpoint.",
+            restoredInputTable.getId());
+      }
+
       final AllocatedTable restoredModelTable = modelTableFuture.get();
       restoredModelTable.subscribe(remoteWorkers).get();
       final AllocatedTable restoredInputTable = inputTableFuture.get();
 
-
-      jobLogger.log(Level.INFO, "Table {0} and {1} are restored from checkpoint.",
+      jobLogger.log(Level.INFO, "Input table [{0}] and model table [{1}] are restored from checkpoint.",
           new Object[]{restoredModelTable.getId(), restoredInputTable.getId()});
 
     } catch (InterruptedException | ExecutionException e) {
@@ -176,21 +195,32 @@ final class ModelChkpManager {
    * Create a checkpoint of a current model table.
    */
   void createCheckpoint() {
+    final int idx = chkpCounter.getAndIncrement();
+    final List<Future<String>> chkpFutures;
+
     try {
       final ListenableFuture<String> inputChkpIdFuture = etMasterFuture.get().getTable(inputTableId).checkpoint();
       final ListenableFuture<String> modelChkpIdFuture = etMasterFuture.get().getTable(modelTableId).checkpoint();
 
-      final int idx = chkpCounter.getAndIncrement();
-
       inputChkpIdFuture.addListener(chkpId ->
           jobLogger.log(Level.INFO, "{0}-th input checkpoint is created. Checkpoint Id: {1}",
-              new Object[] {idx, chkpId}));
+              new Object[]{idx, chkpId}));
       modelChkpIdFuture.addListener(chkpId ->
           jobLogger.log(Level.INFO, "{0}-th model checkpoint is created. Checkpoint Id: {1}",
               new Object[]{idx, chkpId}));
 
-      final Future[] chkpFuture = {inputChkpIdFuture, modelChkpIdFuture};
-      checkpointIdFutures.add(chkpFuture);
+      if (hasLocalModel) {
+        final ListenableFuture<String> localModelChkpIdFuture = etMasterFuture.get()
+            .getTable(localModelTableId).checkpoint();
+        localModelChkpIdFuture.addListener(chkpId ->
+            jobLogger.log(Level.INFO, "{0}-th local model checkpoint is created. Checkpoint Id: {1}",
+                new Object[]{idx, chkpId}));
+        chkpFutures = Arrays.asList(inputChkpIdFuture, modelChkpIdFuture, localModelChkpIdFuture);
+      } else {
+        chkpFutures = Arrays.asList(inputChkpIdFuture, modelChkpIdFuture);
+      }
+
+      checkpointIdFutures.add(chkpFutures);
 
     } catch (TableNotExistException e) {
       throw new RuntimeException(e);
@@ -203,8 +233,9 @@ final class ModelChkpManager {
   void waitChkpsToBeDone() {
     checkpointIdFutures.forEach(futures -> {
       try {
-        futures[0].get();
-        futures[1].get();
+        for (final Future<String> future : futures) {
+          future.get();
+        }
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }

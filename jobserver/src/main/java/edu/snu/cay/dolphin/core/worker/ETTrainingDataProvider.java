@@ -40,16 +40,25 @@ public final class ETTrainingDataProvider<K, V> implements TrainingDataProvider<
 
   private volatile Iterator<Block<K, V, Object>> blockIterator = Iterators.emptyIterator();
 
-  private final Table<K, V, Object> trainingDataTable;
+  private final TableAccessor tableAccessor;
+  private final String inputTableId;
 
   @Inject
   private ETTrainingDataProvider(@Parameter(DolphinParameters.InputTableId.class) final String inputTableId,
                                  final TableAccessor tableAccessor) throws TableNotExistException {
-    this.trainingDataTable = tableAccessor.getTable(inputTableId);
+    this.tableAccessor = tableAccessor;
+    this.inputTableId = inputTableId;
   }
 
   @Override
   public void prepareDataForEpoch() {
+    final Table<K, V, Object> trainingDataTable;
+    try {
+      trainingDataTable = tableAccessor.getTable(inputTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     final Tablet<K, V, Object> tablet = trainingDataTable.getLocalTablet();
 
     LOG.log(Level.INFO, "Number of blocks: {0}, data items: {1}",
@@ -76,11 +85,25 @@ public final class ETTrainingDataProvider<K, V> implements TrainingDataProvider<
 
   @Override
   public Collection<Map.Entry<K, V>> getEpochData() {
+    final Table<K, V, Object> trainingDataTable;
+    try {
+      trainingDataTable = tableAccessor.getTable(inputTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     return trainingDataTable.getLocalTablet().getDataMap().entrySet();
   }
   
   @Override
   public int getNumBatchesPerEpoch() {
+    final Table<K, V, Object> trainingDataTable;
+    try {
+      trainingDataTable = tableAccessor.getTable(inputTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     return trainingDataTable.getLocalTablet().getNumBlocks();
   }
 }

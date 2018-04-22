@@ -57,7 +57,8 @@ final class SparseLDASampler {
    */
   private final int numTrainerThreads;
 
-  private final Table<Long, LDALocalModel, ?> localModelTable;
+  private final TableAccessor tableAccessor;
+  private final String localModelTableId;
 
   /**
    * Allows to access and update the latest model.
@@ -78,7 +79,8 @@ final class SparseLDASampler {
     this.beta = beta;
     this.numTopics = numTopics;
     this.numVocabs = numVocabs;
-    this.localModelTable = tableAccessor.getTable(localModelTableId);
+    this.tableAccessor = tableAccessor;
+    this.localModelTableId = localModelTableId;
     this.modelHolder = modelHolder;
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
@@ -138,6 +140,13 @@ final class SparseLDASampler {
    */
   private void updateModel(final Map.Entry<Long, Document> documentPair, final LDAModel model) {
     final Document document = documentPair.getValue();
+
+    final Table<Long, LDALocalModel, ?> localModelTable;
+    try {
+      localModelTable = tableAccessor.getTable(localModelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
 
     final LDALocalModel localModel;
     try {
