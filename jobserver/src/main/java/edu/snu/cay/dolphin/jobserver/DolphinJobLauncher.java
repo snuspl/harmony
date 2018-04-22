@@ -83,6 +83,12 @@ public final class DolphinJobLauncher {
       final Configuration workerParamConf = configurations.get(2);
       final Configuration userParamConf = configurations.get(3);
 
+      final Configuration masterConf = Configurations.merge(
+          masterParamConf,
+          Tang.Factory.getTang().newConfigurationBuilder()
+              .bindNamedParameter(HasLocalModelTable.class, Boolean.toString(dolphinConf.hasLocalModelTable()))
+              .build());
+
       // server conf. servers will be spawned with this configuration
       final Configuration serverConf = Configurations.merge(
           serverParamConf, userParamConf,
@@ -125,7 +131,7 @@ public final class DolphinJobLauncher {
       }
 
       // job configuration. driver will use this configuration to spawn a job
-      final Configuration jobConf = getJobConfiguration(appId, masterParamConf, serverConf, workerConf, userParamConf);
+      final Configuration jobConf = getJobConfiguration(appId, masterConf, serverConf, workerConf, userParamConf);
 
       final CommandSender commandSender =
           Tang.Factory.getTang().newInjector().getInstance(CommandSender.class);

@@ -56,7 +56,8 @@ final class LDAStatCalculator {
    */
   private final double logGammaBeta;
 
-  private final Table<Long, LDALocalModel, ?> localModelTable;
+  private final TableAccessor tableAccessor;
+  private final String localModelTableId;
 
   private final int numTrainerThreads;
 
@@ -85,7 +86,8 @@ final class LDAStatCalculator {
         numTrainerThreads;
     this.executor = CatchableExecutors.newFixedThreadPool(this.numTrainerThreads);
 
-    this.localModelTable = tableAccessor.getTable(localModelTableId);
+    this.tableAccessor = tableAccessor;
+    this.localModelTableId = localModelTableId;
   }
 
   /**
@@ -108,6 +110,13 @@ final class LDAStatCalculator {
         * (Gamma.logGamma(numTopics * alpha) - numTopics * Gamma.logGamma(alpha)));
 
     final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    final Table<Long, LDALocalModel, ?> localModelTable;
+    try {
+      localModelTable = tableAccessor.getTable(localModelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
 
     for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
       final int finalThreadIdx = threadIdx;

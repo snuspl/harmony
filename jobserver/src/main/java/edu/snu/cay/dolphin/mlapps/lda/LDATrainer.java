@@ -52,7 +52,8 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   private final ModelAccessor<Integer, int[], int[]> modelAccessor;
 
-  private final edu.snu.cay.services.et.evaluator.api.Table<Long, LDALocalModel, ?> localModelTable;
+  private final TableAccessor tableAccessor;
+  private final String localModelTableId;
 
   /**
    * Allows to access and update the latest model.
@@ -85,7 +86,10 @@ final class LDATrainer implements Trainer<Long, Document> {
     this.numTrainerThreads = numTrainerThreads;
     this.sampler = sampler;
     this.statCalculator = statCalculator;
-    this.localModelTable = tableAccessor.getTable(localModelTableId);
+
+    this.tableAccessor = tableAccessor;
+    this.localModelTableId = localModelTableId;
+
     this.trainingDataProvider = trainingDataProvider;
     this.modelAccessor = modelAccessor;
     this.numVocabs = numVocabs;
@@ -118,6 +122,13 @@ final class LDATrainer implements Trainer<Long, Document> {
 
     final TaskUnitInfo initCompTask = new TaskUnitInfo(taskletId, "INIT-COMP", TaskUnitInfo.ResourceType.CPU);
     final TaskUnitInfo initCommTask = new TaskUnitInfo(taskletId, "INIT-COMM", TaskUnitInfo.ResourceType.NET);
+
+    final edu.snu.cay.services.et.evaluator.api.Table<Long, LDALocalModel, ?> localModelTable;
+    try {
+      localModelTable = tableAccessor.getTable(localModelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
 
     localTaskUnitScheduler.waitSchedule(initCompTask);
     for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {

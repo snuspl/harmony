@@ -80,7 +80,8 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
 
   private final TrainingDataProvider<Long, NMFData> trainingDataProvider;
 
-  private final Table<Long, Vector, Vector> localModelTable;
+  private final TableAccessor tableAccessor;
+  private final String localModelTableId;
 
   @Inject
   private NMFTrainer(final ModelAccessor<Integer, Vector, Vector> modelAccessor,
@@ -112,7 +113,8 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
     }
     this.printMatrices = printMatrices;
     this.trainingDataProvider = trainingDataProvider;
-    this.localModelTable = tableAccessor.getTable(localModelTableId);
+    this.tableAccessor = tableAccessor;
+    this.localModelTableId = localModelTableId;
 
     // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
     this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
@@ -250,6 +252,13 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
   }
 
   private NMFLocalModel getLocalModel(final List<Long> keys) {
+    final Table<Long, Vector, Vector> localModelTable;
+    try {
+      localModelTable = tableAccessor.getTable(localModelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     try {
       final Map<Long, Vector> localModelMatrix = localModelTable.multiGetOrInit(keys, false).get();
       if (localModelMatrix.size() != keys.size()) {
@@ -358,6 +367,12 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
     }
 
     // update L matrix
+    final Table<Long, Vector, Vector> localModelTable;
+    try {
+      localModelTable = tableAccessor.getTable(localModelTableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
     localModelTable.updateNoReply(datumPair.getKey(), lGradSum);
   }
 
