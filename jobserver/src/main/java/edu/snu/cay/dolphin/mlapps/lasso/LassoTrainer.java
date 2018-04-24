@@ -208,7 +208,7 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
 
     final Map<CharSequence, Double> map = new HashMap<>();
     map.put("training_loss", trainingLoss);
-    map.put("test_loss", trainingLoss);
+    map.put("test_loss", testLoss);
 
     return map;
   }
