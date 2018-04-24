@@ -21,7 +21,6 @@ import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.mlapps.gbt.tree.*;
 import edu.snu.cay.dolphin.DolphinParameters;
-import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.Tuple3;
 import org.apache.commons.lang3.tuple.Pair;
@@ -220,11 +219,10 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
 
   @Override
   public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, GBTData>> inputData,
-                                                 final Collection<GBTData> testData,
-                                                 final Table modelTable) {
+                                                 final Collection<GBTData> testData) {
     final List<Map.Entry<Long, GBTData>> instances = new ArrayList<>(inputData);
     // This is for the test.
-    showPredictedValues(instances, modelTable);
+    showPredictedValues(instances);
 
     return Collections.emptyMap();
   }
@@ -761,32 +759,28 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
    * Pull all the trees in the server and store them in the forest.
    */
   private List<GBTree> pullAllTrees(final int label) {
-    final List<GBTree> forest = new LinkedList<>();
-    for (int i = 0; i < numKeys; i++) {
-      forest.addAll(modelAccessor.pull(label * numKeys + i));
-    }
-    return forest;
-  }
-
-  /**
-   * Pull all the trees in the server and store them in the forest.
-   */
-  private List<GBTree> pullAllTrees(final int label, final Table modelTable) {
     final List<Integer> keys = new ArrayList<>(numKeys);
     for (int i = 0; i < numKeys; i++) {
       keys.add(label * numKeys + i);
     }
 
-    return ModelAccessor.pull(keys, modelTable);
+    final List<List<GBTree>> pulledModel = modelAccessor.pull(keys);
+
+    final List<GBTree> forest = new LinkedList<>();
+    for (final List<GBTree> gbTreeList : pulledModel) {
+      forest.addAll(gbTreeList);
+    }
+
+    return forest;
   }
 
   /**
    * This method prints the expected y-value for each data based on the trees that are built.
    */
-  private void showPredictedValues(final List<Map.Entry<Long, GBTData>> instances, final Table modelTable) {
+  private void showPredictedValues(final List<Map.Entry<Long, GBTData>> instances) {
     final int epochDataSize = instances.size();
     if (valueType == FeatureType.CONTINUOUS) {
-      final List<GBTree> forest = pullAllTrees(0, modelTable);
+      final List<GBTree> forest = pullAllTrees(0);
       final Float[] predictedValue = new Float[epochDataSize];
       for (int i = 0; i < epochDataSize; i++) {
         predictedValue[i] = 0f;
@@ -813,7 +807,7 @@ final class GBTTrainer implements Trainer<Long, GBTData> {
         }
       }
       for (int label = 0; label < valueTypeNum; label++) {
-        final List<GBTree> forest = pullAllTrees(label, modelTable);
+        final List<GBTree> forest = pullAllTrees(label);
         for (final GBTree thisTree : forest) {
           int dataIdx = 0;
           for (final Map.Entry<Long, GBTData> instance : instances) {

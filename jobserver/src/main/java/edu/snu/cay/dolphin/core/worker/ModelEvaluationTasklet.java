@@ -18,7 +18,6 @@ package edu.snu.cay.dolphin.core.worker;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
 
 import javax.inject.Inject;
-import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -28,24 +27,16 @@ public final class ModelEvaluationTasklet implements Tasklet {
   private static final Logger LOG = Logger.getLogger(ModelEvaluationTasklet.class.getName());
 
   private final ModelEvaluator modelEvaluator;
-  private final TestDataProvider testDataProvider;
-  private final Trainer trainer;
 
   @Inject
-  private ModelEvaluationTasklet(final ModelEvaluator modelEvaluator,
-                                 final TestDataProvider testDataProvider,
-                                 final Trainer trainer) {
+  private ModelEvaluationTasklet(final ModelEvaluator modelEvaluator) {
     this.modelEvaluator = modelEvaluator;
-    this.testDataProvider = testDataProvider;
-    this.trainer = trainer;
   }
 
   @Override
   public void run() throws Exception {
-    final List testData = testDataProvider.getTestData();
-
     // evaluate all check-pointed models
-    modelEvaluator.evaluate(trainer, testData);
+    modelEvaluator.evaluate();
   }
 
   @Override

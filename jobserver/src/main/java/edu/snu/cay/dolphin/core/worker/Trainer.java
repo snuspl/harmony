@@ -15,7 +15,6 @@
  */
 package edu.snu.cay.dolphin.core.worker;
 
-import edu.snu.cay.services.et.evaluator.api.Table;
 import org.apache.reef.annotations.audience.TaskSide;
 
 import java.util.Collection;
@@ -81,11 +80,10 @@ public interface Trainer<K, V> {
    * Evaluate a model with a given input data and test data.
    * @param inputData the data that it evaluates the model with
    * @param testData the test data to evaluate the model computed in the epoch
-   * @param modelTable a model table to evaluate
    * @return the result value of evaluation
    */
   Map<CharSequence, Double> evaluateModel(Collection<Map.Entry<K, V>> inputData,
-                                          Collection<V> testData, Table modelTable);
+                                          Collection<V> testData);
 
   /**
    * Post-run method executed after {@code run} but before task termination, exactly once.

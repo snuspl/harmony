@@ -228,11 +228,10 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
 
   @Override
   public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, NMFData>> inputData,
-                                                 final Collection<NMFData> testData,
-                                                 final Table modelTable) {
+                                                 final Collection<NMFData> testData) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
     final Pair<List<Long>, List<Integer>> inputRowColumnKeys = getInputColumnKeys(inputData);
-    final NMFModel model = pullModelToEvaluate(inputRowColumnKeys.getRight(), modelTable);
+    final NMFModel model = pullModels(inputRowColumnKeys.getRight());
     final NMFLocalModel localModel = getLocalModel(inputRowColumnKeys.getLeft());
 
     LOG.log(Level.INFO, "Start computing loss value");
@@ -240,15 +239,6 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
     map.put("loss", computeLoss(inputData, localModel, model));
 
     return map;
-  }
-
-  private NMFModel pullModelToEvaluate(final List<Integer> keys, final Table<Integer, Vector, Vector> modelTable) {
-    final Map<Integer, Vector> rMatrix = new HashMap<>(keys.size());
-    final List<Vector> vectors = ModelAccessor.pull(keys, modelTable);
-    for (int i = 0; i < keys.size(); ++i) {
-      rMatrix.put(keys.get(i), vectors.get(i));
-    }
-    return new NMFModel(rMatrix);
   }
 
   private NMFLocalModel getLocalModel(final List<Long> keys) {
@@ -463,28 +453,6 @@ final class NMFTrainer implements Trainer<Long, NMFData> {
     }
 
     return loss.get();
-  }
-
-  /**
-   * Gets keys from given input dataset.
-   * It has two groups of keys: row keys and column keys.
-   * Row keys are for input data and local models.
-   * Column keys are for server-side global models.
-   * @param dataValues Dataset assigned to this worker
-   * @return a pair of row keys and column keys
-   */
-  private Pair<List<Long>, List<Integer>> getInputRowKeys(
-      final Collection<Map.Entry<Long, NMFData>> dataValues) {
-    final ArrayList<Long> inputKeys = new ArrayList<>(dataValues.size());
-    final ArrayList<Integer> rowKeys = new ArrayList<>(dataValues.size());
-
-    // aggregate column indices
-    for (final Map.Entry<Long, NMFData> datum : dataValues) {
-      inputKeys.add(datum.getKey());
-      rowKeys.add(datum.getValue().getRowIdx());
-    }
-
-    return Pair.of(inputKeys, rowKeys);
   }
 
   /**

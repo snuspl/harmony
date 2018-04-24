@@ -25,6 +25,7 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.inject.Inject;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,12 +128,21 @@ public final class ETModelAccessor<K, P, V> implements ModelAccessor<K, P, V> {
       throw new RuntimeException(e);
     }
 
-    final List<V> resultValues = ModelAccessor.pull(keys, modelTable);
+    try {
+      final Map<K, V> result = modelTable.multiGetOrInit(keys, true).get();
 
-    pullTracer.recordTime(keys.size());
-    LOG.log(Level.INFO, "{0} keys have been pulled. Used memory: {1} MB",
-        new Object[] {keys.size(), MemoryUtils.getUsedMemoryMB()});
-    return resultValues;
+      final List<V> valueList = new ArrayList<>(keys.size());
+      keys.forEach(key -> valueList.add(result.get(key)));
+
+      pullTracer.recordTime(keys.size());
+      LOG.log(Level.INFO, "{0} keys have been pulled. Used memory: {1} MB",
+          new Object[] {keys.size(), MemoryUtils.getUsedMemoryMB()});
+
+      return valueList;
+
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

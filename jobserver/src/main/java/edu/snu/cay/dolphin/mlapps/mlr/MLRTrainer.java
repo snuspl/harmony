@@ -23,7 +23,6 @@ import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
-import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.utils.CatchableExecutors;
 import edu.snu.cay.utils.MemoryUtils;
 import edu.snu.cay.utils.Tuple3;
@@ -320,10 +319,9 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
   @Override
   public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, MLRData>> inputData,
-                                                 final Collection<MLRData> testData,
-                                                 final Table modelTable) {
+                                                 final Collection<MLRData> testData) {
     LOG.log(Level.INFO, "Pull model to compute loss value");
-    final MLRModel mlrModel = pullModelsToEvaluate(classPartitionIndices, modelTable);
+    final MLRModel mlrModel = pullModelsToEvaluate(classPartitionIndices);
 
     LOG.log(Level.INFO, "Start computing loss value");
     final List<MLRData> inputDataList = new ArrayList<>(inputData.size());
@@ -345,8 +343,8 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
   /**
    * Pull models one last time and perform validation.
    */
-  private MLRModel pullModelsToEvaluate(final List<Integer> keys, final Table<Integer, Vector, Vector> modelTable) {
-    final List<Vector> partitions = ModelAccessor.pull(keys, modelTable);
+  private MLRModel pullModelsToEvaluate(final List<Integer> keys) {
+    final List<Vector> partitions = modelAccessor.pull(keys);
 
     final MLRModel mlrModel = new MLRModel(new Vector[numClasses]);
     final Vector[] params = mlrModel.getParams();

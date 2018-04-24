@@ -22,7 +22,6 @@ import edu.snu.cay.common.math.linalg.Vector;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
-import edu.snu.cay.services.et.evaluator.api.Table;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 
@@ -196,10 +195,9 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
 
   @Override
   public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, LassoData>> inputData,
-                                                 final Collection<LassoData> testData,
-                                                 final Table modelTable) {
+                                                 final Collection<LassoData> testData) {
     // Calculate the loss value.
-    pullModels(modelTable);
+    pullModels();
 
     final double trainingLoss = computeLoss(inputData, null);
     final double testLoss = computeLoss(null, testData);
@@ -239,15 +237,6 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
    */
   private void pullModels() {
     final List<Vector> partialModels = modelAccessor.pull(modelPartitionIndices);
-    oldModel = vectorFactory.concatDense(partialModels);
-    newModel = oldModel.copy();
-  }
-
-  /**
-   * Pull up-to-date model parameters from server.
-   */
-  private void pullModels(final Table modelTable) {
-    final List<Vector> partialModels = ModelAccessor.pull(modelPartitionIndices, modelTable);
     oldModel = vectorFactory.concatDense(partialModels);
     newModel = oldModel.copy();
   }
