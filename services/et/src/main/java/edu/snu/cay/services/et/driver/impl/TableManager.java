@@ -32,7 +32,6 @@ import javax.inject.Inject;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 
 /**
  * A manager class of Tables, which creates and manages allocated tables.
@@ -86,14 +85,14 @@ final class TableManager {
     }
 
     final Injector tableInjector = baseTableInjector.forkInjector(tableConf.getConfiguration());
-    final AllocatedTableImpl allocatedTableImpl = tableInjector.getInstance(AllocatedTableImpl.class);
+    final AllocatedTable allocatedTable = tableInjector.getInstance(AllocatedTable.class);
 
     final ResultFuture<AllocatedTable> resultFuture = new ResultFuture<>();
 
-    allocatedTableImpl.init(tableConf, initialAssociators)
-        .addListener(o -> resultFuture.onCompleted(allocatedTableImpl));
+    allocatedTable.init(tableConf, initialAssociators)
+        .addListener(o -> resultFuture.onCompleted(allocatedTable));
 
-    allocatedTableMap.put(tableId, allocatedTableImpl);
+    allocatedTableMap.put(tableId, allocatedTable);
     return resultFuture;
   }
 
@@ -127,15 +126,7 @@ final class TableManager {
 
     // load checkpointed blocks into the table
     final ResultFuture<AllocatedTable> resultFuture = new ResultFuture<>();
-    allocatedTable.init(tableConf, initialAssociators)
-        .addListener(o -> {
-          try {
-            chkpManagerMaster.load(checkpointId).get();
-            resultFuture.onCompleted(allocatedTable);
-          } catch (ChkpNotExistException | InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-          }
-        });
+    allocatedTable.init(checkpointId, initialAssociators).addListener(o -> resultFuture.onCompleted(allocatedTable));
 
     allocatedTableMap.put(tableId, allocatedTable);
     return resultFuture;

@@ -21,6 +21,7 @@ import edu.snu.cay.services.et.common.util.concurrent.ResultFuture;
 import edu.snu.cay.services.et.configuration.TableConfiguration;
 import edu.snu.cay.services.et.driver.api.AllocatedExecutor;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.exceptions.ChkpNotExistException;
 import edu.snu.cay.services.et.exceptions.NotAssociatedException;
 import edu.snu.cay.utils.StateMachine;
 import org.apache.reef.annotations.audience.DriverSide;
@@ -111,20 +112,51 @@ public final class AllocatedTableImpl implements AllocatedTable {
       final ResultFuture<?> resultFuture = new ResultFuture<>();
       initFuture = resultFuture;
 
-      final ListenableFuture<?> initResultFuture =
-          tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus());
+      tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus())
+          .addListener(o1 -> {
+            final Set<String> executorIdSet = new HashSet<>(initialAssociators.size());
+            initialAssociators.forEach(executor -> executorIdSet.add(executor.getId()));
 
-      initResultFuture.addListener(o1 -> {
-        final Set<String> executorIdSet = new HashSet<>(initialAssociators.size());
-        initialAssociators.forEach(executor -> executorIdSet.add(executor.getId()));
-
-        tableControlAgent.load(tableConf.getId(), executorIdSet, inputPath)
-            .addListener(o2 -> resultFuture.onCompleted(null));
-      });
+            tableControlAgent.load(tableConf.getId(), executorIdSet, inputPath)
+                .addListener(o2 -> resultFuture.onCompleted(null));
+          });
 
     } else {
       initFuture = tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus());
     }
+
+    initFuture.addListener(result -> stateMachine.setState(State.INITIALIZED));
+    return initFuture;
+  }
+
+  @Override
+  public ListenableFuture<?> init(final String chkpId, final List<AllocatedExecutor> initialAssociators) {
+    stateMachine.checkState(State.UNINITIALIZED);
+    try {
+      tableConf = chkpManagerMaster.getTableConf(chkpId);
+    } catch (ChkpNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
+    final Set<String> executorIds = new HashSet<>(initialAssociators.size());
+    initialAssociators.forEach(executor -> {
+      executorIds.add(executor.getId());
+      subscriptionManager.registerSubscription(tableConf.getId(), executor.getId());
+    });
+
+    // partition table into blocks and initialize them in associators
+    blockManager.init(executorIds);
+
+    final ResultFuture<?> initFuture = new ResultFuture<>();
+
+    tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus())
+        .addListener(o1 -> {
+          try {
+            chkpManagerMaster.load(chkpId).addListener(o2 -> initFuture.onCompleted(null));
+          } catch (ChkpNotExistException e) {
+            throw new RuntimeException(e);
+          }
+        });
 
     initFuture.addListener(result -> stateMachine.setState(State.INITIALIZED));
     return initFuture;
