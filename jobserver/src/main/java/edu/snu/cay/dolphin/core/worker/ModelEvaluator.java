@@ -70,6 +70,7 @@ public final class ModelEvaluator {
    * Evaluate all checkpointed models.
    */
   void evaluate() {
+    askMasterToPrepare(); // prepare input table
     final Collection trainingData = trainingDataProvider.getEpochData();
     final List testData;
     try {
@@ -79,7 +80,7 @@ public final class ModelEvaluator {
     }
 
     int modelCount = 0;
-    while (askMasterForCheckpointedModel()) {
+    while (askMasterToPrepare()) {
       LOG.log(Level.INFO, "Evaluate a {0}th model", modelCount++);
 
       final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData);
@@ -102,9 +103,10 @@ public final class ModelEvaluator {
   /**
    * Tell master that it's ready to evaluate the next model.
    * And wait master's response.
+   * At first try, master loads an input table.
    * @return True if there exists a next model table to evaluate
    */
-  private boolean askMasterForCheckpointedModel() {
+  private boolean askMasterToPrepare() {
     LOG.log(Level.INFO, "Ask master.");
     // send message to master
     try {
@@ -120,7 +122,7 @@ public final class ModelEvaluator {
   }
 
   /**
-   * A response from master about {@link #askMasterForCheckpointedModel()}.
+   * A response from master about {@link #askMasterToPrepare()}.
    */
   void onMasterMsg(final ModelEvalAnsMsg msg) {
     this.doNext = msg.getDoNext();

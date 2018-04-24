@@ -33,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -60,6 +61,7 @@ final class ModelChkpManager {
   private final AtomicInteger workerCount = new AtomicInteger(0);
   private final AtomicInteger chkpCounter = new AtomicInteger(0);
   private final AtomicInteger restoreCounter = new AtomicInteger(0);
+  private final AtomicBoolean inputTableRestored = new AtomicBoolean(false);
 
   private List<AllocatedExecutor> runningServers;
   private List<AllocatedExecutor> runningWorkers;
@@ -117,18 +119,47 @@ final class ModelChkpManager {
     if (numWorkersSentMsg == runningWorkers.size()) {
       workerCount.set(0); // reset
       executor.submit(() -> {
-        final boolean doNext = restoreOldestCheckpoint();
+        final boolean doNext;
+
+        // load input table at first time
+        if (inputTableRestored.compareAndSet(false, true)) {
+          doNext = true;
+          restoreInputTable();
+        } else {
+          dropPrevModelTables();
+          doNext = restoreOldestCheckpoint();
+          if (!doNext) {
+            dropInputTable();
+          }
+        }
         runningWorkers.forEach(worker -> msgSender.get().sendModelEvalAnsMsg(worker.getId(), doNext));
       });
     }
   }
 
-  /**
-   * Restores tables with the oldest checkpoint.
-   * It waits until the restoration finishes.
-   */
-  private boolean restoreOldestCheckpoint() {
-    // Need to drop the previous model table first
+  private void restoreInputTable() {
+    try {
+      final List<Future<String>> chkpIdFutures = checkpointIdFutures.pop();
+      final String inputChkpId = chkpIdFutures.get(0).get();
+      final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
+      final AllocatedTable restoredInputTable = inputTableFuture.get();
+
+      jobLogger.log(Level.INFO, "Input table [{0}] has been restored from checkpoint.", restoredInputTable.getId());
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void dropInputTable() {
+    try {
+      etMasterFuture.get().getTable(inputTableId).drop().get();
+    } catch (InterruptedException | ExecutionException | TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void dropPrevModelTables() {
+    // Need to drop the previous model tables first
     try {
       final Future future = etMasterFuture.get().getTable(modelTableId).drop();
       if (hasLocalModel) {
@@ -140,24 +171,16 @@ final class ModelChkpManager {
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
+  }
 
+  /**
+   * Restores tables with the oldest checkpoint.
+   * It waits until the restoration finishes.
+   */
+  private boolean restoreOldestCheckpoint() {
     if (checkpointIdFutures.isEmpty()) {
       jobLogger.log(Level.INFO, "No more checkpoints.");
       return false;
-    }
-
-    // load input table at first time
-    if (restoreCounter.get() == 0) {
-      try {
-        final List<Future<String>> chkpIdFutures = checkpointIdFutures.pop();
-        final String inputChkpId = chkpIdFutures.get(0).get();
-        final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
-        final AllocatedTable restoredInputTable = inputTableFuture.get();
-
-        jobLogger.log(Level.INFO, "Input table [{0}] has been restored from checkpoint.", restoredInputTable.getId());
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
     }
 
     jobMessageObserverFuture.get().sendMessageToClient(String.format("Model eval progress: [%d / %d]",
