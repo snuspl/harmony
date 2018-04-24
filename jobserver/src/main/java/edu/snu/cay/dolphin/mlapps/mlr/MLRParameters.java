@@ -27,10 +27,6 @@ final class MLRParameters {
   static final class NumClasses implements Name<Integer> {
   }
 
-  @NamedParameter(doc = "initial value of the step size", short_name = "init_step_size")
-  static final class InitialStepSize implements Name<Float> {
-  }
-
   static final class MetricKeys {
 
     // The key denoting the sum of loss computed from the training data instances.
