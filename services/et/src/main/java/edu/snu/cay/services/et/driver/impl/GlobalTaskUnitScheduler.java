@@ -72,12 +72,13 @@ public final class GlobalTaskUnitScheduler {
 
     jobIdToCounter.putIfAbsent(jobId,
         Pair.of(new AtomicInteger(0), Collections.newSetFromMap(new ConcurrentHashMap<>())));
-    jobIdToCounter.get(jobId).getValue().add(executorId);
-    final int count = jobIdToCounter.get(jobId).getKey().incrementAndGet();
+    final Pair<AtomicInteger, Set<String>> pair = jobIdToCounter.get(jobId);
+    pair.getValue().add(executorId);
+    final int count = pair.getKey().incrementAndGet();
 
     if (count == jobIdToNumExecutors.get(jobId)) {
-      sendTaskUnitReadyMsg(taskletId, jobIdToCounter.get(jobId).getValue());
       jobIdToCounter.remove(jobId);
+      sendTaskUnitReadyMsg(taskletId, pair.getValue());
     }
   }
 
