@@ -180,7 +180,9 @@ public final class DolphinMaster {
       checkTaskResults(taskletResults);
 
       workers.forEach(worker -> metricManager.stopMetricCollection(worker.getId()));
-      modelChkpManager.waitChkpsToBeDone();
+      if (offlineModelEval) {
+        modelChkpManager.waitChkpsToBeDone();
+      }
     } catch (Exception e) {
       throw new RuntimeException("Dolphin job has been failed", e);
     }
