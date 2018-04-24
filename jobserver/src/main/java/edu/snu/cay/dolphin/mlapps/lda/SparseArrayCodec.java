@@ -18,6 +18,7 @@ package edu.snu.cay.dolphin.mlapps.lda;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import edu.snu.cay.dolphin.mlapps.serialization.Kryos;
+import edu.snu.cay.utils.Buffers;
 import org.apache.reef.io.network.impl.StreamingCodec;
 import org.apache.reef.io.serialization.Codec;
 
@@ -40,7 +41,7 @@ final class SparseArrayCodec implements Codec<int[]>, StreamingCodec<int[]> {
 
   @Override
   public byte[] encode(final int[] array) {
-    try (Output output = new Output(getNumBytes(array) + Integer.BYTES + 1)) {
+    try (Output output = new Output(Buffers.get())) {
       Kryos.get().writeObject(output, array, sparseArraySerializer);
       return output.toBytes();
     }
