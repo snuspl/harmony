@@ -81,6 +81,15 @@ public interface AllocatedTable {
                            List<AllocatedExecutor> initialAssociators);
 
   /**
+   * Initialize this table from a checkpoint.
+   * @param chkpId
+   * @param initialAssociators
+   * @return
+   */
+  ListenableFuture<?> init(String chkpId,
+                           List<AllocatedExecutor> initialAssociators);
+
+  /**
    * Loads an input data into a table with executors. Note that this method must be called after table init.
    * @param executors a list of executors which will load data
    * @param inputPath a data file path
