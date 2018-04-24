@@ -128,61 +128,62 @@ final class ModelChkpManager {
    * It waits until the restoration finishes.
    */
   private boolean restoreOldestCheckpoint() {
-    if (checkpointIdFutures.isEmpty()) {
-      jobLogger.log(Level.INFO, "No more checkpoints.");
-      return false;
-    }
-
-    jobMessageObserverFuture.get().sendMessageToClient(String.format("Model eval progress: [%d / %d]",
-            restoreCounter.incrementAndGet(), chkpCounter.get()).getBytes());
-
     // Need to drop the previous model table first
     try {
-      final Future future0 = etMasterFuture.get().getTable(inputTableId).drop();
-      final Future future1 = etMasterFuture.get().getTable(modelTableId).drop();
+      final Future future = etMasterFuture.get().getTable(modelTableId).drop();
       if (hasLocalModel) {
         etMasterFuture.get().getTable(localModelTableId).drop().get();
       }
-      future0.get();
-      future1.get();
+      future.get();
     } catch (TableNotExistException e) {
       // skip if table does not exist
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
     }
 
-    // sleep before starting table chkp load
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
+    if (checkpointIdFutures.isEmpty()) {
+      jobLogger.log(Level.INFO, "No more checkpoints.");
+      return false;
     }
+
+    // load input table at first time
+    if (restoreCounter.get() == 0) {
+      try {
+        final List<Future<String>> chkpIdFutures = checkpointIdFutures.pop();
+        final String inputChkpId = chkpIdFutures.get(0).get();
+        final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
+        final AllocatedTable restoredInputTable = inputTableFuture.get();
+
+        jobLogger.log(Level.INFO, "Input table [{0}] has been restored from checkpoint.", restoredInputTable.getId());
+      } catch (InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    jobMessageObserverFuture.get().sendMessageToClient(String.format("Model eval progress: [%d / %d]",
+            restoreCounter.incrementAndGet(), chkpCounter.get()).getBytes());
 
     // restore a model to evaluate from a checkpoint
     try {
       final List<Future<String>> chkpIdFutures = checkpointIdFutures.pop();
 
-      final String inputChkpId = chkpIdFutures.get(0).get();
-      final String modelChkpId = chkpIdFutures.get(1).get();
-      final Future<AllocatedTable> inputTableFuture = etMasterFuture.get().createTable(inputChkpId, runningWorkers);
+      final String modelChkpId = chkpIdFutures.get(0).get();
       final Future<AllocatedTable> modelTableFuture = etMasterFuture.get().createTable(modelChkpId, runningServers);
 
       if (hasLocalModel) {
-        final String localModelChkpId = chkpIdFutures.get(2).get();
+        final String localModelChkpId = chkpIdFutures.get(1).get();
         final Future<AllocatedTable> localModelTableFuture = etMasterFuture.get()
             .createTable(localModelChkpId, runningWorkers);
-        final AllocatedTable restoredInputTable = localModelTableFuture.get();
+        final AllocatedTable restoredTable = localModelTableFuture.get();
 
         jobLogger.log(Level.INFO, "Local model table [{0}] has been restored from checkpoint.",
-            restoredInputTable.getId());
+            restoredTable.getId());
       }
 
       final AllocatedTable restoredModelTable = modelTableFuture.get();
       restoredModelTable.subscribe(remoteWorkers).get();
-      final AllocatedTable restoredInputTable = inputTableFuture.get();
 
-      jobLogger.log(Level.INFO, "Input table [{0}] and model table [{1}] are restored from checkpoint.",
-          new Object[]{restoredModelTable.getId(), restoredInputTable.getId()});
+      jobLogger.log(Level.INFO, "Model table [{0}] has been restored from checkpoint.", restoredModelTable.getId());
 
     } catch (InterruptedException | ExecutionException e) {
       throw new RuntimeException(e);
@@ -199,12 +200,8 @@ final class ModelChkpManager {
     final List<Future<String>> chkpFutures;
 
     try {
-      final ListenableFuture<String> inputChkpIdFuture = etMasterFuture.get().getTable(inputTableId).checkpoint();
       final ListenableFuture<String> modelChkpIdFuture = etMasterFuture.get().getTable(modelTableId).checkpoint();
 
-      inputChkpIdFuture.addListener(chkpId ->
-          jobLogger.log(Level.INFO, "{0}-th input checkpoint is created. Checkpoint Id: {1}",
-              new Object[]{idx, chkpId}));
       modelChkpIdFuture.addListener(chkpId ->
           jobLogger.log(Level.INFO, "{0}-th model checkpoint is created. Checkpoint Id: {1}",
               new Object[]{idx, chkpId}));
@@ -215,9 +212,9 @@ final class ModelChkpManager {
         localModelChkpIdFuture.addListener(chkpId ->
             jobLogger.log(Level.INFO, "{0}-th local model checkpoint is created. Checkpoint Id: {1}",
                 new Object[]{idx, chkpId}));
-        chkpFutures = Arrays.asList(inputChkpIdFuture, modelChkpIdFuture, localModelChkpIdFuture);
+        chkpFutures = Arrays.asList(modelChkpIdFuture, localModelChkpIdFuture);
       } else {
-        chkpFutures = Arrays.asList(inputChkpIdFuture, modelChkpIdFuture);
+        chkpFutures = Collections.singletonList(modelChkpIdFuture);
       }
 
       checkpointIdFutures.add(chkpFutures);
@@ -231,6 +228,13 @@ final class ModelChkpManager {
    * Waits all checkpoints requested by {@link #createCheckpoint()} to be done.
    */
   void waitChkpsToBeDone() {
+    try {
+      final Future<String> future = etMasterFuture.get().getTable(inputTableId).checkpoint();
+      checkpointIdFutures.addFirst(Collections.singletonList(future));
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
     checkpointIdFutures.forEach(futures -> {
       try {
         for (final Future<String> future : futures) {
@@ -240,6 +244,7 @@ final class ModelChkpManager {
         throw new RuntimeException(e);
       }
     });
-    jobLogger.log(Level.INFO, "All checkpoints completed. NumCheckpoints: {0}", checkpointIdFutures.size());
+    jobLogger.log(Level.INFO, "All checkpoints completed. The number of checkpointed models: {0}",
+        checkpointIdFutures.size() - 1);
   }
 }
