@@ -20,7 +20,6 @@ import edu.snu.cay.dolphin.examples.common.ExampleParameters;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
 import edu.snu.cay.dolphin.DolphinParameters;
-import edu.snu.cay.services.et.evaluator.api.Table;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.reef.tang.annotations.Parameter;
 
@@ -132,8 +131,7 @@ final class AddVectorTrainer implements Trainer {
   }
 
   @Override
-  public Map<CharSequence, Double> evaluateModel(final Collection inputData, final Collection testData,
-                                                 final Table modelTable) {
+  public Map<CharSequence, Double> evaluateModel(final Collection inputData, final Collection testData) {
     throw new NotImplementedException("This method is not supported yet.");
   }
 

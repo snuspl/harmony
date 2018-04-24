@@ -16,21 +16,17 @@
 package edu.snu.cay.dolphin.core.worker;
 
 import edu.snu.cay.common.metric.avro.Metrics;
-import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.ModelEvalAnsMsg;
 import edu.snu.cay.dolphin.metric.avro.DolphinWorkerMetrics;
 import edu.snu.cay.dolphin.metric.avro.WorkerMetricsType;
 import edu.snu.cay.jobserver.JobLogger;
-import edu.snu.cay.services.et.evaluator.api.Table;
-import edu.snu.cay.services.et.evaluator.api.TableAccessor;
-import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import edu.snu.cay.services.et.metric.MetricCollector;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.io.network.group.impl.utils.ResettingCountDownLatch;
 import org.apache.reef.tang.InjectionFuture;
-import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -45,51 +41,48 @@ public final class ModelEvaluator {
 
   private final JobLogger jobLogger;
 
-  private final InjectionFuture<TableAccessor> tableAccessorFuture;
   private final InjectionFuture<MetricCollector> metricCollectorFuture;
   private final InjectionFuture<WorkerSideMsgSender> msgSenderFuture;
 
-  private final String modelTableId;
-  private final String inputTableId;
+  private final TrainingDataProvider trainingDataProvider;
+  private final TestDataProvider testDataProvider;
+  private final Trainer trainer;
 
   private final ResettingCountDownLatch latch = new ResettingCountDownLatch(1);
   private volatile boolean doNext = true;
 
   @Inject
-  private ModelEvaluator(final InjectionFuture<TableAccessor> tableAccessorFuture,
-                         final InjectionFuture<WorkerSideMsgSender> msgSenderFuture,
+  private ModelEvaluator(final InjectionFuture<WorkerSideMsgSender> msgSenderFuture,
+                         final Trainer trainer,
+                         final TestDataProvider testDataProvider,
+                         final TrainingDataProvider trainingDataProvider,
                          final InjectionFuture<MetricCollector> metricCollectorFuture,
-                         final JobLogger jobLogger,
-                         @Parameter(DolphinParameters.ModelTableId.class) final String modelTableId,
-                         @Parameter(DolphinParameters.InputTableId.class) final String inputTableId) {
+                         final JobLogger jobLogger) {
     this.jobLogger = jobLogger;
-    this.tableAccessorFuture = tableAccessorFuture;
-    this.modelTableId = modelTableId;
-    this.inputTableId = inputTableId;
     this.metricCollectorFuture = metricCollectorFuture;
     this.msgSenderFuture = msgSenderFuture;
+    this.trainer = trainer;
+    this.trainingDataProvider = trainingDataProvider;
+    this.testDataProvider = testDataProvider;
   }
 
   /**
    * Evaluate all checkpointed models.
    */
-  void evaluate(final Trainer trainer, final List testData) {
+  void evaluate() {
+    final Collection trainingData = trainingDataProvider.getEpochData();
+    final List testData;
+    try {
+      testData = testDataProvider.getTestData();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
     int modelCount = 0;
     while (askMasterForCheckpointedModel()) {
-
       LOG.log(Level.INFO, "Evaluate a {0}th model", modelCount++);
-      final Table modelTable;
-      final Table inputTable;
-      try {
-        modelTable = tableAccessorFuture.get().getTable(modelTableId);
-        inputTable = tableAccessorFuture.get().getTable(inputTableId);
-      } catch (TableNotExistException e) {
-        throw new RuntimeException(e);
-      }
 
-      final Collection<Map.Entry> trainingData = inputTable.getLocalTablet().getDataMap().entrySet();
-
-      final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData, modelTable);
+      final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData);
 
       jobLogger.log(Level.INFO, "ObjValue: {0}", objValue);
 

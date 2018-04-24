@@ -288,8 +288,7 @@ final class LDATrainer implements Trainer<Long, Document> {
 
   @Override
   public Map<CharSequence, Double> evaluateModel(final Collection<Map.Entry<Long, Document>> inputData,
-                                                 final Collection<Document> testData,
-                                                 final edu.snu.cay.services.et.evaluator.api.Table modelTable) {
+                                                 final Collection<Document> testData) {
     // key numVocabs is a summary vector of word-topic distribution, in a form of numTopics-dimensional vector
     final List<Integer> vocabList = new ArrayList<>(numVocabs + 1);
     for (int i = 0; i < numVocabs + 1; i++) {
@@ -297,7 +296,7 @@ final class LDATrainer implements Trainer<Long, Document> {
     }
 
     LOG.log(Level.INFO, "Pull model to compute log likelihood");
-    final List<int[]> wordTopicCounts = ModelAccessor.pull(vocabList, modelTable);
+    final List<int[]> wordTopicCounts = modelAccessor.pull(vocabList);
     final int[] wordTopicCountsSummary = wordTopicCounts.remove(numVocabs);
 
     LOG.log(Level.INFO, "Start computing log likelihood");

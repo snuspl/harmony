@@ -15,12 +15,8 @@
  */
 package edu.snu.cay.dolphin.core.worker;
 
-import edu.snu.cay.services.et.evaluator.api.Table;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 /**
  * A class for accessing global model shared by multiple workers.
@@ -78,21 +74,6 @@ public interface ModelAccessor<K, P, V> {
    *        Some positions in the list can be {@code null}, if the key has no associated value
    */
   List<V> pull(List<K> keys);
-
-
-  static <K, V> List<V> pull(final List<K> keys, final Table<K, V, ?> modelTable) {
-    try {
-      final Map<K, V> result = modelTable.multiGetOrInit(keys, true).get();
-
-      final List<V> valueList = new ArrayList<>(keys.size());
-      keys.forEach(key -> valueList.add(result.get(key)));
-
-      return valueList;
-
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   /**
    * Fetches the collected metrics and reset the tracers for collecting metrics in the next round.
