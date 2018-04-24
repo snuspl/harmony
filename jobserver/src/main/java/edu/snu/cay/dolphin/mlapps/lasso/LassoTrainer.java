@@ -298,7 +298,7 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
         final Vector feature = lassoData.getFeature();
         final double value = lassoData.getValue();
         final double prediction = predict(feature);
-        squaredErrorSum += (value - prediction) * (value - prediction);
+        squaredErrorSum += Math.sqrt(value - prediction);
       }
     } else {
       for (final Map.Entry<Long, LassoData> entry : kvData) {
@@ -306,7 +306,7 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
         final Vector feature = lassoData.getFeature();
         final double value = lassoData.getValue();
         final double prediction = predict(feature);
-        squaredErrorSum += (value - prediction) * (value - prediction);
+        squaredErrorSum += Math.sqrt(value - prediction);
       }
     }
 
