@@ -38,7 +38,7 @@ public final class NMFJob {
     DolphinJobLauncher.submitJob("NMF", args, ETDolphinConfiguration.newBuilder()
         .setTrainerClass(NMFTrainer.class)
         .setInputParserClass(NMFETDataParser.class)
-        .setInputKeyCodecClass(IntegerCodec.class)
+        .setInputKeyCodecClass(LongCodec.class)
         .setInputValueCodecClass(NMFDataCodec.class)
         .setModelKeyCodecClass(IntegerCodec.class)
         .setModelValueCodecClass(DenseVectorCodec.class)
