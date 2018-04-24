@@ -15,18 +15,25 @@
  */
 package edu.snu.cay.dolphin.mlapps.lasso;
 
+import com.google.common.util.concurrent.AtomicDouble;
 import edu.snu.cay.common.math.linalg.Matrix;
 import edu.snu.cay.common.math.linalg.MatrixFactory;
 import edu.snu.cay.common.math.linalg.VectorFactory;
 import edu.snu.cay.common.math.linalg.Vector;
+import edu.snu.cay.common.param.Parameters;
+import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.dolphin.DolphinParameters.*;
 import edu.snu.cay.dolphin.core.worker.ModelAccessor;
 import edu.snu.cay.dolphin.core.worker.Trainer;
+import edu.snu.cay.utils.CatchableExecutors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -82,6 +89,16 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
    */
   private final int numFeaturesPerPartition;
 
+  /**
+   * Executes the Trainer threads.
+   */
+  private final ExecutorService executor;
+
+  /**
+   * Number of Trainer threads that train concurrently.
+   */
+  private final int numTrainerThreads;
+
   @Inject
   private LassoTrainer(final ModelAccessor<Integer, Vector, Vector> modelAccessor,
                        @Parameter(Lambda.class) final float lambda,
@@ -90,6 +107,8 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
                        @Parameter(DecayRate.class) final double decayRate,
                        @Parameter(DecayPeriod.class) final int decayPeriod,
                        @Parameter(NumFeaturesPerPartition.class) final int numFeaturesPerPartition,
+                       @Parameter(NumTrainerThreads.class) final int numTrainerThreads,
+                       @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
                        final VectorFactory vectorFactory,
                        final MatrixFactory matrixFactory) {
     this.modelAccessor = modelAccessor;
@@ -104,6 +123,13 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
     if (decayPeriod <= 0) {
       throw new IllegalArgumentException("decay_period must be a positive value");
     }
+
+    // Use the half of the processors if hyper-thread is on, since using virtual cores do not help for float-point ops.
+    this.numTrainerThreads = numTrainerThreads == Integer.parseInt(DolphinParameters.NumTrainerThreads.UNSET_VALUE) ?
+        Runtime.getRuntime().availableProcessors() / (hyperThreadEnabled ? 2 : 1) :
+        numTrainerThreads;
+    this.executor = CatchableExecutors.newFixedThreadPool(this.numTrainerThreads);
+
     this.vectorFactory = vectorFactory;
     this.matrixFactory = matrixFactory;
     this.oldModel = vectorFactory.createDenseZeros(numFeatures);
@@ -152,23 +178,48 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
 
     final Vector preCalculate = featureMatrix.mmul(newModel);
 
-    final Vector columnVector = vectorFactory.createDenseZeros(numInstancesToProcess);
-    // For each dimension, compute the optimal value.
-    for (int featureIdx = 0; featureIdx < numFeatures; featureIdx++) {
-      if (closeToZero(newModel.get(featureIdx))) {
-        continue;
-      }
-      for (int rowIdx = 0; rowIdx < numInstancesToProcess; rowIdx++) {
-        columnVector.set(rowIdx, featureMatrix.get(rowIdx, featureIdx));
-      }
-      final double columnNorm = columnVector.dot(columnVector);
-      if (closeToZero(columnNorm)) {
-        continue;
-      }
-      preCalculate.subi(columnVector.scale(newModel.get(featureIdx)));
-      newModel.set(featureIdx,
-          (float) sthresh((columnVector.dot(yValues.sub(preCalculate))) / columnNorm, lambda, columnNorm));
-      preCalculate.addi(columnVector.scale(newModel.get(featureIdx)));
+    final int numFeaturesPerThread = numFeatures / numTrainerThreads;
+
+    final CyclicBarrier barrier = new CyclicBarrier(numTrainerThreads);
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+
+      executor.submit(() -> {
+        final Vector columnVector = vectorFactory.createDenseZeros(numInstancesToProcess);
+        final Vector preCalculateCopy = finalThreadIdx == 0 ? preCalculate : preCalculate.copy();
+        barrier.await();
+
+        final int startIdx = finalThreadIdx * numFeaturesPerThread;
+        final int endIdx = finalThreadIdx == numTrainerThreads - 1 ? numFeatures : startIdx + numFeaturesPerThread;
+
+        // For each dimension, compute the optimal value.
+        for (int featureIdx = startIdx; featureIdx < endIdx; featureIdx++) {
+          if (closeToZero(newModel.get(featureIdx))) {
+            continue;
+          }
+          for (int rowIdx = 0; rowIdx < numInstancesToProcess; rowIdx++) {
+            columnVector.set(rowIdx, featureMatrix.get(rowIdx, featureIdx));
+          }
+          final double columnNorm = columnVector.dot(columnVector);
+          if (closeToZero(columnNorm)) {
+            continue;
+          }
+          preCalculateCopy.subi(columnVector.scale(newModel.get(featureIdx)));
+          newModel.set(featureIdx,
+              (float) sthresh((columnVector.dot(yValues.sub(preCalculateCopy))) / columnNorm, lambda, columnNorm));
+          preCalculateCopy.addi(columnVector.scale(newModel.get(featureIdx)));
+        }
+        latch.countDown();
+        return null;
+      });
+    }
+
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -199,8 +250,11 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
     // Calculate the loss value.
     pullModels();
 
-    final double trainingLoss = computeLoss(inputData, null);
-    final double testLoss = computeLoss(null, testData);
+    final List<LassoData> inputDataList = new ArrayList<>(inputData.size());
+    inputData.forEach(entry -> inputDataList.add(entry.getValue()));
+
+    final double trainingLoss = computeLoss(inputDataList);
+    final double testLoss = computeLoss(new ArrayList<>(testData));
 
     LOG.log(Level.INFO, "Training Loss: {0}, Test Loss: {1}", new Object[] {trainingLoss, testLoss});
 
@@ -278,28 +332,33 @@ final class LassoTrainer implements Trainer<Long, LassoData> {
    * Compute the loss value for the data.
    * Only one input parameter is not null.
    */
-  private double computeLoss(final Collection<Map.Entry<Long, LassoData>> kvData,
-                             final Collection<LassoData> data) {
-    double squaredErrorSum = 0;
+  private double computeLoss(final List<LassoData> data) {
+    final AtomicDouble squaredErrorSum = new AtomicDouble(0);
 
-    if (kvData == null) {
-      for (final LassoData lassoData : data) {
-        final Vector feature = lassoData.getFeature();
-        final double value = lassoData.getValue();
-        final double prediction = predict(feature);
-        squaredErrorSum += Math.sqrt(value - prediction);
-      }
-    } else {
-      for (final Map.Entry<Long, LassoData> entry : kvData) {
-        final LassoData lassoData = entry.getValue();
-        final Vector feature = lassoData.getFeature();
-        final double value = lassoData.getValue();
-        final double prediction = predict(feature);
-        squaredErrorSum += Math.sqrt(value - prediction);
-      }
+    final int numItemsPerThread = data.size() / numTrainerThreads;
+    final CountDownLatch latch = new CountDownLatch(numTrainerThreads);
+
+    for (int threadIdx = 0; threadIdx < numTrainerThreads; threadIdx++) {
+      final int finalThreadIdx = threadIdx;
+      executor.submit(() -> {
+        final int startIdx = numItemsPerThread * finalThreadIdx;
+        final int endIdx = finalThreadIdx == numTrainerThreads - 1 ? data.size() : startIdx + numItemsPerThread;
+
+        for (final LassoData lassoData : data.subList(startIdx, endIdx)) {
+          final Vector feature = lassoData.getFeature();
+          final double value = lassoData.getValue();
+          final double prediction = predict(feature);
+          squaredErrorSum.addAndGet(Math.sqrt(value - prediction));
+        }
+        latch.countDown();
+      });
     }
-
-    return squaredErrorSum;
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+    return squaredErrorSum.get();
   }
 
   /**
