@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.InitialStepSize;
 import static edu.snu.cay.dolphin.mlapps.mlr.MLRParameters.NumClasses;
 
 /**
@@ -117,7 +116,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
                      @Parameter(NumClasses.class) final int numClasses,
                      @Parameter(NumFeatures.class) final int numFeatures,
                      @Parameter(NumFeaturesPerPartition.class) final int numFeaturesPerPartition,
-                     @Parameter(InitialStepSize.class) final float initStepSize,
+                     @Parameter(StepSize.class) final float initStepSize,
                      @Parameter(Lambda.class) final float lambda,
                      @Parameter(DecayRate.class) final float decayRate,
                      @Parameter(DecayPeriod.class) final int decayPeriod,

@@ -45,7 +45,6 @@ public final class MLRET {
         .setModelValueCodecClass(DenseVectorCodec.class)
         .setModelUpdateValueCodecClass(DenseVectorCodec.class)
         .addParameterClass(NumClasses.class)
-        .addParameterClass(InitialStepSize.class)
         .build());
   }
 }
