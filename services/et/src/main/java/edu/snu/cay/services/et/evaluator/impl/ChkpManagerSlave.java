@@ -172,8 +172,8 @@ public final class ChkpManagerSlave {
           final int numItemsToChkp = (int) (block.getNumPairs() * samplingRatio);
           fos.writeInt(numItemsToChkp);
 
-          LOG.log(Level.INFO, "blockId: {0}, numTotalItems: {1}, numItemsToChkp: {2}",
-              new Object[]{block.getId(), block.getNumPairs(), numItemsToChkp});
+          LOG.log(Level.INFO, "tabldId: {3}, blockId: {0}, numTotalItems: {1}, numItemsToChkp: {2}",
+              new Object[]{block.getId(), block.getNumPairs(), numItemsToChkp, tableId});
 
           final Iterator<Map.Entry<K, V>> iter = block.iterator();
           for (int i = 0; i < numItemsToChkp; i++) {
