@@ -113,7 +113,7 @@ final class LDAStatCalculator {
       final int finalThreadIdx = threadIdx;
       executor.submit(() -> {
         final int startIdx = numItemsPerThread * finalThreadIdx;
-        final int endIdx = startIdx + numItemsPerThread + (finalThreadIdx < numRemainders ? 1 : 0);
+        final int endIdx = startIdx + numItemsPerThread + (finalThreadIdx == numTrainerThreads - 1 ? numRemainders : 0);
 
         for (final Map.Entry<Long, Document> documentPair : documentPairList.subList(startIdx, endIdx)) {
           final Document document = documentPair.getValue();
