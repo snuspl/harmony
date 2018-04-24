@@ -121,7 +121,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
                      @Parameter(DecayPeriod.class) final int decayPeriod,
                      @Parameter(NumTrainerThreads.class) final int numTrainerThreads,
                      @Parameter(Parameters.HyperThreadEnabled.class) final boolean hyperThreadEnabled,
-                     @Parameter(DolphinParameters.NumTotalMiniBatches.class) final int numTotalMiniBatches,
                      final VectorFactory vectorFactory) {
     this.modelAccessor = modelAccessor;
     this.numClasses = numClasses;
@@ -164,7 +163,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
 
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
     LOG.log(Level.INFO, "Step size = {0}", stepSize);
-    LOG.log(Level.INFO, "Number of total mini-batches in an epoch = {0}", numTotalMiniBatches);
     LOG.log(Level.INFO, "Total number of keys = {0}", classPartitionIndices.size());
   }
 
@@ -411,7 +409,6 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
     final AtomicInteger correctPredictions = new AtomicInteger(0);
 
     final int numItemsPerThread = kvData.size() / numTrainerThreads;
-    final int numRemainders = kvData.size() % numTrainerThreads;
 
     final ResettingCountDownLatch latch = new ResettingCountDownLatch(numTrainerThreads);
 
@@ -419,7 +416,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
       final int finalThreadIdx = threadIdx;
       executor.submit(() -> {
         final int startIdx = numItemsPerThread * finalThreadIdx;
-        final int endIdx = startIdx + numItemsPerThread + (numRemainders > finalThreadIdx ? 1 : 0);
+        final int endIdx = finalThreadIdx == numTrainerThreads - 1 ? kvData.size() : startIdx + numItemsPerThread;
 
         for (final MLRData data : kvData.subList(startIdx, endIdx)) {
           final Vector feature = data.getFeature();
