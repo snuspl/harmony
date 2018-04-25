@@ -18,6 +18,7 @@ package edu.snu.cay.services.et.evaluator.impl;
 import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpCommitPath;
 import edu.snu.cay.services.et.configuration.parameters.chkp.ChkpTempPath;
 import edu.snu.cay.services.et.driver.impl.ChkpManagerMaster;
+import edu.snu.cay.services.et.evaluator.api.Block;
 import edu.snu.cay.services.et.evaluator.api.MessageSender;
 import edu.snu.cay.services.et.evaluator.api.Table;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
@@ -168,18 +169,15 @@ public final class ChkpManagerSlave {
         // create a file for each block
         // prevent modifying value while doing chkp
         final Lock lock = tableComponents.getOwnershipCache().holdWriteLock(block.getId());
+        int numWrittenItems;
         try (FSDataOutputStream fos = fs.create(new Path(baseDir, Integer.toString(block.getId())))) {
-          final int numItemsToChkp = (int) (block.getNumPairs() * samplingRatio);
-          fos.writeInt(numItemsToChkp);
-
-          LOG.log(Level.INFO, "tableId: {3}, blockId: {0}, numTotalItems: {1}, numItemsToChkp: {2}",
-              new Object[]{block.getId(), block.getNumPairs(), numItemsToChkp, tableId});
-
-          final Iterator<Map.Entry<K, V>> iter = block.iterator();
-          for (int i = 0; i < numItemsToChkp; i++) {
-            final Map.Entry<K, V> kvEntry = iter.next();
-            kvuSerializer.getKeyCodec().encodeToStream(kvEntry.getKey(), fos);
-            kvuSerializer.getValueCodec().encodeToStream(kvEntry.getValue(), fos);
+          while (true) {
+            try {
+              numWrittenItems = writeBlock(fos, block, samplingRatio, tableId, kvuSerializer);
+              break;
+            } catch (NoSuchElementException e) {
+              LOG.log(Level.SEVERE, "Retry checkpoint", e);
+            }
           }
         } catch (IOException e) {
           throw new RuntimeException(e);
@@ -187,7 +185,7 @@ public final class ChkpManagerSlave {
           lock.unlock();
         }
 
-        numItems.getAndAdd(block.getNumPairs());
+        numItems.getAndAdd(numWrittenItems);
         chkpedBlocks.add(block.getId());
       });
 
@@ -203,6 +201,25 @@ public final class ChkpManagerSlave {
     } catch (NetworkException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private <K, V> int writeBlock(final FSDataOutputStream fos, final Block block,
+                                 final double samplingRatio, final String tableId,
+                                 final KVUSerializer<K, V, ?> kvuSerializer)
+      throws NoSuchElementException, IOException {
+    final int numItemsToChkp = (int) (block.getNumPairs() * samplingRatio);
+    fos.writeInt(numItemsToChkp);
+
+    LOG.log(Level.INFO, "tableId: {3}, blockId: {0}, numTotalItems: {1}, numItemsToChkp: {2}",
+        new Object[]{block.getId(), block.getNumPairs(), numItemsToChkp, tableId});
+
+    final Iterator<Map.Entry<K, V>> iter = block.iterator();
+    for (int i = 0; i < numItemsToChkp; i++) {
+      final Map.Entry<K, V> kvEntry = iter.next();
+      kvuSerializer.getKeyCodec().encodeToStream(kvEntry.getKey(), fos);
+      kvuSerializer.getValueCodec().encodeToStream(kvEntry.getValue(), fos);
+    }
+    return numItemsToChkp;
   }
 
   /**
