@@ -59,6 +59,7 @@ final class JobDispatcher {
   void executeJob(final JobEntity jobEntity,
                   final List<AllocatedExecutor> executors) {
     CatchableExecutors.newSingleThreadExecutor().submit(() -> {
+      sendMessageToClient(String.format("Setup tables and executors for a job. JobId: %s", jobEntity.getJobId()));
       final Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> executorGroupsToTables =
           jobEntity.setupExecutorsAndTables(executors);
 

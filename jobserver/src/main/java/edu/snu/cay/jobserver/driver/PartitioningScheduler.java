@@ -22,12 +22,17 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Created by xyzi on 29/03/2018.
  */
 public final class PartitioningScheduler implements JobScheduler {
+  private static final Logger LOG = Logger.getLogger(PartitioningScheduler.class.getName());
+
   private final ResourcePool resourcePool;
   private final JobDispatcher jobDispatcher;
 
@@ -46,31 +51,34 @@ public final class PartitioningScheduler implements JobScheduler {
                                 final ResourcePool resourcePool,
                                 final JobDispatcher jobDispatcher) {
     this.numPartitions = numPartitions;
-    this.partitions = new LinkedList<>();
+    this.partitions = new ConcurrentLinkedQueue<>();
     this.resourcePool = resourcePool;
     this.jobDispatcher = jobDispatcher;
   }
 
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
-    if (!initialized.get()) {
+    if (initialized.compareAndSet(false, true)) {
       final List<AllocatedExecutor> executorList = new ArrayList<>(resourcePool.getExecutors().values());
 
       if (executorList.size() < numPartitions) {
         throw new RuntimeException();
       }
 
+      LOG.log(Level.INFO, "Number of partitions: {0}", numPartitions);
       partitions.addAll(Lists.partition(executorList, executorList.size() / numPartitions));
     }
 
     if (partitions.isEmpty()) {
       waitingJobs.add(jobEntity);
+      LOG.log(Level.INFO, "Wait for schedule. JobId: {0}", jobEntity.getJobId());
       return true;
     }
 
     final List<AllocatedExecutor> partition = partitions.poll();
     jobIdToExecutors.put(jobEntity.getJobId(), partition);
 
+    LOG.log(Level.INFO, "Schedule job. JobId: {0}", jobEntity.getJobId());
     jobDispatcher.executeJob(jobEntity, partition);
     return true;
   }
@@ -82,8 +90,10 @@ public final class PartitioningScheduler implements JobScheduler {
 
     if (!waitingJobs.isEmpty()) {
       final JobEntity nextJob = waitingJobs.poll();
-      jobIdToExecutors.put(jobEntity.getJobId(), releasedPartition);
+      final List<AllocatedExecutor> partition = partitions.poll();
+      jobIdToExecutors.put(jobEntity.getJobId(), partition);
 
+      LOG.log(Level.INFO, "Schedule job. JobId: {0}", jobEntity.getJobId());
       jobDispatcher.executeJob(nextJob, releasedPartition);
     }
   }
