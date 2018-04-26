@@ -200,6 +200,11 @@ public final class DolphinParameters {
   public final class LocalModelPath implements Name<String> {
   }
 
+  @NamedParameter(doc = "The path of checkpointed input to load",
+      short_name = "input_chkp_path")
+  public final class InputChkpPath implements Name<String> {
+  }
+
   @NamedParameter(doc = "The path of test data",
                   short_name = "test_data_path",
                   default_value = TestDataPath.NONE)
