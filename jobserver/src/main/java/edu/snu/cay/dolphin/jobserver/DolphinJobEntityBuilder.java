@@ -38,6 +38,7 @@ import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.Tang;
 import org.apache.reef.tang.exceptions.InjectionException;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.io.IOException;
 
@@ -89,17 +90,20 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final Configuration workerConf = ConfigurationUtils.fromString(serializedWorkerConf);
     final Injector workerInjector = Tang.Factory.getTang().newInjector(workerConf);
     final int numWorkerBlocks = workerInjector.getNamedInstance(NumWorkerBlocks.class);
+    final boolean hasLocalModelTable = workerInjector.getNamedInstance(HasLocalModelTable.class);
 
     final String inputPath = workerInjector.getNamedInstance(edu.snu.cay.common.param.Parameters.InputDir.class);
     final String[] pathSplit = inputPath.split("/");
     final String inputTableId = pathSplit[pathSplit.length - 1] + jobCount; // Use filename for table ID
     jobInjector.bindVolatileParameter(InputTableId.class, inputTableId);
 
-    final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId, inputPath,
+    final String inputChkpPath = loadModel && hasLocalModelTable ?
+        workerInjector.getNamedInstance(InputChkpPath.class) : null;
+
+    final TableConfiguration workerTableConf = buildWorkerTableConf(inputTableId, inputPath, inputChkpPath,
         workerInjector, numWorkerBlocks, userParamConf);
 
     final TableConfiguration localModelTableConf;
-    final boolean hasLocalModelTable = workerInjector.getNamedInstance(HasLocalModelTable.class);
     if (hasLocalModelTable) {
       final Injector localModelTableInjector = Tang.Factory.getTang().newInjector(
           ConfigurationUtils.SERIALIZER.fromString(
@@ -125,6 +129,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
 
   private static TableConfiguration buildWorkerTableConf(final String tableId,
                                                          final String inputPath,
+                                                         @Nullable final String inputChkpPath,
                                                          final Injector workerInjector,
                                                          final int numTotalBlocks,
                                                          final Configuration userParamConf) throws InjectionException {
@@ -143,6 +148,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setIsMutableTable(false)
         .setIsOrderedTable(true)
         .setInputPath(inputPath)
+        .setChkpPath(inputChkpPath) // chkp path will override input path
         .setDataParserClass(dataParser.getClass())
         .setBulkDataLoaderClass(hasInputDataKey ? ExistKeyBulkDataLoader.class : NoneKeyBulkDataLoader.class)
         .setUserParamConf(userParamConf)

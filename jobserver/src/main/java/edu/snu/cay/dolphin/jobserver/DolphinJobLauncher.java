@@ -175,7 +175,7 @@ public final class DolphinJobLauncher {
     final List<Class<? extends Name<?>>> workerParamList = Arrays.asList(
         NumTrainerThreads.class,
         NumWorkerBlocks.class, HyperThreadEnabled.class, MaxNumEpochs.class,
-        NumTotalMiniBatches.class, TestDataPath.class, InputDir.class
+        NumTotalMiniBatches.class, TestDataPath.class, InputDir.class, InputChkpPath.class
     );
 
     final CommandLine cl = new CommandLine();
