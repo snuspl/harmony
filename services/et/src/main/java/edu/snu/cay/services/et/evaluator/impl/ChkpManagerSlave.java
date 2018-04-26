@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.reef.exception.evaluator.NetworkException;
 import org.apache.reef.io.network.impl.StreamingCodec;
+import org.apache.reef.runtime.common.evaluator.parameters.ApplicationIdentifier;
 import org.apache.reef.tang.InjectionFuture;
 import org.apache.reef.tang.Injector;
 import org.apache.reef.tang.Tang;
@@ -67,8 +68,8 @@ public final class ChkpManagerSlave {
   private final InjectionFuture<Tables> tablesFuture;
   private final InjectionFuture<MessageSender> msgSenderFuture;
   private final ConfigurationSerializer confSerializer;
-  private final String tempPath;
-  private final String commitPath;
+  private final Path tempPath;
+  private final Path commitPath;
   private final boolean commitToHdfs;
 
   private final Set<Checkpoint> localCheckpoint = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -76,14 +77,15 @@ public final class ChkpManagerSlave {
   @Inject
   private ChkpManagerSlave(final InjectionFuture<Tables> tablesFuture,
                            final InjectionFuture<MessageSender> msgSenderFuture,
+                           @Parameter(ApplicationIdentifier.class) final String yarnAppId,
                            @Parameter(ChkpTempPath.class) final String chkpTempPath,
                            @Parameter(ChkpCommitPath.class) final String chkpCommitPath,
                            final ConfigurationSerializer confSerializer) {
     this.tablesFuture = tablesFuture;
     this.msgSenderFuture = msgSenderFuture;
     this.confSerializer = confSerializer;
-    this.tempPath = chkpTempPath;
-    this.commitPath = chkpCommitPath;
+    this.tempPath = new Path(chkpTempPath, yarnAppId);
+    this.commitPath = new Path(chkpCommitPath, yarnAppId);
     this.commitToHdfs = chkpCommitPath.startsWith("hdfs://");
   }
 
