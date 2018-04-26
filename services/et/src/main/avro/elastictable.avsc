@@ -355,7 +355,7 @@
   [
     {"name": "tableId", "type": "string"},
     {"name": "blockIds", "type": {"type": "array", "items": "int"}},
-    {"name": "committed", "type": "boolean"},
+    {"name": "committed", "type": ["null", "boolean"]},
     {"name": "blockOwners", "type": ["null", {"type": "array", "items": "string"}], "default": null}
   ]
 },

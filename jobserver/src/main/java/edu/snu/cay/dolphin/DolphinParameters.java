@@ -184,7 +184,22 @@ public final class DolphinParameters {
                   default_value = "2")
   public final class NumWorkerSenderThreads implements Name<Integer> {
   }
-  
+
+  @NamedParameter(doc = "Whether to load model",
+      short_name = "load_model", default_value = "false")
+  public final class LoadModel implements Name<Boolean> {
+  }
+
+  @NamedParameter(doc = "The path of checkpointed model to load",
+      short_name = "model_path")
+  public final class ModelPath implements Name<String> {
+  }
+
+  @NamedParameter(doc = "The path of checkpointed local model to load",
+      short_name = "local_model_path")
+  public final class LocalModelPath implements Name<String> {
+  }
+
   @NamedParameter(doc = "The path of test data",
                   short_name = "test_data_path",
                   default_value = TestDataPath.NONE)

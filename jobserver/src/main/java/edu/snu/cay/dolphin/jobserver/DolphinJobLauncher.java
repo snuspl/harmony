@@ -167,7 +167,8 @@ public final class DolphinJobLauncher {
 
     // parameters for servers
     final List<Class<? extends Name<?>>> serverParamList = Arrays.asList(
-        NumServerBlocks.class, ServerMetricFlushPeriodMs.class
+        NumServerBlocks.class, ServerMetricFlushPeriodMs.class,
+        LoadModel.class, ModelPath.class, LocalModelPath.class
     );
 
     // parameters for workers

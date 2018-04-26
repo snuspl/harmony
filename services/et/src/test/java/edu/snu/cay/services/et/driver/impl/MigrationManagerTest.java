@@ -334,6 +334,12 @@ public final class MigrationManagerTest {
     }
 
     @Override
+    public void sendChkpLoadMsg(final String chkpPath, final String executorId, final String tableId,
+                                final List<Integer> blockIdsToLoad) {
+
+    }
+
+    @Override
     public void sendOwnershipUpdateMsg(final String executorId,
                                        final String tableId, final int blockId,
                                        final String oldOwnerId, final String newOwnerId) {
