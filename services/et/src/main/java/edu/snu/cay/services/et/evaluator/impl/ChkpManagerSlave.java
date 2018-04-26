@@ -110,30 +110,24 @@ public final class ChkpManagerSlave {
     }
   }
 
-  private org.apache.reef.tang.Configuration readTableConf(final String chkpId) throws IOException {
-    final Path baseDir = new Path(tempPath, chkpId);
-
-    try (FileSystem fs = FileSystem.getLocal(new Configuration())) {
-      try (FSDataInputStream fis = fs.open(new Path(baseDir, CONF_FILE_NAME))) {
-        final int size = fis.readInt();
-        final byte[] buffer = new byte[size];
-        final int readBytes = fis.read(buffer);
-        assert readBytes == size;
-        return confSerializer.fromByteArray(buffer);
-      }
+  private org.apache.reef.tang.Configuration readTableConf(final FileSystem fs,
+                                                           final Path baseDir) throws IOException {
+    try (FSDataInputStream fis = fs.open(new Path(baseDir, CONF_FILE_NAME))) {
+      final int size = fis.readInt();
+      final byte[] buffer = new byte[size];
+      final int readBytes = fis.read(buffer);
+      assert readBytes == size;
+      return confSerializer.fromByteArray(buffer);
     }
   }
 
-  private void writeTableConf(final String chkpId,
+  private void writeTableConf(final FileSystem fs, final Path baseDir,
                               final org.apache.reef.tang.Configuration tableConf) throws IOException {
-    final Path baseDir = new Path(tempPath, chkpId);
-    try (FileSystem fs = FileSystem.getLocal(new Configuration())) {
-      fs.setWriteChecksum(false); // do not make crc file
-      final byte[] serializedTableConf = confSerializer.toByteArray(tableConf);
-      try (FSDataOutputStream fos = fs.create(new Path(baseDir, CONF_FILE_NAME))) {
-        fos.writeInt(serializedTableConf.length);
-        fos.write(serializedTableConf);
-      }
+    fs.setWriteChecksum(false); // do not make crc file
+    final byte[] serializedTableConf = confSerializer.toByteArray(tableConf);
+    try (FSDataOutputStream fos = fs.create(new Path(baseDir, CONF_FILE_NAME))) {
+      fos.writeInt(serializedTableConf.length);
+      fos.write(serializedTableConf);
     }
   }
 
@@ -161,7 +155,7 @@ public final class ChkpManagerSlave {
     try (FileSystem fs = FileSystem.getLocal(new Configuration())) {
       fs.setWriteChecksum(false); // do not make crc file
 
-      writeTableConf(chkpId, tableComponents.getTableConf());
+      writeTableConf(fs, baseDir, tableComponents.getTableConf());
 
       final KVUSerializer<K, V, ?> kvuSerializer = tableComponents.getSerializer();
       final BlockStore<K, V, ?> blockStore = tableComponents.getBlockStore();
@@ -243,7 +237,14 @@ public final class ChkpManagerSlave {
   private <K, V> void commit(final Checkpoint chkp) throws IOException {
     LOG.log(Level.INFO, "Start committing checkpoints. chkpId: {0}", chkp.getCheckpointId());
 
-    final org.apache.reef.tang.Configuration tableConf = readTableConf(chkp.getCheckpointId());
+    final Path baseDir = new Path(tempPath, chkp.getCheckpointId());
+    final org.apache.reef.tang.Configuration tableConf;
+
+    final Configuration hadoopConf = new Configuration();
+    try (FileSystem localFS = FileSystem.getLocal(hadoopConf)) {
+      tableConf = readTableConf(localFS, baseDir);
+    }
+
     final Injector tableInjector = Tang.Factory.getTang().newInjector(tableConf);
 
     final KVUSerializer<K, V, ?> kvuSerializer;
@@ -255,11 +256,15 @@ public final class ChkpManagerSlave {
     final StreamingCodec<K> keyCodec = kvuSerializer.getKeyCodec();
     final StreamingCodec<V> valueCodec = kvuSerializer.getValueCodec();
 
-    final Configuration hadoopConf = new Configuration();
     // read checkpoint files and put into a table
     try (FileSystem localFS = FileSystem.getLocal(hadoopConf);
          FileSystem fsToCommit = commitToHdfs ? FileSystem.get(hadoopConf) : localFS) {
-      final Path baseDir = new Path(tempPath, chkp.getCheckpointId());
+
+      // write conf only once
+      if (chkp.getBlocks().contains(0)) {
+        writeTableConf(fsToCommit, baseDir, tableConf);
+      }
+
       for (final Integer blockId : chkp.getBlocks()) {
 
         final FSDataInputStream fis = localFS.open(new Path(baseDir, Integer.toString(blockId)));
@@ -306,7 +311,7 @@ public final class ChkpManagerSlave {
    * Otherwise it instantiates an one-time-use table.
    */
   private Pair<Table, TableComponents> getTable(final String tableId,
-                                                final String chkpId,
+                                                final Path baseDir,
                                                 final List<String> ownershipStatus) throws IOException {
     TableComponents tableComponents;
     Table table;
@@ -321,8 +326,8 @@ public final class ChkpManagerSlave {
       // instantiate a table for one time use and throw it away
     } catch (TableNotExistException e) {
       final Pair<Table, TableComponents> tablePair;
-      try {
-        tablePair = tablesFuture.get().instantiateTable(readTableConf(chkpId), ownershipStatus);
+      try (FileSystem localFS = FileSystem.getLocal(new Configuration())) {
+        tablePair = tablesFuture.get().instantiateTable(readTableConf(localFS, baseDir), ownershipStatus);
         table = tablePair.getLeft();
         tableComponents = tablePair.getRight();
       } catch (InjectionException e1) {
@@ -339,21 +344,20 @@ public final class ChkpManagerSlave {
   private void loadChkpInTemp(final String chkpId, final String tableId,
                               final List<String> ownershipStatus,
                               final List<Integer> blockIdsToLoad) throws IOException {
-
     final Path baseDir = new Path(tempPath, chkpId);
-
     LOG.log(Level.INFO, "Start chkp(temp) loading. chkpId: {0}, tableId: {1}, baseDir: {2}",
         new Object[]{chkpId, tableId, baseDir});
 
-    final Pair<Table, TableComponents> tablePair = getTable(tableId, chkpId, ownershipStatus);
+    final Pair<Table, TableComponents> tablePair = getTable(tableId, baseDir, ownershipStatus);
     final Table table = tablePair.getLeft();
     final TableComponents tableComponents = tablePair.getRight();
 
-    final FileSystem fs = FileSystem.getLocal(new Configuration());
-    final int numTotalItems = loadChkpIntoTable(table, tableComponents, blockIdsToLoad, baseDir, fs);
+    try (FileSystem fs = FileSystem.getLocal(new Configuration())) {
+      final int numTotalItems = loadChkpIntoTable(table, tableComponents, blockIdsToLoad, baseDir, fs);
 
-    LOG.log(Level.INFO, "Chkp(temp) load done. chkpId: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
-        new Object[]{chkpId, tableId, blockIdsToLoad.size(), numTotalItems});
+      LOG.log(Level.INFO, "Chkp(temp) load done. chkpId: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
+          new Object[]{chkpId, tableId, blockIdsToLoad.size(), numTotalItems});
+    }
   }
 
   /**
@@ -376,11 +380,13 @@ public final class ChkpManagerSlave {
       throw new RuntimeException(e);
     }
 
-    final FileSystem fs = commitToHdfs ? FileSystem.get(new Configuration()) : FileSystem.getLocal(new Configuration());
-    final int numTotalItems = loadChkpIntoTable(table, tableComponents, blockIdsToLoad, baseDir, fs);
+    try (FileSystem fs = commitToHdfs ?
+        FileSystem.get(new Configuration()) : FileSystem.getLocal(new Configuration())) {
+      final int numTotalItems = loadChkpIntoTable(table, tableComponents, blockIdsToLoad, baseDir, fs);
 
-    LOG.log(Level.INFO, "Chkp(commit) load done. chkpId: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
-        new Object[]{chkpId, tableId, blockIdsToLoad.size(), numTotalItems});
+      LOG.log(Level.INFO, "Chkp(commit) load done. chkpId: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
+          new Object[]{chkpId, tableId, blockIdsToLoad.size(), numTotalItems});
+    }
   }
 
   /**
@@ -432,9 +438,9 @@ public final class ChkpManagerSlave {
    * @throws IOException when fail to read a checkpoint
    */
   void loadChkp(final String chkpId, final String tableId,
-                              @Nullable final List<String> ownershipStatus,
-                              final boolean committed,
-                              final List<Integer> blockIdsToLoad) throws IOException {
+                @Nullable final List<String> ownershipStatus,
+                final boolean committed,
+                final List<Integer> blockIdsToLoad) throws IOException {
     if (committed) {
       loadChkpInCommit(chkpId, tableId, blockIdsToLoad);
     } else {
