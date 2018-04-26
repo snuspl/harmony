@@ -188,6 +188,33 @@ public final class MessageSenderImpl implements MessageSender {
   }
 
   @Override
+  public void sendChkpLoadMsg(final String chkpPath, final String executorId,
+                              final String tableId, final List<Integer> blockIdsToLoad) {
+    final byte[] innerMsg = AvroUtils.toBytes(
+        TableChkpMsg.newBuilder()
+            .setType(TableChkpMsgType.ChkpLoadMsg)
+            .setChkpId(chkpPath)
+            .setChkpLoadMsg(
+                ChkpLoadMsg.newBuilder()
+                    .setTableId(tableId)
+                    .setBlockIds(blockIdsToLoad)
+                    .setCommitted(null)
+                    .build())
+            .build(), TableChkpMsg.class);
+
+    final ETMsg msg = ETMsg.newBuilder()
+        .setType(ETMsgType.TableChkpMsg)
+        .setInnerMsg(ByteBuffer.wrap(innerMsg))
+        .build();
+
+    try {
+      networkConnection.send(executorId, msg);
+    } catch (final NetworkException e) {
+      throw new RuntimeException("NetworkException while sending ChkpLoad message", e);
+    }
+  }
+
+  @Override
   public void sendOwnershipUpdateMsg(final String executorId,
                                      final String tableId, final int blockId,
                                      final String oldOwnerId, final String newOwnerId) {

@@ -68,6 +68,13 @@ public interface MessageSender {
    */
   void sendChkpLoadMsg(String chkpId, String executorId, String tableId,
                        List<Integer> blockIdsToLoad, boolean committed, @Nullable List<String> blockOwnerList);
+
+  /**
+   * Sends a ChkpLoadMsg to an executor to load checkpoint to restore a table.
+   */
+  void sendChkpLoadMsg(String chkpPath, String executorId, String tableId,
+                       List<Integer> blockIdsToLoad);
+
  /**
    * Sends a OwnershipUpdateMsg that notifies ownership update in other executors.
    */

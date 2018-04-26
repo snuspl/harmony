@@ -15,7 +15,10 @@
  */
 package edu.snu.cay.services.et.driver.impl;
 
+import com.google.common.collect.Lists;
+import edu.snu.cay.services.et.configuration.parameters.*;
 import edu.snu.cay.services.et.driver.api.AllocatedTable;
+import edu.snu.cay.services.et.evaluator.api.UpdateFunction;
 import edu.snu.cay.services.et.evaluator.impl.ChkpManagerSlave;
 import edu.snu.cay.services.et.common.util.concurrent.AggregateFuture;
 import edu.snu.cay.services.et.common.util.concurrent.ListenableFuture;
@@ -25,9 +28,19 @@ import edu.snu.cay.services.et.driver.api.MessageSender;
 import edu.snu.cay.services.et.exceptions.ChkpNotExistException;
 import edu.snu.cay.services.et.exceptions.TableNotExistException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.reef.io.network.impl.StreamingCodec;
+import org.apache.reef.io.serialization.Codec;
 import org.apache.reef.tang.InjectionFuture;
+import org.apache.reef.tang.Injector;
+import org.apache.reef.tang.Tang;
+import org.apache.reef.tang.exceptions.InjectionException;
+import org.apache.reef.tang.formats.ConfigurationSerializer;
 
 import javax.inject.Inject;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -60,11 +73,15 @@ public final class ChkpManagerMaster {
    */
   private final Map<String, Checkpoint> checkpointMap = new ConcurrentHashMap<>();
 
+  private final ConfigurationSerializer confSerializer;
+
   @Inject
   private ChkpManagerMaster(final InjectionFuture<MessageSender> msgSenderFuture,
+                            final ConfigurationSerializer confSerializer,
                             final InjectionFuture<TableManager> tableManagerFuture) {
     this.msgSenderFuture = msgSenderFuture;
     this.tableManagerFuture = tableManagerFuture;
+    this.confSerializer = confSerializer;
   }
 
   /**
@@ -80,7 +97,7 @@ public final class ChkpManagerMaster {
     private final Map<String, List<Integer>> executorToBlocksMap;
 
     // indicate whether blocks are moved to final location or not
-    private final Set<Integer> blocksCommitted = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Integer> blocksCommitted;
 
     Checkpoint(final String checkpointId,
                final TableConfiguration tableConf,
@@ -88,9 +105,10 @@ public final class ChkpManagerMaster {
       this.checkpointId = checkpointId;
       this.tableConf = tableConf;
 
-      final Map<String, List<Integer>> map = new ConcurrentHashMap<>();
-      executorToBlocks.forEach(pair -> map.put(pair.getLeft(), pair.getRight()));
-      this.executorToBlocksMap = map;
+      this.executorToBlocksMap = new ConcurrentHashMap<>();
+      executorToBlocks.forEach(pair -> executorToBlocksMap.put(pair.getLeft(), pair.getRight()));
+
+      this.blocksCommitted = Collections.newSetFromMap(new ConcurrentHashMap<>());
     }
 
     String getCheckpointId() {
@@ -187,15 +205,79 @@ public final class ChkpManagerMaster {
     return chkp.getTableConf();
   }
 
+  private TableConfiguration getTableConfFromPath(final String checkpointPath) throws IOException {
+    final org.apache.reef.tang.Configuration tableConf;
+    try (FileSystem hdfs = FileSystem.get(new Configuration())) {
+      tableConf = ChkpManagerSlave.readTableConf(confSerializer, hdfs, new Path(checkpointPath));
+    }
+
+    final Injector tableInjector = Tang.Factory.getTang().newInjector(tableConf);
+    try {
+      final String tableId = tableInjector.getNamedInstance(TableIdentifier.class);
+      final StreamingCodec keyCodec = tableInjector.getNamedInstance(KeyCodec.class);
+      final StreamingCodec valueCodec = tableInjector.getNamedInstance(ValueCodec.class);
+      final Codec updateValueCodec = tableInjector.getNamedInstance(UpdateValueCodec.class);
+      final UpdateFunction updateFunction = tableInjector.getInstance(UpdateFunction.class);
+      final boolean isMutable = tableInjector.getNamedInstance(IsMutableTable.class);
+      final boolean isOrdered = tableInjector.getNamedInstance(IsOrderedTable.class);
+      final int chunkSize = tableInjector.getNamedInstance(ChunkSize.class);
+      final int numTotalBlocks = tableInjector.getNamedInstance(NumTotalBlocks.class);
+
+//      final Optional<String> inputPathOptional = tableInjector.getNamedInstance(Parameters.InputDir.class);
+//      final DataParser dataParser = tableInjector.getInstance(DataParser.class);
+//      final BulkDataLoader bulkDataLoader = tableInjector.getInstance(BulkDataLoader.class);
+
+      return TableConfiguration.newBuilder()
+          .setId(tableId)
+          .setKeyCodecClass(keyCodec.getClass())
+          .setValueCodecClass(valueCodec.getClass())
+          .setUpdateValueCodecClass(updateValueCodec.getClass())
+          .setUpdateFunctionClass(updateFunction.getClass())
+          .setIsMutableTable(isMutable)
+          .setIsOrderedTable(isOrdered)
+          .setChunkSize(chunkSize)
+          .setNumTotalBlocks(numTotalBlocks)
+          .build();
+
+    } catch (InjectionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Gets an owner of committed blocks of a checkpoint.
    */
-  private Map<String, Set<Integer>> getOwnerOfCommittedBlocks(final Checkpoint chkp) {
-    final Set<Integer> committedBlocks = chkp.getCommittedBlocks();
+  private Map<String, Set<Integer>> getOwnerOfCommittedBlocks(final Set<Integer> blocksToLoad,
+                                                              final TableConfiguration newTableConf) {
 
     final AllocatedTable table;
     try {
-      table = tableManagerFuture.get().getAllocatedTable(chkp.getTableConf().getId());
+      table = tableManagerFuture.get().getAllocatedTable(newTableConf.getId());
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
+    final List<String> associators = new ArrayList<>(table.getAssociatedExecutorIds());
+
+    final List<List<Integer>> partitionedBlocks = Lists.partition(new ArrayList<>(blocksToLoad), associators.size());
+
+    final Map<String, Set<Integer>> partitionInfo = new HashMap<>();
+
+    for (int i = 0; i < associators.size(); i++) {
+      partitionInfo.put(associators.get(i), new HashSet<>(partitionedBlocks.get(i)));
+    }
+
+    return partitionInfo;
+  }
+
+  /**
+   * Gets an owner of committed blocks of a checkpoint.
+   */
+  private Map<String, Set<Integer>> getOwnerOfCommittedBlocks(final Set<Integer> committedBlocks,
+                                                              final String tableId) {
+    final AllocatedTable table;
+    try {
+      table = tableManagerFuture.get().getAllocatedTable(tableId);
     } catch (TableNotExistException e) {
       throw new RuntimeException(e);
     }
@@ -219,6 +301,59 @@ public final class ChkpManagerMaster {
   }
 
   /**
+   *
+   * @param chkpPath
+   * @return
+   * @throws IOException
+   */
+  ListenableFuture<?> load(final TableConfiguration newTableConf, final String chkpPath) throws IOException {
+    // read Checkpoint from path
+    // assume the old and the new configurations are same except table Id and the number of blocks.
+    final TableConfiguration oldTableConf = getTableConfFromPath(chkpPath);
+
+    final ResultFuture<Void> resultFuture = new ResultFuture<>();
+
+    final int oldNumTotalBlocks = oldTableConf.getNumTotalBlocks();
+    final int newNumTotalBlocks = newTableConf.getNumTotalBlocks();
+
+    final Set<Integer> blocksToLoad = new HashSet<>();
+    for (int blockId = 0; blockId < oldNumTotalBlocks; blockId++) {
+      blocksToLoad.add(blockId);
+    }
+
+    final Map<String, Set<Integer>> blocksInCommit;
+    if (oldNumTotalBlocks == newNumTotalBlocks) {
+      blocksInCommit = getOwnerOfCommittedBlocks(blocksToLoad, newTableConf.getId());
+    } else {
+      blocksInCommit = getOwnerOfCommittedBlocks(blocksToLoad, newTableConf);
+    }
+
+    LOG.log(Level.INFO, "ChkpPath: {0}, Executors to load committed block-checkpoints: {1}",
+        new Object[]{chkpPath, blocksInCommit});
+
+    final AggregateFuture<String> loadFuture =
+        new AggregateFuture<>(blocksInCommit.size());
+    ongoingLoad.put(chkpPath, loadFuture);
+
+    loadFuture.addListener(o -> {
+      ongoingLoad.remove(chkpPath);
+      resultFuture.onCompleted(null);
+
+      LOG.log(Level.INFO, "Load checkpoint done. ChkpPath: {0}", chkpPath);
+    });
+
+    // Let associators load their own blocks from a committed chkp.
+    blocksInCommit.forEach((executorId, blockIds) -> {
+      if (!blockIds.isEmpty()) {
+        msgSenderFuture.get().sendChkpLoadMsg(chkpPath, executorId, newTableConf.getId(),
+            new ArrayList<>(blockIds));
+      }
+    });
+
+    return resultFuture;
+  }
+
+  /**
    * Loads a checkpoint into a new table.
    * Note that it does not create a table by itself.
    * @param checkpointId a checkpoint Id
@@ -235,7 +370,8 @@ public final class ChkpManagerMaster {
     final ResultFuture<Void> resultFuture = new ResultFuture<>();
 
     final Map<String, List<Integer>> blocksInTemp = chkp.getTempBlocks();
-    final Map<String, Set<Integer>> blocksInCommit = getOwnerOfCommittedBlocks(chkp);
+    final Map<String, Set<Integer>> blocksInCommit =
+        getOwnerOfCommittedBlocks(chkp.getCommittedBlocks(), chkp.getTableConf().getId());
 
     LOG.log(Level.INFO, "ChkpId: {0}, Executors to load temporal block-checkpoints: {1}",
         new Object[]{checkpointId, blocksInTemp});

@@ -28,6 +28,7 @@ import org.apache.reef.annotations.audience.DriverSide;
 import org.apache.reef.annotations.audience.Private;
 
 import javax.inject.Inject;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -106,7 +107,24 @@ public final class AllocatedTableImpl implements AllocatedTable {
     blockManager.init(executorIds);
 
     final ListenableFuture<?> initFuture;
-    if (tableConfiguration.getInputPathOptional().isPresent()) {
+
+    if (tableConfiguration.getChkpPathOptional().isPresent()) {
+      final String chkpPath = tableConfiguration.getChkpPathOptional().get();
+
+      final ResultFuture<?> resultFuture = new ResultFuture<>();
+      initFuture = resultFuture;
+
+      tableControlAgent.initTable(tableConf, executorIds, blockManager.getOwnershipStatus())
+          .addListener(o1 -> {
+            try {
+              chkpManagerMaster.load(tableConfiguration, chkpPath)
+                  .addListener(o2 -> resultFuture.onCompleted(null));
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
+
+    } else if (tableConfiguration.getInputPathOptional().isPresent()) {
       final String inputPath = tableConfiguration.getInputPathOptional().get();
 
       final ResultFuture<?> resultFuture = new ResultFuture<>();

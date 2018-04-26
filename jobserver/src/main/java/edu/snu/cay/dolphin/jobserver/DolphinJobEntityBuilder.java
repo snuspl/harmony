@@ -59,6 +59,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
 
     final String appId = jobInjector.getNamedInstance(Parameters.AppIdentifier.class);
     final String dolphinJobId = appId + "-" + jobCount;
+
     final String modelTableId = ModelTableId.DEFAULT_VALUE + jobCount;
     final String localModelTableId = LocalModelTableId.DEFAULT_VALUE + jobCount;
 
@@ -78,7 +79,10 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
     final Injector serverInjector = Tang.Factory.getTang().newInjector(serverConf);
     final int numServerBlocks = serverInjector.getNamedInstance(NumServerBlocks.class);
 
-    final TableConfiguration serverTableConf = buildServerTableConf(modelTableId,
+    final boolean loadModel = serverInjector.getNamedInstance(LoadModel.class);
+    final String modelPath = loadModel ? serverInjector.getNamedInstance(ModelPath.class) : null;
+
+    final TableConfiguration serverTableConf = buildServerTableConf(modelTableId, modelPath,
         serverInjector, numServerBlocks, userParamConf);
 
     // prepare worker-side configurations
@@ -101,7 +105,10 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
           ConfigurationUtils.SERIALIZER.fromString(
               workerInjector.getNamedInstance(
                   ETDolphinLauncher.SerializedLocalModelTableConf.class)));
-      localModelTableConf = buildLocalModelTableConf(localModelTableId,
+
+      final String localModelPath = loadModel ? serverInjector.getNamedInstance(LocalModelPath.class) : null;
+
+      localModelTableConf = buildLocalModelTableConf(localModelTableId, localModelPath,
           localModelTableInjector, numWorkerBlocks, userParamConf);
     } else {
       localModelTableConf = null;
@@ -143,6 +150,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
   }
 
   private static TableConfiguration buildLocalModelTableConf(final String tableId,
+                                                             final String modelChkpPath,
                                                              final Injector localModelTableInjector,
                                                              final int numTotalBlocks,
                                                              final Configuration userParamConf)
@@ -161,11 +169,13 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(true)
         .setIsOrderedTable(true)
+        .setChkpPath(modelChkpPath)
         .setUserParamConf(userParamConf)
         .build();
   }
 
   private static TableConfiguration buildServerTableConf(final String tableId,
+                                                         final String modelChkpPath,
                                                          final Injector serverInjector,
                                                          final int numTotalBlocks,
                                                          final Configuration userParamConf) throws InjectionException {
@@ -183,6 +193,7 @@ public final class DolphinJobEntityBuilder implements JobEntityBuilder {
         .setNumTotalBlocks(numTotalBlocks)
         .setIsMutableTable(true)
         .setIsOrderedTable(false)
+        .setChkpPath(modelChkpPath)
         .setUserParamConf(userParamConf)
         .build();
   }

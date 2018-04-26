@@ -43,6 +43,7 @@ public final class TableConfiguration {
   private final boolean isOrderedTable;
   private final int chunkSize;
   private final int numTotalBlocks;
+  private final Optional<String> chkpPathOptional;
   private final Optional<String> inputPathOptional;
   private final Class<? extends DataParser> dataParserClass;
   private final Class<? extends BulkDataLoader> bulkDataLoaderClass;
@@ -59,6 +60,7 @@ public final class TableConfiguration {
                              final boolean isOrderedTable,
                              final Integer chunkSize,
                              final Integer numTotalBlocks,
+                             final String chkpPath,
                              final String inputPath,
                              final Class<? extends DataParser> dataParserClass,
                              final Class<? extends BulkDataLoader> bulkDataLoaderClass,
@@ -72,6 +74,7 @@ public final class TableConfiguration {
     this.isOrderedTable = isOrderedTable;
     this.chunkSize = chunkSize;
     this.numTotalBlocks = numTotalBlocks;
+    this.chkpPathOptional = Optional.ofNullable(chkpPath);
     this.inputPathOptional = Optional.ofNullable(inputPath);
     this.dataParserClass = dataParserClass;
     this.bulkDataLoaderClass = bulkDataLoaderClass;
@@ -139,6 +142,10 @@ public final class TableConfiguration {
    */
   public int getChunkSize() {
     return chunkSize;
+  }
+
+  public Optional<String> getChkpPathOptional() {
+    return chkpPathOptional;
   }
 
   public Optional<String> getInputPathOptional() {
@@ -221,6 +228,7 @@ public final class TableConfiguration {
      */
     private Integer chunkSize = Integer.valueOf(ChunkSize.DEFAULT_VALUE_STR);
     private Integer numTotalBlocks = Integer.valueOf(NumTotalBlocks.DEFAULT_VALUE_STR);
+    private String chkpPath = null;
     private String inputPath = null;
     private Class<? extends DataParser> dataParserClass = DefaultDataParser.class;
     private Class<? extends BulkDataLoader> bulkDataLoaderClass = NoneKeyBulkDataLoader.class;
@@ -274,6 +282,11 @@ public final class TableConfiguration {
       return this;
     }
 
+    public Builder setChkpPath(final String chkpPath) {
+      this.chkpPath = chkpPath;
+      return this;
+    }
+
     public Builder setInputPath(final String inputPath) {
       this.inputPath = inputPath;
       return this;
@@ -305,7 +318,7 @@ public final class TableConfiguration {
       BuilderUtils.notNull(isOrderedTable);
 
       return new TableConfiguration(id, keyCodecClass, valueCodecClass, updateValueCodecClass, updateFunctionClass,
-          isMutableTable, isOrderedTable, chunkSize, numTotalBlocks, inputPath,
+          isMutableTable, isOrderedTable, chunkSize, numTotalBlocks, chkpPath, inputPath,
           dataParserClass, bulkDataLoaderClass, userParamConf);
     }
   }

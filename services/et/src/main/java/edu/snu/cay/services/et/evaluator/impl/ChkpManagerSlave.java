@@ -110,8 +110,9 @@ public final class ChkpManagerSlave {
     }
   }
 
-  private org.apache.reef.tang.Configuration readTableConf(final FileSystem fs,
-                                                           final Path baseDir) throws IOException {
+  public static org.apache.reef.tang.Configuration readTableConf(final ConfigurationSerializer confSerializer,
+                                                                 final FileSystem fs,
+                                                                 final Path baseDir) throws IOException {
     try (FSDataInputStream fis = fs.open(new Path(baseDir, CONF_FILE_NAME))) {
       final int size = fis.readInt();
       final byte[] buffer = new byte[size];
@@ -242,7 +243,7 @@ public final class ChkpManagerSlave {
 
     final Configuration hadoopConf = new Configuration();
     try (FileSystem localFS = FileSystem.getLocal(hadoopConf)) {
-      tableConf = readTableConf(localFS, baseDir);
+      tableConf = readTableConf(confSerializer, localFS, baseDir);
     }
 
     final Injector tableInjector = Tang.Factory.getTang().newInjector(tableConf);
@@ -327,7 +328,8 @@ public final class ChkpManagerSlave {
     } catch (TableNotExistException e) {
       final Pair<Table, TableComponents> tablePair;
       try (FileSystem localFS = FileSystem.getLocal(new Configuration())) {
-        tablePair = tablesFuture.get().instantiateTable(readTableConf(localFS, baseDir), ownershipStatus);
+        tablePair = tablesFuture.get().instantiateTable(
+            readTableConf(confSerializer, localFS, baseDir), ownershipStatus);
         table = tablePair.getLeft();
         tableComponents = tablePair.getRight();
       } catch (InjectionException e1) {
@@ -365,9 +367,7 @@ public final class ChkpManagerSlave {
    */
   private void loadChkpInCommit(final String chkpId, final String tableId,
                                 final List<Integer> blockIdsToLoad) throws IOException {
-
     final Path baseDir = new Path(commitPath, chkpId);
-
     LOG.log(Level.INFO, "Start chkp(commit) loading. chkpId: {0}, tableId: {1}, baseDir: {2}",
         new Object[]{chkpId, tableId, baseDir});
 
@@ -386,6 +386,33 @@ public final class ChkpManagerSlave {
 
       LOG.log(Level.INFO, "Chkp(commit) load done. chkpId: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
           new Object[]{chkpId, tableId, blockIdsToLoad.size(), numTotalItems});
+    }
+  }
+
+  /**
+   * Load a checkpoint from path.
+   */
+  private void loadChkpFromPath(final String chkpPath, final String tableId,
+                                final List<Integer> blockIdsToLoad) throws IOException {
+    final Path baseDir = new Path(chkpPath);
+    LOG.log(Level.INFO, "Start chkp(commit) loading. chkpPath: {0}, tableId: {1}",
+        new Object[]{chkpPath, tableId});
+
+    final TableComponents tableComponents;
+    final Table table;
+    try {
+      tableComponents = tablesFuture.get().getTableComponents(tableId);
+      table = tablesFuture.get().getTable(tableId);
+    } catch (TableNotExistException e) {
+      throw new RuntimeException(e);
+    }
+
+    try (FileSystem fs = chkpPath.startsWith("hdfs://") ?
+        FileSystem.get(new Configuration()) : FileSystem.getLocal(new Configuration())) {
+      final int numTotalItems = loadChkpIntoTable(table, tableComponents, blockIdsToLoad, baseDir, fs);
+
+      LOG.log(Level.INFO, "Chkp(commit) load done. chkpPath: {0}, tableId: {1}, numBlocks: {2}, numItems:{3}",
+          new Object[]{chkpPath, tableId, blockIdsToLoad.size(), numTotalItems});
     }
   }
 
@@ -439,9 +466,11 @@ public final class ChkpManagerSlave {
    */
   void loadChkp(final String chkpId, final String tableId,
                 @Nullable final List<String> ownershipStatus,
-                final boolean committed,
+                @Nullable final Boolean committed,
                 final List<Integer> blockIdsToLoad) throws IOException {
-    if (committed) {
+    if (committed == null) {
+      loadChkpFromPath(chkpId, tableId, blockIdsToLoad);
+    } else if (committed) {
       loadChkpInCommit(chkpId, tableId, blockIdsToLoad);
     } else {
       loadChkpInTemp(chkpId, tableId, ownershipStatus, blockIdsToLoad);
