@@ -22,6 +22,7 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -36,21 +37,48 @@ public final class PartitioningScheduler implements JobScheduler {
   private final ResourcePool resourcePool;
   private final JobDispatcher jobDispatcher;
 
-  private final int numPartitions;
-
   private final AtomicBoolean initialized = new AtomicBoolean(false);
 
-  private final Queue<List<AllocatedExecutor>> partitions;
+  private final int numPartitions;
+  private final int numConcurrentJobs;
 
-  private final Map<String, List<AllocatedExecutor>> jobIdToExecutors = new HashMap<>();
+  private final Map<String, Partition> jobIdToPartition = new HashMap<>();
+
+  private final Queue<Partition> partitions;
 
   private final Queue<JobEntity> waitingJobs = new LinkedList<>();
 
+  private class Partition {
+    private final List<AllocatedExecutor> executors;
+
+    private final int numMaxConcurrentJobs;
+
+    private final Set<String> runningJobs;
+
+    Partition(final List<AllocatedExecutor> executors,
+                     final int numMaxConcurrentJobs) {
+      this.executors = executors;
+      this.numMaxConcurrentJobs = numMaxConcurrentJobs;
+      this.runningJobs = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    }
+
+    synchronized void executeJob(final JobEntity jobEntity) {
+      this.runningJobs.add(jobEntity.getJobId());
+      jobDispatcher.executeJob(jobEntity, executors);
+    }
+
+    synchronized boolean isAvailable() {
+      return runningJobs.size() < numMaxConcurrentJobs;
+    }
+  }
+
   @Inject
-  private PartitioningScheduler(@Parameter(Parameters.DegreeOfParallelism.class) final int numPartitions,
+  private PartitioningScheduler(@Parameter(Parameters.NumPartitions.class) final int numPartitions,
+                                @Parameter(Parameters.NumConcurrentJobs.class) final int numConcurrentJobs,
                                 final ResourcePool resourcePool,
                                 final JobDispatcher jobDispatcher) {
     this.numPartitions = numPartitions;
+    this.numConcurrentJobs = numConcurrentJobs;
     this.partitions = new ConcurrentLinkedQueue<>();
     this.resourcePool = resourcePool;
     this.jobDispatcher = jobDispatcher;
@@ -59,42 +87,52 @@ public final class PartitioningScheduler implements JobScheduler {
   @Override
   public synchronized boolean onJobArrival(final JobEntity jobEntity) {
     if (initialized.compareAndSet(false, true)) {
-      final List<AllocatedExecutor> executorList = new ArrayList<>(resourcePool.getExecutors().values());
-
-      if (executorList.size() < numPartitions) {
-        throw new RuntimeException();
-      }
-
-      LOG.log(Level.INFO, "Number of partitions: {0}", numPartitions);
-      partitions.addAll(Lists.partition(executorList, executorList.size() / numPartitions));
+      initPartitions();
     }
 
+    scheduleJob(jobEntity);
+    return true;
+  }
+
+  private void initPartitions() {
+    final List<AllocatedExecutor> executorList = new ArrayList<>(resourcePool.getExecutors().values());
+
+    if (executorList.size() < numPartitions) {
+      throw new RuntimeException();
+    }
+
+    LOG.log(Level.INFO, "Number of partitions: {0}", numPartitions);
+    final int partitionSize = executorList.size() / numPartitions;
+    for (final List<AllocatedExecutor> executors : Lists.partition(executorList, partitionSize)) {
+      partitions.add(new Partition(executors, numConcurrentJobs));
+    }
+  }
+
+  private void scheduleJob(final JobEntity jobEntity) {
     if (partitions.isEmpty()) {
       waitingJobs.add(jobEntity);
       LOG.log(Level.INFO, "Wait for schedule. JobId: {0}", jobEntity.getJobId());
-      return true;
+      return;
     }
 
-    final List<AllocatedExecutor> partition = partitions.poll();
-    jobIdToExecutors.put(jobEntity.getJobId(), partition);
+    final Partition partition = partitions.poll();
+    jobIdToPartition.put(jobEntity.getJobId(), partition);
 
     LOG.log(Level.INFO, "Schedule job. JobId: {0}", jobEntity.getJobId());
-    jobDispatcher.executeJob(jobEntity, partition);
-    return true;
+    partition.executeJob(jobEntity);
+    if (partition.isAvailable()) {
+      partitions.add(partition);
+    }
   }
 
   @Override
   public synchronized void onJobFinish(final JobEntity jobEntity) {
-    final List<AllocatedExecutor> releasedPartition = jobIdToExecutors.remove(jobEntity.getJobId());
+    final Partition releasedPartition = jobIdToPartition.remove(jobEntity.getJobId());
     partitions.add(releasedPartition);
 
     if (!waitingJobs.isEmpty()) {
       final JobEntity nextJob = waitingJobs.poll();
-      final List<AllocatedExecutor> partition = partitions.poll();
-      jobIdToExecutors.put(jobEntity.getJobId(), partition);
-
-      LOG.log(Level.INFO, "Schedule job. JobId: {0}", jobEntity.getJobId());
-      jobDispatcher.executeJob(nextJob, releasedPartition);
+      scheduleJob(nextJob);
     }
   }
 

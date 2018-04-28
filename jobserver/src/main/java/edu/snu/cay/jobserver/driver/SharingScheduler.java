@@ -36,7 +36,7 @@ public final class SharingScheduler implements JobScheduler {
   private final Queue<JobEntity> waitingJobs = new LinkedList<>();
 
   @Inject
-  private SharingScheduler(@Parameter(Parameters.DegreeOfParallelism.class) final int concurrency,
+  private SharingScheduler(@Parameter(Parameters.NumPartitions.class) final int concurrency,
                            final ResourcePool resourcePool,
                            final JobDispatcher jobDispatcher) {
     this.concurrency = concurrency;
