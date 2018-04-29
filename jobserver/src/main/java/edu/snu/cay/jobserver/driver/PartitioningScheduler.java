@@ -64,7 +64,7 @@ public final class PartitioningScheduler implements JobScheduler {
 
     synchronized void executeJob(final JobEntity jobEntity) {
       this.runningJobs.add(jobEntity.getJobId());
-      jobDispatcher.executeJob(jobEntity, executors);
+      jobDispatcher.executeJob(jobEntity, new ArrayList<>(executors));
     }
 
     synchronized boolean isAvailable() {
