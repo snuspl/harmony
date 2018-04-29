@@ -63,27 +63,24 @@ final class JobDispatcher {
       final Pair<List<List<AllocatedExecutor>>, List<AllocatedTable>> executorGroupsToTables =
           jobEntity.setupExecutorsAndTables(executors);
 
-      try {
-        final JobMaster jobMaster = jobEntity.getJobMaster();
-        jobServerDriverFuture.get().registerJobMaster(jobEntity.getJobId(), jobMaster);
-        globalTaskUnitSchedulerFuture.get().onJobStart(jobEntity.getJobId(), executors.size());
+      final JobMaster jobMaster = jobEntity.getJobMaster();
+      jobServerDriverFuture.get().registerJobMaster(jobEntity.getJobId(), jobMaster);
+      globalTaskUnitSchedulerFuture.get().onJobStart(jobEntity.getJobId(), executors.size());
 
-        sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
-        jobMaster.start(executorGroupsToTables.getLeft(), executorGroupsToTables.getRight());
+      sendMessageToClient(String.format("Start executing a job. JobId: %s", jobEntity.getJobId()));
+      jobMaster.start(executorGroupsToTables.getLeft(), executorGroupsToTables.getRight());
 
-      } finally {
-        sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
-        executorGroupsToTables.getRight().forEach(table -> {
-          try {
-            table.drop().get();
-          } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-          }
-        });
-        globalTaskUnitSchedulerFuture.get().onJobFinish(jobEntity.getJobId());
-        jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
-        jobSchedulerFuture.get().onJobFinish(jobEntity);
-      }
+      sendMessageToClient(String.format("Job execution has been finished. JobId: %s", jobEntity.getJobId()));
+      executorGroupsToTables.getRight().forEach(table -> {
+        try {
+          table.drop().get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+      });
+      globalTaskUnitSchedulerFuture.get().onJobFinish(jobEntity.getJobId());
+      jobServerDriverFuture.get().deregisterJobMaster(jobEntity.getJobId());
+      jobSchedulerFuture.get().onJobFinish(jobEntity);
     });
   }
 
