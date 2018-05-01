@@ -30,7 +30,6 @@ import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -41,7 +40,6 @@ import java.util.logging.Logger;
  */
 public final class WorkerTasklet<K, V> implements Tasklet {
   private static final Logger LOG = Logger.getLogger(WorkerTasklet.class.getName());
-  public static final String TASKLET_ID = "WorkerTasklet";
 
   private final String taskletId;
   private final int startingEpoch;
@@ -51,7 +49,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   private final MiniBatchBarrier miniBatchBarrier;
   private final TrainingDataProvider<K, V> trainingDataProvider;
   private final ModelAccessor modelAccessor;
-  private final TestDataProvider<V> testDataProvider;
   private final Trainer<K, V> trainer;
   private final MetricCollector metricCollector;
 
@@ -76,7 +73,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
                         final MiniBatchBarrier miniBatchBarrier,
                         final TrainingDataProvider<K, V> trainingDataProvider,
                         final ModelAccessor modelAccessor,
-                        final TestDataProvider<V> testDataProvider,
                         final Trainer<K, V> trainer,
                         final MetricCollector metricCollector) {
     this.taskletId = taskletId;
@@ -87,7 +83,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
     this.miniBatchBarrier = miniBatchBarrier;
     this.trainingDataProvider = trainingDataProvider;
     this.modelAccessor = modelAccessor;
-    this.testDataProvider = testDataProvider;
     this.trainer = trainer;
     this.metricCollector = metricCollector;
 
@@ -100,9 +95,6 @@ public final class WorkerTasklet<K, V> implements Tasklet {
   @Override
   public void run() throws Exception {
     LOG.log(Level.INFO, "{0} starting from epoch {1}", new Object[]{taskletId, startingEpoch});
-
-    final List<V> testData = testDataProvider.getTestData();
-    LOG.log(Level.INFO, "Test data set size: {0}", testData.size());
 
     trainer.initGlobalSettings();
 

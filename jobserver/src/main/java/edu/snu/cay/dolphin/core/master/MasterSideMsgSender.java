@@ -16,7 +16,7 @@
 package edu.snu.cay.dolphin.core.master;
 
 import edu.snu.cay.dolphin.MiniBatchControlMsg;
-import edu.snu.cay.dolphin.core.worker.WorkerTasklet;
+import edu.snu.cay.dolphin.core.worker.ModelEvaluationTasklet;
 import edu.snu.cay.jobserver.JobLogger;
 import edu.snu.cay.dolphin.DolphinMsg;
 import edu.snu.cay.dolphin.ModelEvalAnsMsg;
@@ -102,7 +102,8 @@ final class MasterSideMsgSender {
         .build();
 
     try {
-      etMasterFuture.get().getExecutor(workerId).getRunningTasklet(jobId + "-" + WorkerTasklet.TASKLET_ID)
+      etMasterFuture.get().getExecutor(workerId)
+          .getRunningTasklet(jobId + "-" + ModelEvaluationTasklet.class.getSimpleName())
           .send(AvroUtils.toBytes(msg, DolphinMsg.class));
     } catch (NetworkException | ExecutorNotExistException e) {
       jobLogger.log(Level.INFO, String.format("Fail to send ModelEvalAns msg to worker %s.", workerId), e);

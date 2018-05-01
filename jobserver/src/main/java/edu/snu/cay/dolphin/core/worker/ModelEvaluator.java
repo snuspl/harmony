@@ -66,10 +66,25 @@ public final class ModelEvaluator {
     this.testDataProvider = testDataProvider;
   }
 
+  void evaluateCurrModel() {
+    final Collection trainingData = trainingDataProvider.getEpochData();
+    final List testData;
+    try {
+      testData = testDataProvider.getTestData();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    LOG.log(Level.INFO, "Evaluate the current model");
+
+    final Map<CharSequence, Double> objValue = trainer.evaluateModel(trainingData, testData);
+    jobLogger.log(Level.INFO, "ObjValue: {0}", objValue);
+  }
+
   /**
    * Evaluate all checkpointed models.
    */
-  void evaluate() {
+  void evaluatePrevModels() {
     askMasterToPrepare(); // prepare input table
     final Collection trainingData = trainingDataProvider.getEpochData();
     final List testData;
