@@ -15,7 +15,9 @@
  */
 package edu.snu.cay.dolphin.core.worker;
 
+import edu.snu.cay.dolphin.DolphinParameters;
 import edu.snu.cay.services.et.evaluator.api.Tasklet;
+import org.apache.reef.tang.annotations.Parameter;
 
 import javax.inject.Inject;
 import java.util.logging.Logger;
@@ -26,17 +28,25 @@ import java.util.logging.Logger;
 public final class ModelEvaluationTasklet implements Tasklet {
   private static final Logger LOG = Logger.getLogger(ModelEvaluationTasklet.class.getName());
 
+  private final boolean modelEvaluation;
+
   private final ModelEvaluator modelEvaluator;
 
   @Inject
-  private ModelEvaluationTasklet(final ModelEvaluator modelEvaluator) {
+  private ModelEvaluationTasklet(@Parameter(DolphinParameters.ModelEvaluation.class) final boolean modelEvaluation,
+                                 final ModelEvaluator modelEvaluator) {
+    this.modelEvaluation = modelEvaluation;
     this.modelEvaluator = modelEvaluator;
   }
 
   @Override
   public void run() throws Exception {
-    // evaluate all check-pointed models
-    modelEvaluator.evaluate();
+    if (modelEvaluation) {
+      modelEvaluator.evaluateCurrModel();
+    } else {
+      // evaluate all check-points of trained models
+      modelEvaluator.evaluatePrevModels();
+    }
   }
 
   @Override

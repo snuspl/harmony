@@ -66,6 +66,7 @@ public final class DolphinMaster {
   private final String jobId;
 
   private final boolean offlineModelEval; // whether to perform model evaluation offline or online
+  private final boolean modelEvaluation;
   private final String modelTableId;
   private final String inputTableId;
   private final String localModelTableId;
@@ -84,6 +85,7 @@ public final class DolphinMaster {
                         @Parameter(InputTableId.class) final String inputTableId,
                         @Parameter(LocalModelTableId.class) final String localModelTableId,
                         @Parameter(OfflineModelEvaluation.class) final boolean offlineModelEval,
+                        @Parameter(ModelEvaluation.class) final boolean modelEvaluation,
                         @Parameter(ServerMetricFlushPeriodMs.class) final long serverMetricFlushPeriodMs,
                         @Parameter(ETDolphinLauncher.SerializedWorkerConf.class) final String serializedWorkerConf)
       throws IOException, InjectionException {
@@ -100,11 +102,12 @@ public final class DolphinMaster {
     this.localModelTableId = localModelTableId;
     this.workerConf = confSerializer.fromString(serializedWorkerConf);
     this.offlineModelEval = offlineModelEval;
+    this.modelEvaluation = modelEvaluation;
   }
 
   public TaskletConfiguration getWorkerTaskletConf() {
     return TaskletConfiguration.newBuilder()
-        .setId(jobId + "-" + WorkerTasklet.TASKLET_ID)
+        .setId(jobId + "-" + WorkerTasklet.class.getSimpleName())
         .setTaskletClass(WorkerTasklet.class)
         .setTaskletMsgHandlerClass(WorkerSideMsgHandler.class)
         .setUserParamConf(Configurations.merge(
@@ -115,13 +118,14 @@ public final class DolphinMaster {
                 .bindNamedParameter(InputTableId.class, inputTableId)
                 .bindNamedParameter(LocalModelTableId.class, localModelTableId)
                 .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
+                .bindNamedParameter(ModelEvaluation.class, Boolean.toString(modelEvaluation))
                 .build(),
             workerConf)).build();
   }
 
   public TaskletConfiguration getWorkerTaskletConf(final Class<? extends Tasklet> taskletClass) {
     return TaskletConfiguration.newBuilder()
-        .setId(jobId + "-" + WorkerTasklet.TASKLET_ID)
+        .setId(jobId + "-" + taskletClass.getSimpleName())
         .setTaskletClass(taskletClass)
         .setTaskletMsgHandlerClass(WorkerSideMsgHandler.class)
         .setUserParamConf(Configurations.merge(
@@ -132,6 +136,7 @@ public final class DolphinMaster {
                 .bindNamedParameter(InputTableId.class, inputTableId)
                 .bindNamedParameter(LocalModelTableId.class, localModelTableId)
                 .bindNamedParameter(OfflineModelEvaluation.class, Boolean.toString(offlineModelEval))
+                .bindNamedParameter(ModelEvaluation.class, Boolean.toString(modelEvaluation))
                 .build(),
             workerConf))
         .build();
@@ -168,7 +173,6 @@ public final class DolphinMaster {
   /**
    * Start running a job with given executors and tables.
    * It returns after checking the result of tasks.
-   * TODO #1175: In multi-job mode, each dolphin master will use given tables
    */
   public void start(final List<AllocatedExecutor> servers, final List<AllocatedExecutor> workers,
                     final AllocatedTable modelTable, final AllocatedTable trainingDataTable) {

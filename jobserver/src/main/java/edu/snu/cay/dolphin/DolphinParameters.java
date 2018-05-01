@@ -214,6 +214,11 @@ public final class DolphinParameters {
     }
   }
 
+  @NamedParameter(doc = "Whether to evaluate the trained model or train a new model.",
+      short_name = "model_eval", default_value = "false")
+  public final class ModelEvaluation implements Name<Boolean> {
+  }
+
   @NamedParameter(doc = "Whether to evaluate a trained model in offline or online.",
       short_name = "offline_model_eval", default_value = "false")
   public final class OfflineModelEvaluation implements Name<Boolean> {
