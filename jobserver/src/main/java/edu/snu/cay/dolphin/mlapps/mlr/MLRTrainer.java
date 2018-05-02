@@ -448,7 +448,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
         final int finalThreadIdx = threadIdx;
         executor.submit(() -> {
           final int startIdx = numClassesPerThread * finalThreadIdx;
-          final int endIdx = startIdx + numClassRemainders + (numClassRemainders > finalThreadIdx ? 1 : 0);
+          final int endIdx = finalThreadIdx == numTrainerThreads - 1 ? startIdx + numClassRemainders : numClasses;
 
           for (int classIndex = startIdx; classIndex < endIdx; classIndex++) {
             final Vector perClassParams = params[classIndex];
