@@ -29,8 +29,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * because blocks can move to other executors after return.
  */
 final class LocalKeyGenerator {
-  private final OwnershipCache ownershipCache;
   private final OrderingBasedBlockPartitioner orderingBasedBlockPartitioner;
+  private final OwnershipCache ownershipCache;
+
+  private int blockIdIndexer = 0;
 
   private final Map<Integer, AtomicLong> blockKeyCounters = new ConcurrentHashMap<>();
 
@@ -50,9 +52,11 @@ final class LocalKeyGenerator {
    * @return a map between block id and a list of keys that belong to this block
    * @throws KeyGenerationException when the number of keys in one block has exceeded its limit
    */
-  Map<Integer, List<Long>> getBlockToKeys(final int numKeys) throws KeyGenerationException {
+  synchronized Map<Integer, List<Long>> getBlockToKeys(final int numKeys) throws KeyGenerationException {
     // obtain blockToKeySpace info
     final Map<Integer, Pair<Long, Long>> blockToKeySpace = new HashMap<>();
+
+    // assume that ownership status never change
     final List<Integer> localBlockIds = ownershipCache.getCurrentLocalBlockIds();
     localBlockIds.forEach(blockId ->
         blockToKeySpace.put(blockId, orderingBasedBlockPartitioner.getKeySpace(blockId)));
@@ -65,7 +69,10 @@ final class LocalKeyGenerator {
 
     final Map<Integer, List<Long>> blockIdToKeyListMap = new HashMap<>();
 
-    for (final int blockId : blockToKeySpace.keySet()) {
+    for (int i = 0; i < localBlockIds.size(); i++, blockIdIndexer++) {
+      final int blockIdx = blockIdIndexer % localBlockIds.size();
+      final int blockId = localBlockIds.get(blockIdx);
+
       final List<Long> keys = new ArrayList<>(numKeysPerBlock);
       blockIdToKeyListMap.put(blockId, keys);
 
@@ -81,12 +88,17 @@ final class LocalKeyGenerator {
         numKeysToAllocate = numKeysPerBlock;
       }
 
+      // next allocation will start from this block
+      if (numKeysToAllocate == 0) {
+        break;
+      }
+
       blockKeyCounters.putIfAbsent(blockId, new AtomicLong());
 
       final long numUsedKeys = blockKeyCounters.get(blockId).getAndAdd(numKeysToAllocate);
 
       // though we may delegate an overflow to other blocks that have space, let's just throw exception
-      if (maxKey - minKey + 1 < numKeysToAllocate - numUsedKeys) {
+      if (maxKey - minKey + 1 - numUsedKeys < numKeysToAllocate) {
         throw new KeyGenerationException("The number of keys in one block has exceeded its limit.");
       }
 
