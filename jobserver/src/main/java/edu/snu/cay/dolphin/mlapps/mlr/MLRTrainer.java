@@ -159,7 +159,7 @@ final class MLRTrainer implements Trainer<Long, MLRData> {
       }
     }
 
-    this.keyToGradientMap = new HashMap<>(numClasses * numPartitionsPerClass);
+    this.keyToGradientMap = new ConcurrentHashMap<>(numClasses * numPartitionsPerClass);
 
     LOG.log(Level.INFO, "Number of Trainer threads = {0}", this.numTrainerThreads);
     LOG.log(Level.INFO, "Step size = {0}", stepSize);
