@@ -34,7 +34,7 @@ public final class LocalTaskUnitScheduler {
   private static final Logger LOG = Logger.getLogger(LocalTaskUnitScheduler.class.getName());
 
   private final Semaphore cpuSemaphore = new Semaphore(1);
-  private final Semaphore netSemaphore = new Semaphore(1);
+  private final Semaphore netSemaphore = new Semaphore(2);
 
   private final BlockingQueue<Pair<TaskUnitInfo, CountDownLatch>> cpuReadyQueue = new LinkedBlockingQueue<>();
   private final BlockingQueue<Pair<TaskUnitInfo, CountDownLatch>> netReadyQueue = new LinkedBlockingQueue<>();
