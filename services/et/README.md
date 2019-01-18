@@ -1,10 +1,8 @@
 # Elastic Tables
 
-**Elastic Tables**(*working title*) is a distributed computing framework that provides elastic management for resources and in-memory data with Table abstraction.
+**Elastic Tables** is a distributed storage abstraction that provides elastic management of data.
 
 ## Requirements
 
 * Java 8 JDK
 * [Apache Maven](https://maven.apache.org/) 3.3 or newer
-* Latest [REEF](https://reef.apache.org/) snapshot
-* Latest CAY snapshot
